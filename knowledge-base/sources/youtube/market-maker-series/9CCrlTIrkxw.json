@@ -1,0 +1,3012 @@
+{
+  "videoId": "9CCrlTIrkxw",
+  "language": "en",
+  "segments": [
+    {
+      "text": "okay folks welcome back",
+      "start": 10.06,
+      "duration": 4
+    },
+    {
+      "text": "this teachings cannot be specifically",
+      "start": 11.99,
+      "duration": 5.96
+    },
+    {
+      "text": "dealing with secrets of swing trading",
+      "start": 14.06,
+      "duration": 3.89
+    },
+    {
+      "text": "all right swing trading okay the points",
+      "start": 22.09,
+      "duration": 6.189
+    },
+    {
+      "text": "of focus in this module okay I'm going",
+      "start": 25.16,
+      "duration": 4.65
+    },
+    {
+      "text": "to teach you how to map buy conditions",
+      "start": 28.279,
+      "duration": 4.021
+    },
+    {
+      "text": "and implementing the optimal trade entry",
+      "start": 29.81,
+      "duration": 5.97
+    },
+    {
+      "text": "and we teaching you how to map sell",
+      "start": 32.3,
+      "duration": 5.73
+    },
+    {
+      "text": "conditions and implement the optimal",
+      "start": 35.78,
+      "duration": 8.369
+    },
+    {
+      "text": "trade entry okay folks we're looking at",
+      "start": 38.03,
+      "duration": 8.79
+    },
+    {
+      "text": "the Aussie dollar this is a daily chart",
+      "start": 44.149,
+      "duration": 4.771
+    },
+    {
+      "text": "and I'm going to be using this currency",
+      "start": 46.82,
+      "duration": 5.97
+    },
+    {
+      "text": "pair this works on all currency pairs",
+      "start": 48.92,
+      "duration": 8.569
+    },
+    {
+      "text": "all markets all asset classes as well so",
+      "start": 52.79,
+      "duration": 8.28
+    },
+    {
+      "text": "before we get into it I think one of the",
+      "start": 57.489,
+      "duration": 7.151
+    },
+    {
+      "text": "most repeating questions I get by way of",
+      "start": 61.07,
+      "duration": 5.03
+    },
+    {
+      "text": "folks that are follow me on Twitter",
+      "start": 64.64,
+      "duration": 6.33
+    },
+    {
+      "text": "Facebook and on YouTube is they need to",
+      "start": 66.1,
+      "duration": 6.25
+    },
+    {
+      "text": "know where they feel they need to know",
+      "start": 70.97,
+      "duration": 4.32
+    },
+    {
+      "text": "the daily bias you know what should i do",
+      "start": 72.35,
+      "duration": 6.42
+    },
+    {
+      "text": "today if I just knew ICT if I just knew",
+      "start": 75.29,
+      "duration": 6.03
+    },
+    {
+      "text": "what the bias is gonna be tomorrow I",
+      "start": 78.77,
+      "duration": 5.73
+    },
+    {
+      "text": "knew I would be speed profitable in my",
+      "start": 81.32,
+      "duration": 4.89
+    },
+    {
+      "text": "demo account I knew I'd see the positive",
+      "start": 84.5,
+      "duration": 7.11
+    },
+    {
+      "text": "return in my time and while there's",
+      "start": 86.21,
+      "duration": 7.74
+    },
+    {
+      "text": "several things that we can do to arrive",
+      "start": 91.61,
+      "duration": 6
+    },
+    {
+      "text": "at daily bias in my mentorship I teach",
+      "start": 93.95,
+      "duration": 5.97
+    },
+    {
+      "text": "institutional order flow in great detail",
+      "start": 97.61,
+      "duration": 4.29
+    },
+    {
+      "text": "but that's not what I'm teaching you",
+      "start": 99.92,
+      "duration": 3.98
+    },
+    {
+      "text": "here but I will give you a real quick",
+      "start": 101.9,
+      "duration": 6.12
+    },
+    {
+      "text": "approach that it's not going to be as",
+      "start": 103.9,
+      "duration": 7.57
+    },
+    {
+      "text": "time-sensitive and by that I mean you",
+      "start": 108.02,
+      "duration": 5.13
+    },
+    {
+      "text": "won't catch the turning points with it",
+      "start": 111.47,
+      "duration": 4.41
+    },
+    {
+      "text": "okay you're gonna get the meat of the",
+      "start": 113.15,
+      "duration": 5.249
+    },
+    {
+      "text": "moves and that's all that you're really",
+      "start": 115.88,
+      "duration": 5.04
+    },
+    {
+      "text": "required to find really they do very",
+      "start": 118.399,
+      "duration": 5.61
+    },
+    {
+      "text": "well there's other tools and concepts",
+      "start": 120.92,
+      "duration": 5.75
+    },
+    {
+      "text": "that we can use to warn ourselves",
+      "start": 124.009,
+      "duration": 5.81
+    },
+    {
+      "text": "potential turning points of the",
+      "start": 126.67,
+      "duration": 6.579
+    },
+    {
+      "text": "likelihood of a reversal but before we",
+      "start": 129.819,
+      "duration": 5.471
+    },
+    {
+      "text": "get into it I just wanted to make",
+      "start": 133.249,
+      "duration": 3.99
+    },
+    {
+      "text": "of that because I knew there's a lot of",
+      "start": 135.29,
+      "duration": 5.399
+    },
+    {
+      "text": "folks that see my videos and they come",
+      "start": 137.239,
+      "duration": 5.911
+    },
+    {
+      "text": "away with the understanding that you",
+      "start": 140.689,
+      "duration": 3.63
+    },
+    {
+      "text": "have to have the bias every single day",
+      "start": 143.15,
+      "duration": 3.179
+    },
+    {
+      "text": "and you don't you don't need to know",
+      "start": 144.319,
+      "duration": 4.56
+    },
+    {
+      "text": "that you just need to know the few times",
+      "start": 146.329,
+      "duration": 5.22
+    },
+    {
+      "text": "a month or a couple times a week when",
+      "start": 148.879,
+      "duration": 5.61
+    },
+    {
+      "text": "it's really loaded in one direction over",
+      "start": 151.549,
+      "duration": 4.47
+    },
+    {
+      "text": "the other and in trade in those",
+      "start": 154.489,
+      "duration": 3.39
+    },
+    {
+      "text": "conditions and I think if you do that",
+      "start": 156.019,
+      "duration": 4.08
+    },
+    {
+      "text": "your demo account results we'd be much",
+      "start": 157.879,
+      "duration": 5.181
+    },
+    {
+      "text": "more encouraging and your time spent",
+      "start": 160.099,
+      "duration": 5.51
+    },
+    {
+      "text": "practicing will be a lot more fruitful",
+      "start": 163.06,
+      "duration": 4.959
+    },
+    {
+      "text": "so when we look at price action there's",
+      "start": 165.609,
+      "duration": 4.541
+    },
+    {
+      "text": "a couple things that I want to kind of",
+      "start": 168.019,
+      "duration": 4.44
+    },
+    {
+      "text": "remind you of there are times when the",
+      "start": 170.15,
+      "duration": 5.07
+    },
+    {
+      "text": "market moves in trending environments",
+      "start": 172.459,
+      "duration": 4.741
+    },
+    {
+      "text": "where it moves directionally then the",
+      "start": 175.22,
+      "duration": 3.84
+    },
+    {
+      "text": "market goes into consolidation and then",
+      "start": 177.2,
+      "duration": 4.86
+    },
+    {
+      "text": "it trends again well those two",
+      "start": 179.06,
+      "duration": 6.929
+    },
+    {
+      "text": "conditions are very easy to see if you",
+      "start": 182.06,
+      "duration": 5.789
+    },
+    {
+      "text": "just relax and try not to over",
+      "start": 185.989,
+      "duration": 6.301
+    },
+    {
+      "text": "complicate it now there are specific",
+      "start": 187.849,
+      "duration": 7.23
+    },
+    {
+      "text": "rules in finding key support resistance",
+      "start": 192.29,
+      "duration": 4.619
+    },
+    {
+      "text": "levels and we mentioned a few of those",
+      "start": 195.079,
+      "duration": 4.62
+    },
+    {
+      "text": "in the higher time frame concepts video",
+      "start": 196.909,
+      "duration": 4.351
+    },
+    {
+      "text": "that you should have watched prior to",
+      "start": 199.699,
+      "duration": 6.29
+    },
+    {
+      "text": "this one but I believe that it's easier",
+      "start": 201.26,
+      "duration": 8.819
+    },
+    {
+      "text": "for me to teach you how to find the bias",
+      "start": 205.989,
+      "duration": 7
+    },
+    {
+      "text": "by teaching you how to stay on the side",
+      "start": 210.079,
+      "duration": 6.78
+    },
+    {
+      "text": "of higher timeframe momentum okay and",
+      "start": 212.989,
+      "duration": 8.22
+    },
+    {
+      "text": "while I am NOT a supporter if you will",
+      "start": 216.859,
+      "duration": 7.071
+    },
+    {
+      "text": "of indicators it's gonna seem",
+      "start": 221.209,
+      "duration": 5.761
+    },
+    {
+      "text": "sacrilegious for me the foot an",
+      "start": 223.93,
+      "duration": 4.839
+    },
+    {
+      "text": "indicator on my chart like you're gonna",
+      "start": 226.97,
+      "duration": 4.229
+    },
+    {
+      "text": "see tonight but I think it's a good",
+      "start": 228.769,
+      "duration": 3.03
+    },
+    {
+      "text": "crutch",
+      "start": 231.199,
+      "duration": 5.1
+    },
+    {
+      "text": "it helps traders find their way if you",
+      "start": 231.799,
+      "duration": 9.481
+    },
+    {
+      "text": "will on a directionally I guess trending",
+      "start": 236.299,
+      "duration": 8.25
+    },
+    {
+      "text": "environment so the way I use this as I",
+      "start": 241.28,
+      "duration": 5.76
+    },
+    {
+      "text": "incorporate two moving averages okay now",
+      "start": 244.549,
+      "duration": 4.61
+    },
+    {
+      "text": "I don't require using a moving average",
+      "start": 247.04,
+      "duration": 6.509
+    },
+    {
+      "text": "but I think the smoothing effect of the",
+      "start": 249.159,
+      "duration": 6.64
+    },
+    {
+      "text": "moving average over price action on a",
+      "start": 253.549,
+      "duration": 4.851
+    },
+    {
+      "text": "higher time frame daily chart will help",
+      "start": 255.799,
+      "duration": 5.521
+    },
+    {
+      "text": "at least build an understanding of where",
+      "start": 258.4,
+      "duration": 5.62
+    },
+    {
+      "text": "you should really quickly just look at",
+      "start": 261.32,
+      "duration": 3.839
+    },
+    {
+      "text": "your chart real quick with the moving",
+      "start": 264.02,
+      "duration": 3.149
+    },
+    {
+      "text": "averages it'll help you stay on one side",
+      "start": 265.159,
+      "duration": 3.871
+    },
+    {
+      "text": "of the marketplace now the benefit of it",
+      "start": 267.169,
+      "duration": 4.471
+    },
+    {
+      "text": "is only arrived at by having it on a",
+      "start": 269.03,
+      "duration": 5.19
+    },
+    {
+      "text": "daily chart as soon as you start",
+      "start": 271.64,
+      "duration": 3.9
+    },
+    {
+      "text": "applying this to like a five minute or",
+      "start": 274.22,
+      "duration": 4.32
+    },
+    {
+      "text": "one minute chart the reliability really",
+      "start": 275.54,
+      "duration": 5.37
+    },
+    {
+      "text": "goes out the window in my opinion so why",
+      "start": 278.54,
+      "duration": 4.77
+    },
+    {
+      "text": "is there any significance of a moving",
+      "start": 280.91,
+      "duration": 4.08
+    },
+    {
+      "text": "average or two moving averages placed on",
+      "start": 283.31,
+      "duration": 3.63
+    },
+    {
+      "text": "a daily chart well because the daily",
+      "start": 284.99,
+      "duration": 4.23
+    },
+    {
+      "text": "chart really is the most widely followed",
+      "start": 286.94,
+      "duration": 5.67
+    },
+    {
+      "text": "chart in the banking sector so when",
+      "start": 289.22,
+      "duration": 6.45
+    },
+    {
+      "text": "we're looking for an intermediate term",
+      "start": 292.61,
+      "duration": 6.3
+    },
+    {
+      "text": "level of momentum it's going to be found",
+      "start": 295.67,
+      "duration": 5.1
+    },
+    {
+      "text": "on the daily chart so if we want to be",
+      "start": 298.91,
+      "duration": 4.02
+    },
+    {
+      "text": "trading in an immediate term momentum",
+      "start": 300.77,
+      "duration": 5.37
+    },
+    {
+      "text": "and it's exactly where the banks are we",
+      "start": 302.93,
+      "duration": 5.91
+    },
+    {
+      "text": "looking at that time frame then it goes",
+      "start": 306.14,
+      "duration": 4.05
+    },
+    {
+      "text": "without saying that there should be a",
+      "start": 308.84,
+      "duration": 5.76
+    },
+    {
+      "text": "high probability of well confluence with",
+      "start": 310.19,
+      "duration": 6.57
+    },
+    {
+      "text": "that idea and what we see in price",
+      "start": 314.6,
+      "duration": 6.09
+    },
+    {
+      "text": "action so I've taught in the past the 9",
+      "start": 316.76,
+      "duration": 7.35
+    },
+    {
+      "text": "and 18 in an 18 and 40 but I'm gonna",
+      "start": 320.69,
+      "duration": 5.75
+    },
+    {
+      "text": "give you one that's really simple",
+      "start": 324.11,
+      "duration": 8.31
+    },
+    {
+      "text": "and it's the 10 and 20 period okay and",
+      "start": 326.44,
+      "duration": 8.65
+    },
+    {
+      "text": "the red line here is going to delineate",
+      "start": 332.42,
+      "duration": 12.36
+    },
+    {
+      "text": "the 20 period okay and the green level",
+      "start": 335.09,
+      "duration": 13.4
+    },
+    {
+      "text": "here is gone to delineate the 10 level",
+      "start": 344.78,
+      "duration": 7.41
+    },
+    {
+      "text": "okay so it's 10 period and a 20-period",
+      "start": 348.49,
+      "duration": 8.53
+    },
+    {
+      "text": "moving average okay and I'll let you see",
+      "start": 352.19,
+      "duration": 8.34
+    },
+    {
+      "text": "what these settings are so that way you",
+      "start": 357.02,
+      "duration": 6.57
+    },
+    {
+      "text": "guys can relax and know what they are",
+      "start": 360.53,
+      "duration": 5.34
+    },
+    {
+      "text": "it's exponential moving average 20",
+      "start": 363.59,
+      "duration": 6.57
+    },
+    {
+      "text": "period on the close and the other one is",
+      "start": 365.87,
+      "duration": 7.58
+    },
+    {
+      "text": "a 10 period exponential on the close",
+      "start": 370.16,
+      "duration": 7.08
+    },
+    {
+      "text": "okay so that way you have everything",
+      "start": 373.45,
+      "duration": 6.67
+    },
+    {
+      "text": "that's on my chart now now on a daily",
+      "start": 377.24,
+      "duration": 4.58
+    },
+    {
+      "text": "chart all we're looking for is",
+      "start": 380.12,
+      "duration": 4.2
+    },
+    {
+      "text": "preferably the market leaving a",
+      "start": 381.82,
+      "duration": 4.72
+    },
+    {
+      "text": "consolidation I think everyone would",
+      "start": 384.32,
+      "duration": 3.75
+    },
+    {
+      "text": "agree that this is a consolidation here",
+      "start": 386.54,
+      "duration": 4.86
+    },
+    {
+      "text": "and price has left the consolidation by",
+      "start": 388.07,
+      "duration": 6.93
+    },
+    {
+      "text": "breaking a swing high here and also we",
+      "start": 391.4,
+      "duration": 5.1
+    },
+    {
+      "text": "have the crossover on the moving average",
+      "start": 395,
+      "duration": 5.04
+    },
+    {
+      "text": "so right there this is what I want you",
+      "start": 396.5,
+      "duration": 4.89
+    },
+    {
+      "text": "to do this is how you map out your",
+      "start": 400.04,
+      "duration": 2.52
+    },
+    {
+      "text": "bullish um",
+      "start": 401.39,
+      "duration": 2.49
+    },
+    {
+      "text": "in this case it's a bullish condition",
+      "start": 402.56,
+      "duration": 3.63
+    },
+    {
+      "text": "and you drag that rectangle all the way",
+      "start": 403.88,
+      "duration": 3.75
+    },
+    {
+      "text": "up until a point of which where it",
+      "start": 406.19,
+      "duration": 5.16
+    },
+    {
+      "text": "crosses below the 20 so in other words",
+      "start": 407.63,
+      "duration": 7.32
+    },
+    {
+      "text": "10 drops down below we can't look for",
+      "start": 411.35,
+      "duration": 6.3
+    },
+    {
+      "text": "any buys in here after this point until",
+      "start": 414.95,
+      "duration": 5.58
+    },
+    {
+      "text": "we see the daily trade back above with",
+      "start": 417.65,
+      "duration": 5.04
+    },
+    {
+      "text": "the 10 period of of the 20 period okay",
+      "start": 420.53,
+      "duration": 4.22
+    },
+    {
+      "text": "it's a real simple little momentum",
+      "start": 422.69,
+      "duration": 5.03
+    },
+    {
+      "text": "filter okay it's not to hang everything",
+      "start": 424.75,
+      "duration": 6.97
+    },
+    {
+      "text": "on it okay but for sake of finding swing",
+      "start": 427.72,
+      "duration": 6.01
+    },
+    {
+      "text": "trades I'm gonna incorporate a couple",
+      "start": 431.72,
+      "duration": 3.449
+    },
+    {
+      "text": "things here and you'll see how fast and",
+      "start": 433.73,
+      "duration": 3.81
+    },
+    {
+      "text": "easy you can get to a bias trading on",
+      "start": 435.169,
+      "duration": 3.841
+    },
+    {
+      "text": "one side of the marketplace only and",
+      "start": 437.54,
+      "duration": 2.82
+    },
+    {
+      "text": "incorporating some of the things I've",
+      "start": 439.01,
+      "duration": 4.05
+    },
+    {
+      "text": "already taught you so we have the bias",
+      "start": 440.36,
+      "duration": 4.98
+    },
+    {
+      "text": "shifting to a bullish condition here",
+      "start": 443.06,
+      "duration": 4.169
+    },
+    {
+      "text": "with the 10 period going over the 20",
+      "start": 445.34,
+      "duration": 3.54
+    },
+    {
+      "text": "period on a daily chart again it's",
+      "start": 447.229,
+      "duration": 3.991
+    },
+    {
+      "text": "important that you only do this on the",
+      "start": 448.88,
+      "duration": 4.08
+    },
+    {
+      "text": "daily chart try not to do this on your 5",
+      "start": 451.22,
+      "duration": 4.23
+    },
+    {
+      "text": "and 15 and 1 minute charts but we have",
+      "start": 452.96,
+      "duration": 4.86
+    },
+    {
+      "text": "this condition we can drop down into an",
+      "start": 455.45,
+      "duration": 4.14
+    },
+    {
+      "text": "hourly chart now why an hourly chart",
+      "start": 457.82,
+      "duration": 4.83
+    },
+    {
+      "text": "hourly chart to me is a real good swing",
+      "start": 459.59,
+      "duration": 4.95
+    },
+    {
+      "text": "trading time frame okay so you'll be",
+      "start": 462.65,
+      "duration": 3.329
+    },
+    {
+      "text": "able to see everything that's important",
+      "start": 464.54,
+      "duration": 5.78
+    },
+    {
+      "text": "from a weekly basis or a daily basis but",
+      "start": 465.979,
+      "duration": 7.741
+    },
+    {
+      "text": "to me 60-minute more swing trading ideal",
+      "start": 470.32,
+      "duration": 5.2
+    },
+    {
+      "text": "scenario so what we're gonna do is we're",
+      "start": 473.72,
+      "duration": 2.67
+    },
+    {
+      "text": "gonna go over here in the lower",
+      "start": 475.52,
+      "duration": 4.61
+    },
+    {
+      "text": "left-hand corner there's a little tiny I",
+      "start": 476.39,
+      "duration": 7.77
+    },
+    {
+      "text": "guess it's a little half triangle you",
+      "start": 480.13,
+      "duration": 6.28
+    },
+    {
+      "text": "drag that over to the beginning of your",
+      "start": 484.16,
+      "duration": 4.56
+    },
+    {
+      "text": "shaded area that you've deleted where",
+      "start": 486.41,
+      "duration": 5.34
+    },
+    {
+      "text": "the 10 crosses over the 20 and we're",
+      "start": 488.72,
+      "duration": 6.87
+    },
+    {
+      "text": "leaving okay a consolidation we have a",
+      "start": 491.75,
+      "duration": 6.69
+    },
+    {
+      "text": "break and market structure here so we",
+      "start": 495.59,
+      "duration": 5.1
+    },
+    {
+      "text": "have potential bullishness and it's",
+      "start": 498.44,
+      "duration": 5.34
+    },
+    {
+      "text": "important the 10 period is pointing",
+      "start": 500.69,
+      "duration": 5.07
+    },
+    {
+      "text": "higher and the 20 period is pointing",
+      "start": 503.78,
+      "duration": 4.109
+    },
+    {
+      "text": "higher and the 10 is opening up and",
+      "start": 505.76,
+      "duration": 4.29
+    },
+    {
+      "text": "spreading away from the 20 okay this is",
+      "start": 507.889,
+      "duration": 4.351
+    },
+    {
+      "text": "called stacking ok so whenever these two",
+      "start": 510.05,
+      "duration": 4.44
+    },
+    {
+      "text": "averages are opening up and pointing up",
+      "start": 512.24,
+      "duration": 5.429
+    },
+    {
+      "text": "its stacking when it's bearish like it",
+      "start": 514.49,
+      "duration": 5.099
+    },
+    {
+      "text": "is over here when the 10 periods below",
+      "start": 517.669,
+      "duration": 3.571
+    },
+    {
+      "text": "the 20 period and it's opening up and",
+      "start": 519.589,
+      "duration": 3.481
+    },
+    {
+      "text": "both are pointing down again it's called",
+      "start": 521.24,
+      "duration": 3.66
+    },
+    {
+      "text": "stacking that's when the conditions are",
+      "start": 523.07,
+      "duration": 5.04
+    },
+    {
+      "text": "optimal ok so we have really strong",
+      "start": 524.9,
+      "duration": 4.68
+    },
+    {
+      "text": "momentum here so now if we drop down",
+      "start": 528.11,
+      "duration": 5.67
+    },
+    {
+      "text": "into a 60-minute chart it'll take us",
+      "start": 529.58,
+      "duration": 6.16
+    },
+    {
+      "text": "immediately down into",
+      "start": 533.78,
+      "duration": 4.21
+    },
+    {
+      "text": "in this shaded point here now here's",
+      "start": 535.74,
+      "duration": 4.349
+    },
+    {
+      "text": "where it's important that you follow",
+      "start": 537.99,
+      "duration": 7.02
+    },
+    {
+      "text": "along with the optimal trade entry once",
+      "start": 540.089,
+      "duration": 9.391
+    },
+    {
+      "text": "we're in this shaded area price has to",
+      "start": 545.01,
+      "duration": 8.97
+    },
+    {
+      "text": "be above the red line and have moved",
+      "start": 549.48,
+      "duration": 7.859
+    },
+    {
+      "text": "away made a swing high after an impulse",
+      "start": 553.98,
+      "duration": 5.25
+    },
+    {
+      "text": "like moving higher so they're no works",
+      "start": 557.339,
+      "duration": 4.531
+    },
+    {
+      "text": "we have to see price moving higher above",
+      "start": 559.23,
+      "duration": 5.76
+    },
+    {
+      "text": "the red line and we're gonna be looking",
+      "start": 561.87,
+      "duration": 4.05
+    },
+    {
+      "text": "for awesome trade entries when it",
+      "start": 564.99,
+      "duration": 4.07
+    },
+    {
+      "text": "reaches back into a previous swing low",
+      "start": 565.92,
+      "duration": 6.57
+    },
+    {
+      "text": "here prices below the red line we cannot",
+      "start": 569.06,
+      "duration": 5.41
+    },
+    {
+      "text": "take anything there so we missed this",
+      "start": 572.49,
+      "duration": 7.59
+    },
+    {
+      "text": "move here which is fine if we look at",
+      "start": 574.47,
+      "duration": 8.07
+    },
+    {
+      "text": "this scenario back here I kind of like",
+      "start": 580.08,
+      "duration": 4.59
+    },
+    {
+      "text": "want to bring this retention here if we",
+      "start": 582.54,
+      "duration": 5.1
+    },
+    {
+      "text": "look at this move up if we drop our fib",
+      "start": 584.67,
+      "duration": 5.49
+    },
+    {
+      "text": "on that I'm going to show you what you",
+      "start": 587.64,
+      "duration": 6.569
+    },
+    {
+      "text": "would have had to sit through if you did",
+      "start": 590.16,
+      "duration": 6.54
+    },
+    {
+      "text": "something like this okay here's your",
+      "start": 594.209,
+      "duration": 5.281
+    },
+    {
+      "text": "swing impulse leg and optimal trade",
+      "start": 596.7,
+      "duration": 4.44
+    },
+    {
+      "text": "entries down here you'd have to sit",
+      "start": 599.49,
+      "duration": 4.74
+    },
+    {
+      "text": "through all of this before finally the",
+      "start": 601.14,
+      "duration": 6.27
+    },
+    {
+      "text": "move takes place okay I don't want you",
+      "start": 604.23,
+      "duration": 6.599
+    },
+    {
+      "text": "doing it even though this is a scenario",
+      "start": 607.41,
+      "duration": 4.679
+    },
+    {
+      "text": "that worked out pretty good and we've",
+      "start": 610.829,
+      "duration": 3.661
+    },
+    {
+      "text": "gotten a symmetrical price swing that's",
+      "start": 612.089,
+      "duration": 4.291
+    },
+    {
+      "text": "not the setups I want you to see or at",
+      "start": 614.49,
+      "duration": 4.53
+    },
+    {
+      "text": "least hunt what I want you to look for",
+      "start": 616.38,
+      "duration": 7.23
+    },
+    {
+      "text": "is when price is above the red 20 period",
+      "start": 619.02,
+      "duration": 7.319
+    },
+    {
+      "text": "and it makes an impulse leg and it comes",
+      "start": 623.61,
+      "duration": 4.68
+    },
+    {
+      "text": "back down to an optimal trade entry too",
+      "start": 626.339,
+      "duration": 4.531
+    },
+    {
+      "text": "long okay we don't have it here I'm",
+      "start": 628.29,
+      "duration": 3.78
+    },
+    {
+      "text": "gonna spare you putting the FIB line",
+      "start": 630.87,
+      "duration": 2.79
+    },
+    {
+      "text": "because this doesn't get down to it and",
+      "start": 632.07,
+      "duration": 3.72
+    },
+    {
+      "text": "price is gone below the red line or",
+      "start": 633.66,
+      "duration": 11.4
+    },
+    {
+      "text": "below the red line here okay and all",
+      "start": 635.79,
+      "duration": 10.08
+    },
+    {
+      "text": "through he",
+      "start": 645.06,
+      "duration": 2.1
+    },
+    {
+      "text": "we're filtering we can't take anything",
+      "start": 645.87,
+      "duration": 5.61
+    },
+    {
+      "text": "here and finally watch what happens we",
+      "start": 647.16,
+      "duration": 8.1
+    },
+    {
+      "text": "start seeing impulse swings and price",
+      "start": 651.48,
+      "duration": 6.24
+    },
+    {
+      "text": "moves away from the red line comes back",
+      "start": 655.26,
+      "duration": 4.68
+    },
+    {
+      "text": "to it but now watch it happens see we",
+      "start": 657.72,
+      "duration": 5.07
+    },
+    {
+      "text": "have the price dip below the 20 but the",
+      "start": 659.94,
+      "duration": 4.86
+    },
+    {
+      "text": "10 has not crossed over so this can",
+      "start": 662.79,
+      "duration": 4.26
+    },
+    {
+      "text": "happen on the one-hour chart",
+      "start": 664.8,
+      "duration": 5.43
+    },
+    {
+      "text": "do not do this when it doesn't on the",
+      "start": 667.05,
+      "duration": 5.36
+    },
+    {
+      "text": "daily chart price has to be above both",
+      "start": 670.23,
+      "duration": 6.66
+    },
+    {
+      "text": "the 20 and 10 but on the 1 our price can",
+      "start": 672.41,
+      "duration": 6.24
+    },
+    {
+      "text": "stab below the red line",
+      "start": 676.89,
+      "duration": 6.36
+    },
+    {
+      "text": "during the retracement only violet when",
+      "start": 678.65,
+      "duration": 6.37
+    },
+    {
+      "text": "the 10 period has not crossed over the",
+      "start": 683.25,
+      "duration": 3.99
+    },
+    {
+      "text": "red though so as soon as this occurs and",
+      "start": 685.02,
+      "duration": 5.16
+    },
+    {
+      "text": "then the 10 period trades below or marks",
+      "start": 687.24,
+      "duration": 5.849
+    },
+    {
+      "text": "below the 20-period moving average if we",
+      "start": 690.18,
+      "duration": 5.01
+    },
+    {
+      "text": "got that cross over we can't take too",
+      "start": 693.089,
+      "duration": 6.471
+    },
+    {
+      "text": "long ok so we'll have the Fibonacci here",
+      "start": 695.19,
+      "duration": 6.39
+    },
+    {
+      "text": "you're probably thinking oh well this",
+      "start": 699.56,
+      "duration": 3.82
+    },
+    {
+      "text": "has been several days now Michael did",
+      "start": 701.58,
+      "duration": 3.33
+    },
+    {
+      "text": "you know this isn't giving me a treat",
+      "start": 703.38,
+      "duration": 3.06
+    },
+    {
+      "text": "every single day right this is just that",
+      "start": 704.91,
+      "duration": 4.29
+    },
+    {
+      "text": "one pair so we have a nun post leg here",
+      "start": 706.44,
+      "duration": 5.01
+    },
+    {
+      "text": "comes back down into optimal trade entry",
+      "start": 709.2,
+      "duration": 4.5
+    },
+    {
+      "text": "perfect delivery and we have symmetrical",
+      "start": 711.45,
+      "duration": 4.8
+    },
+    {
+      "text": "price swing here ok really nice little",
+      "start": 713.7,
+      "duration": 5.46
+    },
+    {
+      "text": "swing trade here and it started on the",
+      "start": 716.25,
+      "duration": 6.63
+    },
+    {
+      "text": "26 and is on to 27th so basically one",
+      "start": 719.16,
+      "duration": 6.09
+    },
+    {
+      "text": "day of a hold for a nice little swing",
+      "start": 722.88,
+      "duration": 7.079
+    },
+    {
+      "text": "trade putting the trade on here at the",
+      "start": 725.25,
+      "duration": 11.3
+    },
+    {
+      "text": "round 75 70 and getting out at",
+      "start": 729.959,
+      "duration": 11.281
+    },
+    {
+      "text": "approximately 76 10 so not a bad little",
+      "start": 736.55,
+      "duration": 7.33
+    },
+    {
+      "text": "move you can leave a small portion one",
+      "start": 741.24,
+      "duration": 5.07
+    },
+    {
+      "text": "as it is a swing trade and leave your",
+      "start": 743.88,
+      "duration": 5.67
+    },
+    {
+      "text": "stop down here ok do not trail your",
+      "start": 746.31,
+      "duration": 5.49
+    },
+    {
+      "text": "stop-loss you want to be taking partials",
+      "start": 749.55,
+      "duration": 5.159
+    },
+    {
+      "text": "ok and then once we get a run away from",
+      "start": 751.8,
+      "duration": 5.07
+    },
+    {
+      "text": "a consolidation like we have here price",
+      "start": 754.709,
+      "duration": 3.891
+    },
+    {
+      "text": "has to show a willingness to want to run",
+      "start": 756.87,
+      "duration": 4.35
+    },
+    {
+      "text": "me remember inside this green shaded",
+      "start": 758.6,
+      "duration": 5.14
+    },
+    {
+      "text": "area we are bullish on the daily so",
+      "start": 761.22,
+      "duration": 4.35
+    },
+    {
+      "text": "we're anticipating this type of a move",
+      "start": 763.74,
+      "duration": 4.08
+    },
+    {
+      "text": "here we want to see it you're starting",
+      "start": 765.57,
+      "duration": 5.25
+    },
+    {
+      "text": "to run higher so when consolidations",
+      "start": 767.82,
+      "duration": 4.83
+    },
+    {
+      "text": "occur if we take that trade we want to",
+      "start": 770.82,
+      "duration": 3.509
+    },
+    {
+      "text": "leave our stop loss in until we start",
+      "start": 772.65,
+      "duration": 5.04
+    },
+    {
+      "text": "leaving the consolidation ok and then we",
+      "start": 774.329,
+      "duration": 5.251
+    },
+    {
+      "text": "can start trailing it up behind",
+      "start": 777.69,
+      "duration": 5.01
+    },
+    {
+      "text": "to swing lows from market action and",
+      "start": 779.58,
+      "duration": 5.67
+    },
+    {
+      "text": "I'll explain that in a second but taking",
+      "start": 782.7,
+      "duration": 4.44
+    },
+    {
+      "text": "a portion off here and then letting the",
+      "start": 785.25,
+      "duration": 4.61
+    },
+    {
+      "text": "remainder go you can see how we have",
+      "start": 787.14,
+      "duration": 4.86
+    },
+    {
+      "text": "really nice extensions up here at to",
+      "start": 789.86,
+      "duration": 8.92
+    },
+    {
+      "text": "500% and then price drops down in here",
+      "start": 792,
+      "duration": 8.16
+    },
+    {
+      "text": "so we can't take a new set up here but",
+      "start": 798.78,
+      "duration": 4.73
+    },
+    {
+      "text": "we can hold on to the one we did in here",
+      "start": 800.16,
+      "duration": 6.09
+    },
+    {
+      "text": "price starts to run and now we have",
+      "start": 803.51,
+      "duration": 5.97
+    },
+    {
+      "text": "another one right in here we have a",
+      "start": 806.25,
+      "duration": 7.2
+    },
+    {
+      "text": "potential swing up and down and I'll",
+      "start": 809.48,
+      "duration": 12.33
+    },
+    {
+      "text": "show you that one right here right there",
+      "start": 813.45,
+      "duration": 10.8
+    },
+    {
+      "text": "it's just the highest body closed or",
+      "start": 821.81,
+      "duration": 5.14
+    },
+    {
+      "text": "open trades back down into it not over",
+      "start": 824.25,
+      "duration": 4.23
+    },
+    {
+      "text": "shoots it a little bit okay because we",
+      "start": 826.95,
+      "duration": 3.36
+    },
+    {
+      "text": "are on a one-hour chart and I'm not",
+      "start": 828.48,
+      "duration": 4.83
+    },
+    {
+      "text": "using the wick but your stop-loss would",
+      "start": 830.31,
+      "duration": 7.89
+    },
+    {
+      "text": "be below here it came close but",
+      "start": 833.31,
+      "duration": 6.18
+    },
+    {
+      "text": "ultimately it spreads that gives us",
+      "start": 838.2,
+      "duration": 3.96
+    },
+    {
+      "text": "symmetrical price swing price drops down",
+      "start": 839.49,
+      "duration": 4.08
+    },
+    {
+      "text": "below the red line we can't take",
+      "start": 842.16,
+      "duration": 3.69
+    },
+    {
+      "text": "anything in here no long trades in here",
+      "start": 843.57,
+      "duration": 4.56
+    },
+    {
+      "text": "got to stay trimmer inside this green",
+      "start": 845.85,
+      "duration": 4.68
+    },
+    {
+      "text": "shaded area we're looking for Long's so",
+      "start": 848.13,
+      "duration": 4.71
+    },
+    {
+      "text": "wild prices below the red line we can't",
+      "start": 850.53,
+      "duration": 4.2
+    },
+    {
+      "text": "take anything along we had to wait until",
+      "start": 852.84,
+      "duration": 4.8
+    },
+    {
+      "text": "price gets back above the red line as it",
+      "start": 854.73,
+      "duration": 5.16
+    },
+    {
+      "text": "does here but then price goes below the",
+      "start": 857.64,
+      "duration": 5.25
+    },
+    {
+      "text": "red line and so does the 10 period so we",
+      "start": 859.89,
+      "duration": 4.8
+    },
+    {
+      "text": "can't take this scenario at the wait",
+      "start": 862.89,
+      "duration": 5.85
+    },
+    {
+      "text": "price trades higher disc back down not",
+      "start": 864.69,
+      "duration": 5.55
+    },
+    {
+      "text": "deep enough for optimal trade entry in",
+      "start": 868.74,
+      "duration": 2.67
+    },
+    {
+      "text": "here so nothing would have happened",
+      "start": 870.24,
+      "duration": 5.93
+    },
+    {
+      "text": "there price here gives us a nice little",
+      "start": 871.41,
+      "duration": 6.99
+    },
+    {
+      "text": "so now I gotta get this in how early",
+      "start": 876.17,
+      "duration": 5.92
+    },
+    {
+      "text": "chart so there's a little bit more pips",
+      "start": 878.4,
+      "duration": 5.25
+    },
+    {
+      "text": "in this if you look at a 15 minute time",
+      "start": 882.09,
+      "duration": 4.08
+    },
+    {
+      "text": "frame or a 5 minute time frame so here",
+      "start": 883.65,
+      "duration": 6.78
+    },
+    {
+      "text": "we have our impulse leg retraces optimal",
+      "start": 886.17,
+      "duration": 6.84
+    },
+    {
+      "text": "trade entry symmetrical price swing",
+      "start": 890.43,
+      "duration": 5.7
+    },
+    {
+      "text": "leave a little portion on why because we",
+      "start": 893.01,
+      "duration": 4.8
+    },
+    {
+      "text": "are inside the green shaded area and",
+      "start": 896.13,
+      "duration": 3.12
+    },
+    {
+      "text": "we're anticipating that daily chart to",
+      "start": 897.81,
+      "duration": 4.08
+    },
+    {
+      "text": "expand on the up side so this is an area",
+      "start": 899.25,
+      "duration": 4.02
+    },
+    {
+      "text": "where we could have taken another long",
+      "start": 901.89,
+      "duration": 3.84
+    },
+    {
+      "text": "or we could have added more from our",
+      "start": 903.27,
+      "duration": 5
+    },
+    {
+      "text": "original position",
+      "start": 905.73,
+      "duration": 2.54
+    },
+    {
+      "text": "okay and we can't use this one even",
+      "start": 912.9,
+      "duration": 8.14
+    },
+    {
+      "text": "though we have equal highs let you know",
+      "start": 918.94,
+      "duration": 5.13
+    },
+    {
+      "text": "about this would be a run on that week",
+      "start": 921.04,
+      "duration": 5.82
+    },
+    {
+      "text": "if we could do a fib from this level",
+      "start": 924.07,
+      "duration": 4.71
+    },
+    {
+      "text": "here up to this Bobby",
+      "start": 926.86,
+      "duration": 3.63
+    },
+    {
+      "text": "you'll see it is actually a perfect",
+      "start": 928.78,
+      "duration": 3.63
+    },
+    {
+      "text": "optimal trade entry but the filtering",
+      "start": 930.49,
+      "duration": 4.41
+    },
+    {
+      "text": "process we can't take it",
+      "start": 932.41,
+      "duration": 7.53
+    },
+    {
+      "text": "so nothing there nothing there",
+      "start": 934.9,
+      "duration": 6.54
+    },
+    {
+      "text": "price trades below the red line can't",
+      "start": 939.94,
+      "duration": 5.9
+    },
+    {
+      "text": "trade there can't trade there and price",
+      "start": 941.44,
+      "duration": 9.12
+    },
+    {
+      "text": "meanders sideways in here we get above",
+      "start": 945.84,
+      "duration": 6.43
+    },
+    {
+      "text": "it but doesn't give us anything to trade",
+      "start": 950.56,
+      "duration": 4.95
+    },
+    {
+      "text": "there and we're still below the red line",
+      "start": 952.27,
+      "duration": 5.46
+    },
+    {
+      "text": "can't take any trades there long or",
+      "start": 955.51,
+      "duration": 3.75
+    },
+    {
+      "text": "below the red line we're still filtering",
+      "start": 957.73,
+      "duration": 2.88
+    },
+    {
+      "text": "nothing this is something you can go",
+      "start": 959.26,
+      "duration": 3.81
+    },
+    {
+      "text": "through all the majors with okay or if",
+      "start": 960.61,
+      "duration": 3.78
+    },
+    {
+      "text": "you'd like to trade exotics which I",
+      "start": 963.07,
+      "duration": 2.61
+    },
+    {
+      "text": "don't like to do that in the States",
+      "start": 964.39,
+      "duration": 3.84
+    },
+    {
+      "text": "I don't get to tax treatment for",
+      "start": 965.68,
+      "duration": 3.78
+    },
+    {
+      "text": "anything that's not coupled with a",
+      "start": 968.23,
+      "duration": 5.34
+    },
+    {
+      "text": "dollar so you guys can look for every",
+      "start": 969.46,
+      "duration": 5.64
+    },
+    {
+      "text": "tool every pair out there twenty-eight",
+      "start": 973.57,
+      "duration": 3.42
+    },
+    {
+      "text": "pairs you can go through this and find a",
+      "start": 975.1,
+      "duration": 3.45
+    },
+    {
+      "text": "scenario where a swing trade will be",
+      "start": 976.99,
+      "duration": 5.31
+    },
+    {
+      "text": "forming with this insight and again",
+      "start": 978.55,
+      "duration": 5.25
+    },
+    {
+      "text": "we're inside the green shaded area so",
+      "start": 982.3,
+      "duration": 3.48
+    },
+    {
+      "text": "there's nothing we can do in terms of a",
+      "start": 983.8,
+      "duration": 4.88
+    },
+    {
+      "text": "buy while prices below the red line and",
+      "start": 985.78,
+      "duration": 7.23
+    },
+    {
+      "text": "we miss all that okay now we go back out",
+      "start": 988.68,
+      "duration": 5.98
+    },
+    {
+      "text": "to a daily timeframe so we had a couple",
+      "start": 993.01,
+      "duration": 5.22
+    },
+    {
+      "text": "in there for swing trades not in every",
+      "start": 994.66,
+      "duration": 7.05
+    },
+    {
+      "text": "day trade okay and this whole movement",
+      "start": 998.23,
+      "duration": 8.64
+    },
+    {
+      "text": "here was about about a month in two",
+      "start": 1001.71,
+      "duration": 7.65
+    },
+    {
+      "text": "weeks or so so we had a couple swing",
+      "start": 1006.87,
+      "duration": 3.96
+    },
+    {
+      "text": "trade now swing trades are about that",
+      "start": 1009.36,
+      "duration": 3.54
+    },
+    {
+      "text": "length they're not every day trades you",
+      "start": 1010.83,
+      "duration": 3.15
+    },
+    {
+      "text": "want to put them one and hold on for",
+      "start": 1012.9,
+      "duration": 3.93
+    },
+    {
+      "text": "them for a while now we're look at when",
+      "start": 1013.98,
+      "duration": 5.01
+    },
+    {
+      "text": "we look for mapping out a bearish",
+      "start": 1016.83,
+      "duration": 7.08
+    },
+    {
+      "text": "condition okay and we're gonna look for",
+      "start": 1018.99,
+      "duration": 8.07
+    },
+    {
+      "text": "the crossover here and we're gonna drag",
+      "start": 1023.91,
+      "duration": 4.86
+    },
+    {
+      "text": "that down until we get across over on",
+      "start": 1027.06,
+      "duration": 4.47
+    },
+    {
+      "text": "the upside and I'm going to change this",
+      "start": 1028.77,
+      "duration": 5.67
+    },
+    {
+      "text": "to red so that way everything inside",
+      "start": 1031.53,
+      "duration": 5.309
+    },
+    {
+      "text": "this red shaded area we will keep our",
+      "start": 1034.44,
+      "duration": 4.08
+    },
+    {
+      "text": "focus on only looking for optimal trade",
+      "start": 1036.839,
+      "duration": 3.841
+    },
+    {
+      "text": "entry cells when prices move that's a",
+      "start": 1038.52,
+      "duration": 4.669
+    },
+    {
+      "text": "little too much nails in it",
+      "start": 1040.68,
+      "duration": 6.84
+    },
+    {
+      "text": "let's do this let's go - yeah that's a",
+      "start": 1043.189,
+      "duration": 7.001
+    },
+    {
+      "text": "little bit friendlier on the eye all",
+      "start": 1047.52,
+      "duration": 6.36
+    },
+    {
+      "text": "right and again we're in consolidation",
+      "start": 1050.19,
+      "duration": 6.479
+    },
+    {
+      "text": "so we want to see price breakdown",
+      "start": 1053.88,
+      "duration": 4.289
+    },
+    {
+      "text": "on the moving average yes and show",
+      "start": 1056.669,
+      "duration": 3.181
+    },
+    {
+      "text": "willingness to want to leave the",
+      "start": 1058.169,
+      "duration": 3.931
+    },
+    {
+      "text": "consolidation that happens here comes",
+      "start": 1059.85,
+      "duration": 4.35
+    },
+    {
+      "text": "back up retest the consolidation and now",
+      "start": 1062.1,
+      "duration": 4.11
+    },
+    {
+      "text": "we can start to look for optimal trade",
+      "start": 1064.2,
+      "duration": 3.479
+    },
+    {
+      "text": "entries right in here so we're going to",
+      "start": 1066.21,
+      "duration": 4.949
+    },
+    {
+      "text": "take this little toggle thing here put",
+      "start": 1067.679,
+      "duration": 6.271
+    },
+    {
+      "text": "it and I'll start here so you guys can",
+      "start": 1071.159,
+      "duration": 4.62
+    },
+    {
+      "text": "see the contrast but really when we get",
+      "start": 1073.95,
+      "duration": 3.81
+    },
+    {
+      "text": "about the 11th of October that's when it",
+      "start": 1075.779,
+      "duration": 3.691
+    },
+    {
+      "text": "would be an ideal scenario because every",
+      "start": 1077.76,
+      "duration": 2.73
+    },
+    {
+      "text": "time you leave a consolidation you want",
+      "start": 1079.47,
+      "duration": 2.67
+    },
+    {
+      "text": "to wait for it to potentially retrace",
+      "start": 1080.49,
+      "duration": 3.929
+    },
+    {
+      "text": "back to it much like we saw it here it",
+      "start": 1082.14,
+      "duration": 3.93
+    },
+    {
+      "text": "left the consolidating back down",
+      "start": 1084.419,
+      "duration": 4.411
+    },
+    {
+      "text": "potentially retesting the point which it",
+      "start": 1086.07,
+      "duration": 5.04
+    },
+    {
+      "text": "left and then we can start seeing it",
+      "start": 1088.83,
+      "duration": 5.91
+    },
+    {
+      "text": "really start to tear up higher so we're",
+      "start": 1091.11,
+      "duration": 4.949
+    },
+    {
+      "text": "going to drop down to an hourly chart",
+      "start": 1094.74,
+      "duration": 6.299
+    },
+    {
+      "text": "now and we can start looking for price",
+      "start": 1096.059,
+      "duration": 8.281
+    },
+    {
+      "text": "staying below the red line and giving",
+      "start": 1101.039,
+      "duration": 6.601
+    },
+    {
+      "text": "optimal trade entry cells okay now",
+      "start": 1104.34,
+      "duration": 4.65
+    },
+    {
+      "text": "notice we can spike through it that's",
+      "start": 1107.64,
+      "duration": 3.11
+    },
+    {
+      "text": "like we just said before when the buys",
+      "start": 1108.99,
+      "duration": 4.71
+    },
+    {
+      "text": "but if we go through it the 10 period",
+      "start": 1110.75,
+      "duration": 4.63
+    },
+    {
+      "text": "has to remain below it - cannot cross",
+      "start": 1113.7,
+      "duration": 4.02
+    },
+    {
+      "text": "over so we have an optimal trade entry",
+      "start": 1115.38,
+      "duration": 5.1
+    },
+    {
+      "text": "cell here and again this is not an",
+      "start": 1117.72,
+      "duration": 7.439
+    },
+    {
+      "text": "everyday setup your swings so we have",
+      "start": 1120.48,
+      "duration": 7.34
+    },
+    {
+      "text": "Athol trade entry here body the body",
+      "start": 1125.159,
+      "duration": 6.721
+    },
+    {
+      "text": "cell tends below 220 you're both",
+      "start": 1127.82,
+      "duration": 6.25
+    },
+    {
+      "text": "stacking this is a sell at optimal trade",
+      "start": 1131.88,
+      "duration": 6.169
+    },
+    {
+      "text": "entry and target 2 is hit beautifully",
+      "start": 1134.07,
+      "duration": 6.54
+    },
+    {
+      "text": "you can leave a little portion on with a",
+      "start": 1138.049,
+      "duration": 5.771
+    },
+    {
+      "text": "stop up here but swing trading you do",
+      "start": 1140.61,
+      "duration": 4.86
+    },
+    {
+      "text": "not want to aggressively trail your stop",
+      "start": 1143.82,
+      "duration": 2.88
+    },
+    {
+      "text": "you want to be taking partials and",
+      "start": 1145.47,
+      "duration": 4.589
+    },
+    {
+      "text": "looking to add new positions when you",
+      "start": 1146.7,
+      "duration": 9.51
+    },
+    {
+      "text": "can here's another scenario okay no",
+      "start": 1150.059,
+      "duration": 9.561
+    },
+    {
+      "text": "can't do it we're above the red line",
+      "start": 1156.21,
+      "duration": 3.41
+    },
+    {
+      "text": "or about the red line in here can't do",
+      "start": 1163.75,
+      "duration": 4.14
+    },
+    {
+      "text": "that",
+      "start": 1167.38,
+      "duration": 2.88
+    },
+    {
+      "text": "now we're above it for a long period of",
+      "start": 1167.89,
+      "duration": 4.019
+    },
+    {
+      "text": "time so we can't do anything that we get",
+      "start": 1170.26,
+      "duration": 5.34
+    },
+    {
+      "text": "back below it does it here price stays",
+      "start": 1171.909,
+      "duration": 6.9
+    },
+    {
+      "text": "below it we climb back above it again",
+      "start": 1175.6,
+      "duration": 5.25
+    },
+    {
+      "text": "we're in a Cell scenario so we have to",
+      "start": 1178.809,
+      "duration": 4.61
+    },
+    {
+      "text": "wait for price to get below both the red",
+      "start": 1180.85,
+      "duration": 7.37
+    },
+    {
+      "text": "line and see the 10 and 20 period",
+      "start": 1183.419,
+      "duration": 11.471
+    },
+    {
+      "text": "exponential stacking lower and we have",
+      "start": 1188.22,
+      "duration": 7.9
+    },
+    {
+      "text": "something in here let's take a look at",
+      "start": 1194.89,
+      "duration": 7.769
+    },
+    {
+      "text": "that we have a swing high here see that",
+      "start": 1196.12,
+      "duration": 9.27
+    },
+    {
+      "text": "I have an indecisive candle here and a",
+      "start": 1202.659,
+      "duration": 4.38
+    },
+    {
+      "text": "bullish up close camera on the lower",
+      "start": 1205.39,
+      "duration": 4.47
+    },
+    {
+      "text": "closed candle here the highest portion",
+      "start": 1207.039,
+      "duration": 4.471
+    },
+    {
+      "text": "is the body on this one we're going to",
+      "start": 1209.86,
+      "duration": 6.03
+    },
+    {
+      "text": "drag it down to this lowest body here",
+      "start": 1211.51,
+      "duration": 6.96
+    },
+    {
+      "text": "trade out the optimal trade entry and we",
+      "start": 1215.89,
+      "duration": 4.769
+    },
+    {
+      "text": "get target one fall short of target two",
+      "start": 1218.47,
+      "duration": 4.5
+    },
+    {
+      "text": "that does give us an awesome tray - you",
+      "start": 1220.659,
+      "duration": 9.27
+    },
+    {
+      "text": "just sell there and the next ideal one",
+      "start": 1222.97,
+      "duration": 9.72
+    },
+    {
+      "text": "is here we have price below both moving",
+      "start": 1229.929,
+      "duration": 4.98
+    },
+    {
+      "text": "averages they're stacking here it does",
+      "start": 1232.69,
+      "duration": 3.599
+    },
+    {
+      "text": "punch up through it but we don't get the",
+      "start": 1234.909,
+      "duration": 6.411
+    },
+    {
+      "text": "tent ready to cross over and we have to",
+      "start": 1236.289,
+      "duration": 5.031
+    },
+    {
+      "text": "put that down right on the lowest body",
+      "start": 1245.97,
+      "duration": 6.43
+    },
+    {
+      "text": "portion here comes up Nick's the to 62%",
+      "start": 1249.19,
+      "duration": 6.39
+    },
+    {
+      "text": "tradesman level there's a cell we could",
+      "start": 1252.4,
+      "duration": 6.389
+    },
+    {
+      "text": "look for target one target two",
+      "start": 1255.58,
+      "duration": 6.829
+    },
+    {
+      "text": "symmetrical to our extension eventually",
+      "start": 1258.789,
+      "duration": 5.52
+    },
+    {
+      "text": "here's another one in here",
+      "start": 1262.409,
+      "duration": 6.311
+    },
+    {
+      "text": "or price trades back up to here but we",
+      "start": 1264.309,
+      "duration": 6.421
+    },
+    {
+      "text": "cross over so we probably not going to",
+      "start": 1268.72,
+      "duration": 3.87
+    },
+    {
+      "text": "take that one you have to hold on to the",
+      "start": 1270.73,
+      "duration": 6.09
+    },
+    {
+      "text": "original one we had up here and another",
+      "start": 1272.59,
+      "duration": 6.93
+    },
+    {
+      "text": "one now we don't get up high enough to",
+      "start": 1276.82,
+      "duration": 7.32
+    },
+    {
+      "text": "get into that one yeah it didn't retrace",
+      "start": 1279.52,
+      "duration": 7.38
+    },
+    {
+      "text": "deep enough there so we would still be",
+      "start": 1284.14,
+      "duration": 4.86
+    },
+    {
+      "text": "holding some portion on that we entered",
+      "start": 1286.9,
+      "duration": 5.13
+    },
+    {
+      "text": "back there and we don't have anything",
+      "start": 1289,
+      "duration": 5.78
+    },
+    {
+      "text": "here",
+      "start": 1292.03,
+      "duration": 2.75
+    },
+    {
+      "text": "back above the red line starts",
+      "start": 1297.42,
+      "duration": 8.19
+    },
+    {
+      "text": "consolidating and then we have price",
+      "start": 1299.48,
+      "duration": 10.18
+    },
+    {
+      "text": "really not doing too much so I'll take",
+      "start": 1305.61,
+      "duration": 5.61
+    },
+    {
+      "text": "that Avinash you know so it's clear to",
+      "start": 1309.66,
+      "duration": 6.03
+    },
+    {
+      "text": "see what's going on and price starts to",
+      "start": 1311.22,
+      "duration": 7.56
+    },
+    {
+      "text": "move back in our favor here again we're",
+      "start": 1315.69,
+      "duration": 4.95
+    },
+    {
+      "text": "waiting for these scenarios this is what",
+      "start": 1318.78,
+      "duration": 3.66
+    },
+    {
+      "text": "you look for you wait for these types of",
+      "start": 1320.64,
+      "duration": 9.42
+    },
+    {
+      "text": "setups here so we have both the averages",
+      "start": 1322.44,
+      "duration": 9.72
+    },
+    {
+      "text": "moving lower even though we spike",
+      "start": 1330.06,
+      "duration": 4.71
+    },
+    {
+      "text": "through the red line the ten period has",
+      "start": 1332.16,
+      "duration": 5.31
+    },
+    {
+      "text": "not crossed over to the twenty looking",
+      "start": 1334.77,
+      "duration": 4.77
+    },
+    {
+      "text": "for inside this red shaded area again",
+      "start": 1337.47,
+      "duration": 3.39
+    },
+    {
+      "text": "we're anticipating a daily chart to",
+      "start": 1339.54,
+      "duration": 3.96
+    },
+    {
+      "text": "expands going lower so we put our short",
+      "start": 1340.86,
+      "duration": 5.13
+    },
+    {
+      "text": "on here stop will be above the high here",
+      "start": 1343.5,
+      "duration": 5.67
+    },
+    {
+      "text": "and we can see target one target two",
+      "start": 1345.99,
+      "duration": 5.24
+    },
+    {
+      "text": "symmetrical price swing beautifully hit",
+      "start": 1349.17,
+      "duration": 5.76
+    },
+    {
+      "text": "eventually later on we get to our",
+      "start": 1351.23,
+      "duration": 6.28
+    },
+    {
+      "text": "extension hit we have another scenario",
+      "start": 1354.93,
+      "duration": 5.37
+    },
+    {
+      "text": "now even though we spiked through the",
+      "start": 1357.51,
+      "duration": 4.17
+    },
+    {
+      "text": "tenth area has not crossed over the",
+      "start": 1360.3,
+      "duration": 3.6
+    },
+    {
+      "text": "twenty period so everything is still",
+      "start": 1361.68,
+      "duration": 6.41
+    },
+    {
+      "text": "valid here else we'll trade entries sell",
+      "start": 1363.9,
+      "duration": 8.43
+    },
+    {
+      "text": "target one hit target to hit eventually",
+      "start": 1368.09,
+      "duration": 5.97
+    },
+    {
+      "text": "symmetrical price swing as hit as well",
+      "start": 1372.33,
+      "duration": 5.52
+    },
+    {
+      "text": "and we can hold on to a portion now we",
+      "start": 1374.06,
+      "duration": 6.07
+    },
+    {
+      "text": "have a consolidation when price leaves",
+      "start": 1377.85,
+      "duration": 4.41
+    },
+    {
+      "text": "the consolidation then and only then do",
+      "start": 1380.13,
+      "duration": 3.24
+    },
+    {
+      "text": "we consider looking to lower our",
+      "start": 1382.26,
+      "duration": 5.49
+    },
+    {
+      "text": "protective stop-loss and I'll just bring",
+      "start": 1383.37,
+      "duration": 6.72
+    },
+    {
+      "text": "that over here a little bit and we don't",
+      "start": 1387.75,
+      "duration": 6.78
+    },
+    {
+      "text": "go anything more towards an auto trade",
+      "start": 1390.09,
+      "duration": 7.26
+    },
+    {
+      "text": "entry until we start seeing price back",
+      "start": 1394.53,
+      "duration": 4.65
+    },
+    {
+      "text": "above the red line and now we're",
+      "start": 1397.35,
+      "duration": 5.43
+    },
+    {
+      "text": "consolidating again I think we're",
+      "start": 1399.18,
+      "duration": 5.85
+    },
+    {
+      "text": "probably going to run in a cell",
+      "start": 1402.78,
+      "duration": 7.26
+    },
+    {
+      "text": "condition before long yeah we have",
+      "start": 1405.03,
+      "duration": 8.48
+    },
+    {
+      "text": "another one in here here's a nice one",
+      "start": 1410.04,
+      "duration": 6.93
+    },
+    {
+      "text": "have a nice swing high here price trades",
+      "start": 1413.51,
+      "duration": 8.34
+    },
+    {
+      "text": "down right to here",
+      "start": 1416.97,
+      "duration": 6.52
+    },
+    {
+      "text": "awesome trade entry",
+      "start": 1421.85,
+      "duration": 3.8
+    },
+    {
+      "text": "sell and we can see symmetrical price",
+      "start": 1423.49,
+      "duration": 3.93
+    },
+    {
+      "text": "swing boom really nice little swing",
+      "start": 1425.65,
+      "duration": 4.65
+    },
+    {
+      "text": "trade their price trades above the red",
+      "start": 1427.42,
+      "duration": 4.74
+    },
+    {
+      "text": "line so we were on the sidelines until",
+      "start": 1430.3,
+      "duration": 4.56
+    },
+    {
+      "text": "we get back in sync again right in here",
+      "start": 1432.16,
+      "duration": 7.68
+    },
+    {
+      "text": "another scenario so what this does is",
+      "start": 1434.86,
+      "duration": 7.23
+    },
+    {
+      "text": "actually gives us a context to work",
+      "start": 1439.84,
+      "duration": 4.65
+    },
+    {
+      "text": "within and then we use this body here",
+      "start": 1442.09,
+      "duration": 7.23
+    },
+    {
+      "text": "and we're going to drag it down to the",
+      "start": 1444.49,
+      "duration": 6.75
+    },
+    {
+      "text": "lowest open or close which is right",
+      "start": 1449.32,
+      "duration": 3.84
+    },
+    {
+      "text": "there I'll still trade actually right",
+      "start": 1451.24,
+      "duration": 5.069
+    },
+    {
+      "text": "there sell beautiful expense expansion",
+      "start": 1453.16,
+      "duration": 4.92
+    },
+    {
+      "text": "down to set metrical pricing and 200",
+      "start": 1456.309,
+      "duration": 4.861
+    },
+    {
+      "text": "extension and doesn't give us much more",
+      "start": 1458.08,
+      "duration": 5.28
+    },
+    {
+      "text": "below that before we started going",
+      "start": 1461.17,
+      "duration": 3.81
+    },
+    {
+      "text": "consolidating and back above the red",
+      "start": 1463.36,
+      "duration": 3.39
+    },
+    {
+      "text": "line so we're neutral and then",
+      "start": 1464.98,
+      "duration": 4.02
+    },
+    {
+      "text": "everything has reversed until recent",
+      "start": 1466.75,
+      "duration": 4.8
+    },
+    {
+      "text": "current price action now so you can see",
+      "start": 1469,
+      "duration": 4.29
+    },
+    {
+      "text": "it gives you a context to work within",
+      "start": 1471.55,
+      "duration": 4.14
+    },
+    {
+      "text": "now it's not perfect nothing's guide",
+      "start": 1473.29,
+      "duration": 4.17
+    },
+    {
+      "text": "we're going to be perfect but it gives",
+      "start": 1475.69,
+      "duration": 4.53
+    },
+    {
+      "text": "you a quick down and dirty way to apply",
+      "start": 1477.46,
+      "duration": 4.8
+    },
+    {
+      "text": "to simple moving averages of twenty and",
+      "start": 1480.22,
+      "duration": 4.32
+    },
+    {
+      "text": "ten period exponential moving average on",
+      "start": 1482.26,
+      "duration": 5.07
+    },
+    {
+      "text": "a daily and on an hourly chart and it",
+      "start": 1484.54,
+      "duration": 4.98
+    },
+    {
+      "text": "frames your context of what side of the",
+      "start": 1487.33,
+      "duration": 3.54
+    },
+    {
+      "text": "marketplace should you be waiting to",
+      "start": 1489.52,
+      "duration": 4.68
+    },
+    {
+      "text": "only trade on now go back through here",
+      "start": 1490.87,
+      "duration": 4.86
+    },
+    {
+      "text": "and you'll see obviously there's a few",
+      "start": 1494.2,
+      "duration": 5.64
+    },
+    {
+      "text": "times where if we are in this",
+      "start": 1495.73,
+      "duration": 6.21
+    },
+    {
+      "text": "environment where we're in the red",
+      "start": 1499.84,
+      "duration": 4.589
+    },
+    {
+      "text": "shaded area the ideal scenario would be",
+      "start": 1501.94,
+      "duration": 5.94
+    },
+    {
+      "text": "to be looking for selling short but",
+      "start": 1504.429,
+      "duration": 5.851
+    },
+    {
+      "text": "right away you can look for like this",
+      "start": 1507.88,
+      "duration": 4.61
+    },
+    {
+      "text": "here this scenario this is a buy here",
+      "start": 1510.28,
+      "duration": 6.81
+    },
+    {
+      "text": "and that runs up what would this be if",
+      "start": 1512.49,
+      "duration": 6.76
+    },
+    {
+      "text": "it's not a swing trade what could this",
+      "start": 1517.09,
+      "duration": 3.839
+    },
+    {
+      "text": "potentially be I'll just throw this in",
+      "start": 1519.25,
+      "duration": 3.96
+    },
+    {
+      "text": "here as a bonus this could be a day",
+      "start": 1520.929,
+      "duration": 4.291
+    },
+    {
+      "text": "trade okay you could be a day trader",
+      "start": 1523.21,
+      "duration": 3.9
+    },
+    {
+      "text": "here because it's counter what you're",
+      "start": 1525.22,
+      "duration": 3.48
+    },
+    {
+      "text": "waiting for for a swing trade going",
+      "start": 1527.11,
+      "duration": 3.69
+    },
+    {
+      "text": "short if you see these scenarios well",
+      "start": 1528.7,
+      "duration": 3.78
+    },
+    {
+      "text": "you can take a long why because you have",
+      "start": 1530.8,
+      "duration": 2.64
+    },
+    {
+      "text": "equal highs here",
+      "start": 1532.48,
+      "duration": 2.91
+    },
+    {
+      "text": "okay what's what's the high on this",
+      "start": 1533.44,
+      "duration": 4.619
+    },
+    {
+      "text": "candle seventy eight thirty so what's",
+      "start": 1535.39,
+      "duration": 5.94
+    },
+    {
+      "text": "twenty cuts above that 7850 okay so we",
+      "start": 1538.059,
+      "duration": 11.431
+    },
+    {
+      "text": "could look for an area to go up to there",
+      "start": 1541.33,
+      "duration": 9.9
+    },
+    {
+      "text": "okay so",
+      "start": 1549.49,
+      "duration": 3.6
+    },
+    {
+      "text": "we could be a buyer here and take our",
+      "start": 1551.23,
+      "duration": 4.92
+    },
+    {
+      "text": "profits here okay or we can look over",
+      "start": 1553.09,
+      "duration": 5.28
+    },
+    {
+      "text": "here and take a portion of it off here",
+      "start": 1556.15,
+      "duration": 3.87
+    },
+    {
+      "text": "and leave a small portion alone to see",
+      "start": 1558.37,
+      "duration": 3.33
+    },
+    {
+      "text": "if we can get it run about 10 20 50 baht",
+      "start": 1560.02,
+      "duration": 5.039
+    },
+    {
+      "text": "as a day traders mindset okay that type",
+      "start": 1561.7,
+      "duration": 6.12
+    },
+    {
+      "text": "of thing so we can do things both",
+      "start": 1565.059,
+      "duration": 4.5
+    },
+    {
+      "text": "directions even though we have a sell",
+      "start": 1567.82,
+      "duration": 4.17
+    },
+    {
+      "text": "model okay or sell program they'll be",
+      "start": 1569.559,
+      "duration": 4.321
+    },
+    {
+      "text": "working inside of with this red shaded",
+      "start": 1571.99,
+      "duration": 4.65
+    },
+    {
+      "text": "area relative to the daily chart okay",
+      "start": 1573.88,
+      "duration": 5.25
+    },
+    {
+      "text": "doesn't negate you not being able to do",
+      "start": 1576.64,
+      "duration": 3.9
+    },
+    {
+      "text": "anything it just means it for a swing",
+      "start": 1579.13,
+      "duration": 3.63
+    },
+    {
+      "text": "trade you have to wait for price to give",
+      "start": 1580.54,
+      "duration": 6.21
+    },
+    {
+      "text": "you scenarios as we outlined for",
+      "start": 1582.76,
+      "duration": 5.159
+    },
+    {
+      "text": "bearishness like here",
+      "start": 1586.75,
+      "duration": 4.5
+    },
+    {
+      "text": "okay optimal trade entry so and then",
+      "start": 1587.919,
+      "duration": 6.091
+    },
+    {
+      "text": "leaving portions on a lot longer than",
+      "start": 1591.25,
+      "duration": 4.44
+    },
+    {
+      "text": "you would with day trades so in other",
+      "start": 1594.01,
+      "duration": 3.659
+    },
+    {
+      "text": "words for a swing trade you can take off",
+      "start": 1595.69,
+      "duration": 4.05
+    },
+    {
+      "text": "like 50% leave the remaining 50% on",
+      "start": 1597.669,
+      "duration": 3.871
+    },
+    {
+      "text": "whereas a day trade if it goes to your",
+      "start": 1599.74,
+      "duration": 3.24
+    },
+    {
+      "text": "first objective you want to think about",
+      "start": 1601.54,
+      "duration": 3.93
+    },
+    {
+      "text": "75 to 80% off and leave a small portion",
+      "start": 1602.98,
+      "duration": 6.54
+    },
+    {
+      "text": "on because it's a day trade so I think",
+      "start": 1605.47,
+      "duration": 5.16
+    },
+    {
+      "text": "this is going to pretty much to do this",
+      "start": 1609.52,
+      "duration": 3.659
+    },
+    {
+      "text": "video here and watch it a couple times",
+      "start": 1610.63,
+      "duration": 4.919
+    },
+    {
+      "text": "you'll see it's not complicated it's not",
+      "start": 1613.179,
+      "duration": 5.041
+    },
+    {
+      "text": "you know acrobatics it's very simple",
+      "start": 1615.549,
+      "duration": 6.151
+    },
+    {
+      "text": "approach to using a retail tool a moving",
+      "start": 1618.22,
+      "duration": 4.89
+    },
+    {
+      "text": "average but underneath is tell you",
+      "start": 1621.7,
+      "duration": 3.33
+    },
+    {
+      "text": "moving averages are actually used on",
+      "start": 1623.11,
+      "duration": 3.569
+    },
+    {
+      "text": "large funds and they're trend-following",
+      "start": 1625.03,
+      "duration": 4.11
+    },
+    {
+      "text": "in nature so the reason why I'm telling",
+      "start": 1626.679,
+      "duration": 5.161
+    },
+    {
+      "text": "you how to use it like this because this",
+      "start": 1629.14,
+      "duration": 4.11
+    },
+    {
+      "text": "is very close to one of the long-term",
+      "start": 1631.84,
+      "duration": 4.41
+    },
+    {
+      "text": "trending models that a large fun uses",
+      "start": 1633.25,
+      "duration": 9.09
+    },
+    {
+      "text": "that I know of okay folks hopefully you",
+      "start": 1636.25,
+      "duration": 7.44
+    },
+    {
+      "text": "enjoyed this presentation if you'd like",
+      "start": 1642.34,
+      "duration": 2.969
+    },
+    {
+      "text": "to find more you can visit my website at",
+      "start": 1643.69,
+      "duration": 4.79
+    },
+    {
+      "text": "the inner circle trader.com",
+      "start": 1645.309,
+      "duration": 3.171
+    }
+  ],
+  "fullText": "okay folks welcome back this teachings cannot be specifically dealing with secrets of swing trading all right swing trading okay the points of focus in this module okay I'm going to teach you how to map buy conditions and implementing the optimal trade entry and we teaching you how to map sell conditions and implement the optimal trade entry okay folks we're looking at the Aussie dollar this is a daily chart and I'm going to be using this currency pair this works on all currency pairs all markets all asset classes as well so before we get into it I think one of the most repeating questions I get by way of folks that are follow me on Twitter Facebook and on YouTube is they need to know where they feel they need to know the daily bias you know what should i do today if I just knew ICT if I just knew what the bias is gonna be tomorrow I knew I would be speed profitable in my demo account I knew I'd see the positive return in my time and while there's several things that we can do to arrive at daily bias in my mentorship I teach institutional order flow in great detail but that's not what I'm teaching you here but I will give you a real quick approach that it's not going to be as time-sensitive and by that I mean you won't catch the turning points with it okay you're gonna get the meat of the moves and that's all that you're really required to find really they do very well there's other tools and concepts that we can use to warn ourselves potential turning points of the likelihood of a reversal but before we get into it I just wanted to make of that because I knew there's a lot of folks that see my videos and they come away with the understanding that you have to have the bias every single day and you don't you don't need to know that you just need to know the few times a month or a couple times a week when it's really loaded in one direction over the other and in trade in those conditions and I think if you do that your demo account results we'd be much more encouraging and your time spent practicing will be a lot more fruitful so when we look at price action there's a couple things that I want to kind of remind you of there are times when the market moves in trending environments where it moves directionally then the market goes into consolidation and then it trends again well those two conditions are very easy to see if you just relax and try not to over complicate it now there are specific rules in finding key support resistance levels and we mentioned a few of those in the higher time frame concepts video that you should have watched prior to this one but I believe that it's easier for me to teach you how to find the bias by teaching you how to stay on the side of higher timeframe momentum okay and while I am NOT a supporter if you will of indicators it's gonna seem sacrilegious for me the foot an indicator on my chart like you're gonna see tonight but I think it's a good crutch it helps traders find their way if you will on a directionally I guess trending environment so the way I use this as I incorporate two moving averages okay now I don't require using a moving average but I think the smoothing effect of the moving average over price action on a higher time frame daily chart will help at least build an understanding of where you should really quickly just look at your chart real quick with the moving averages it'll help you stay on one side of the marketplace now the benefit of it is only arrived at by having it on a daily chart as soon as you start applying this to like a five minute or one minute chart the reliability really goes out the window in my opinion so why is there any significance of a moving average or two moving averages placed on a daily chart well because the daily chart really is the most widely followed chart in the banking sector so when we're looking for an intermediate term level of momentum it's going to be found on the daily chart so if we want to be trading in an immediate term momentum and it's exactly where the banks are we looking at that time frame then it goes without saying that there should be a high probability of well confluence with that idea and what we see in price action so I've taught in the past the 9 and 18 in an 18 and 40 but I'm gonna give you one that's really simple and it's the 10 and 20 period okay and the red line here is going to delineate the 20 period okay and the green level here is gone to delineate the 10 level okay so it's 10 period and a 20-period moving average okay and I'll let you see what these settings are so that way you guys can relax and know what they are it's exponential moving average 20 period on the close and the other one is a 10 period exponential on the close okay so that way you have everything that's on my chart now now on a daily chart all we're looking for is preferably the market leaving a consolidation I think everyone would agree that this is a consolidation here and price has left the consolidation by breaking a swing high here and also we have the crossover on the moving average so right there this is what I want you to do this is how you map out your bullish um in this case it's a bullish condition and you drag that rectangle all the way up until a point of which where it crosses below the 20 so in other words 10 drops down below we can't look for any buys in here after this point until we see the daily trade back above with the 10 period of of the 20 period okay it's a real simple little momentum filter okay it's not to hang everything on it okay but for sake of finding swing trades I'm gonna incorporate a couple things here and you'll see how fast and easy you can get to a bias trading on one side of the marketplace only and incorporating some of the things I've already taught you so we have the bias shifting to a bullish condition here with the 10 period going over the 20 period on a daily chart again it's important that you only do this on the daily chart try not to do this on your 5 and 15 and 1 minute charts but we have this condition we can drop down into an hourly chart now why an hourly chart hourly chart to me is a real good swing trading time frame okay so you'll be able to see everything that's important from a weekly basis or a daily basis but to me 60-minute more swing trading ideal scenario so what we're gonna do is we're gonna go over here in the lower left-hand corner there's a little tiny I guess it's a little half triangle you drag that over to the beginning of your shaded area that you've deleted where the 10 crosses over the 20 and we're leaving okay a consolidation we have a break and market structure here so we have potential bullishness and it's important the 10 period is pointing higher and the 20 period is pointing higher and the 10 is opening up and spreading away from the 20 okay this is called stacking ok so whenever these two averages are opening up and pointing up its stacking when it's bearish like it is over here when the 10 periods below the 20 period and it's opening up and both are pointing down again it's called stacking that's when the conditions are optimal ok so we have really strong momentum here so now if we drop down into a 60-minute chart it'll take us immediately down into in this shaded point here now here's where it's important that you follow along with the optimal trade entry once we're in this shaded area price has to be above the red line and have moved away made a swing high after an impulse like moving higher so they're no works we have to see price moving higher above the red line and we're gonna be looking for awesome trade entries when it reaches back into a previous swing low here prices below the red line we cannot take anything there so we missed this move here which is fine if we look at this scenario back here I kind of like want to bring this retention here if we look at this move up if we drop our fib on that I'm going to show you what you would have had to sit through if you did something like this okay here's your swing impulse leg and optimal trade entries down here you'd have to sit through all of this before finally the move takes place okay I don't want you doing it even though this is a scenario that worked out pretty good and we've gotten a symmetrical price swing that's not the setups I want you to see or at least hunt what I want you to look for is when price is above the red 20 period and it makes an impulse leg and it comes back down to an optimal trade entry too long okay we don't have it here I'm gonna spare you putting the FIB line because this doesn't get down to it and price is gone below the red line or below the red line here okay and all through he we're filtering we can't take anything here and finally watch what happens we start seeing impulse swings and price moves away from the red line comes back to it but now watch it happens see we have the price dip below the 20 but the 10 has not crossed over so this can happen on the one-hour chart do not do this when it doesn't on the daily chart price has to be above both the 20 and 10 but on the 1 our price can stab below the red line during the retracement only violet when the 10 period has not crossed over the red though so as soon as this occurs and then the 10 period trades below or marks below the 20-period moving average if we got that cross over we can't take too long ok so we'll have the Fibonacci here you're probably thinking oh well this has been several days now Michael did you know this isn't giving me a treat every single day right this is just that one pair so we have a nun post leg here comes back down into optimal trade entry perfect delivery and we have symmetrical price swing here ok really nice little swing trade here and it started on the 26 and is on to 27th so basically one day of a hold for a nice little swing trade putting the trade on here at the round 75 70 and getting out at approximately 76 10 so not a bad little move you can leave a small portion one as it is a swing trade and leave your stop down here ok do not trail your stop-loss you want to be taking partials ok and then once we get a run away from a consolidation like we have here price has to show a willingness to want to run me remember inside this green shaded area we are bullish on the daily so we're anticipating this type of a move here we want to see it you're starting to run higher so when consolidations occur if we take that trade we want to leave our stop loss in until we start leaving the consolidation ok and then we can start trailing it up behind to swing lows from market action and I'll explain that in a second but taking a portion off here and then letting the remainder go you can see how we have really nice extensions up here at to 500% and then price drops down in here so we can't take a new set up here but we can hold on to the one we did in here price starts to run and now we have another one right in here we have a potential swing up and down and I'll show you that one right here right there it's just the highest body closed or open trades back down into it not over shoots it a little bit okay because we are on a one-hour chart and I'm not using the wick but your stop-loss would be below here it came close but ultimately it spreads that gives us symmetrical price swing price drops down below the red line we can't take anything in here no long trades in here got to stay trimmer inside this green shaded area we're looking for Long's so wild prices below the red line we can't take anything along we had to wait until price gets back above the red line as it does here but then price goes below the red line and so does the 10 period so we can't take this scenario at the wait price trades higher disc back down not deep enough for optimal trade entry in here so nothing would have happened there price here gives us a nice little so now I gotta get this in how early chart so there's a little bit more pips in this if you look at a 15 minute time frame or a 5 minute time frame so here we have our impulse leg retraces optimal trade entry symmetrical price swing leave a little portion on why because we are inside the green shaded area and we're anticipating that daily chart to expand on the up side so this is an area where we could have taken another long or we could have added more from our original position okay and we can't use this one even though we have equal highs let you know about this would be a run on that week if we could do a fib from this level here up to this Bobby you'll see it is actually a perfect optimal trade entry but the filtering process we can't take it so nothing there nothing there price trades below the red line can't trade there can't trade there and price meanders sideways in here we get above it but doesn't give us anything to trade there and we're still below the red line can't take any trades there long or below the red line we're still filtering nothing this is something you can go through all the majors with okay or if you'd like to trade exotics which I don't like to do that in the States I don't get to tax treatment for anything that's not coupled with a dollar so you guys can look for every tool every pair out there twenty-eight pairs you can go through this and find a scenario where a swing trade will be forming with this insight and again we're inside the green shaded area so there's nothing we can do in terms of a buy while prices below the red line and we miss all that okay now we go back out to a daily timeframe so we had a couple in there for swing trades not in every day trade okay and this whole movement here was about about a month in two weeks or so so we had a couple swing trade now swing trades are about that length they're not every day trades you want to put them one and hold on for them for a while now we're look at when we look for mapping out a bearish condition okay and we're gonna look for the crossover here and we're gonna drag that down until we get across over on the upside and I'm going to change this to red so that way everything inside this red shaded area we will keep our focus on only looking for optimal trade entry cells when prices move that's a little too much nails in it let's do this let's go - yeah that's a little bit friendlier on the eye all right and again we're in consolidation so we want to see price breakdown on the moving average yes and show willingness to want to leave the consolidation that happens here comes back up retest the consolidation and now we can start to look for optimal trade entries right in here so we're going to take this little toggle thing here put it and I'll start here so you guys can see the contrast but really when we get about the 11th of October that's when it would be an ideal scenario because every time you leave a consolidation you want to wait for it to potentially retrace back to it much like we saw it here it left the consolidating back down potentially retesting the point which it left and then we can start seeing it really start to tear up higher so we're going to drop down to an hourly chart now and we can start looking for price staying below the red line and giving optimal trade entry cells okay now notice we can spike through it that's like we just said before when the buys but if we go through it the 10 period has to remain below it - cannot cross over so we have an optimal trade entry cell here and again this is not an everyday setup your swings so we have Athol trade entry here body the body cell tends below 220 you're both stacking this is a sell at optimal trade entry and target 2 is hit beautifully you can leave a little portion on with a stop up here but swing trading you do not want to aggressively trail your stop you want to be taking partials and looking to add new positions when you can here's another scenario okay no can't do it we're above the red line or about the red line in here can't do that now we're above it for a long period of time so we can't do anything that we get back below it does it here price stays below it we climb back above it again we're in a Cell scenario so we have to wait for price to get below both the red line and see the 10 and 20 period exponential stacking lower and we have something in here let's take a look at that we have a swing high here see that I have an indecisive candle here and a bullish up close camera on the lower closed candle here the highest portion is the body on this one we're going to drag it down to this lowest body here trade out the optimal trade entry and we get target one fall short of target two that does give us an awesome tray - you just sell there and the next ideal one is here we have price below both moving averages they're stacking here it does punch up through it but we don't get the tent ready to cross over and we have to put that down right on the lowest body portion here comes up Nick's the to 62% tradesman level there's a cell we could look for target one target two symmetrical to our extension eventually here's another one in here or price trades back up to here but we cross over so we probably not going to take that one you have to hold on to the original one we had up here and another one now we don't get up high enough to get into that one yeah it didn't retrace deep enough there so we would still be holding some portion on that we entered back there and we don't have anything here back above the red line starts consolidating and then we have price really not doing too much so I'll take that Avinash you know so it's clear to see what's going on and price starts to move back in our favor here again we're waiting for these scenarios this is what you look for you wait for these types of setups here so we have both the averages moving lower even though we spike through the red line the ten period has not crossed over to the twenty looking for inside this red shaded area again we're anticipating a daily chart to expands going lower so we put our short on here stop will be above the high here and we can see target one target two symmetrical price swing beautifully hit eventually later on we get to our extension hit we have another scenario now even though we spiked through the tenth area has not crossed over the twenty period so everything is still valid here else we'll trade entries sell target one hit target to hit eventually symmetrical price swing as hit as well and we can hold on to a portion now we have a consolidation when price leaves the consolidation then and only then do we consider looking to lower our protective stop-loss and I'll just bring that over here a little bit and we don't go anything more towards an auto trade entry until we start seeing price back above the red line and now we're consolidating again I think we're probably going to run in a cell condition before long yeah we have another one in here here's a nice one have a nice swing high here price trades down right to here awesome trade entry sell and we can see symmetrical price swing boom really nice little swing trade their price trades above the red line so we were on the sidelines until we get back in sync again right in here another scenario so what this does is actually gives us a context to work within and then we use this body here and we're going to drag it down to the lowest open or close which is right there I'll still trade actually right there sell beautiful expense expansion down to set metrical pricing and 200 extension and doesn't give us much more below that before we started going consolidating and back above the red line so we're neutral and then everything has reversed until recent current price action now so you can see it gives you a context to work within now it's not perfect nothing's guide we're going to be perfect but it gives you a quick down and dirty way to apply to simple moving averages of twenty and ten period exponential moving average on a daily and on an hourly chart and it frames your context of what side of the marketplace should you be waiting to only trade on now go back through here and you'll see obviously there's a few times where if we are in this environment where we're in the red shaded area the ideal scenario would be to be looking for selling short but right away you can look for like this here this scenario this is a buy here and that runs up what would this be if it's not a swing trade what could this potentially be I'll just throw this in here as a bonus this could be a day trade okay you could be a day trader here because it's counter what you're waiting for for a swing trade going short if you see these scenarios well you can take a long why because you have equal highs here okay what's what's the high on this candle seventy eight thirty so what's twenty cuts above that 7850 okay so we could look for an area to go up to there okay so we could be a buyer here and take our profits here okay or we can look over here and take a portion of it off here and leave a small portion alone to see if we can get it run about 10 20 50 baht as a day traders mindset okay that type of thing so we can do things both directions even though we have a sell model okay or sell program they'll be working inside of with this red shaded area relative to the daily chart okay doesn't negate you not being able to do anything it just means it for a swing trade you have to wait for price to give you scenarios as we outlined for bearishness like here okay optimal trade entry so and then leaving portions on a lot longer than you would with day trades so in other words for a swing trade you can take off like 50% leave the remaining 50% on whereas a day trade if it goes to your first objective you want to think about 75 to 80% off and leave a small portion on because it's a day trade so I think this is going to pretty much to do this video here and watch it a couple times you'll see it's not complicated it's not you know acrobatics it's very simple approach to using a retail tool a moving average but underneath is tell you moving averages are actually used on large funds and they're trend-following in nature so the reason why I'm telling you how to use it like this because this is very close to one of the long-term trending models that a large fun uses that I know of okay folks hopefully you enjoyed this presentation if you'd like to find more you can visit my website at the inner circle trader.com",
+  "grouped_segments": [
+    {
+      "start": 10.06,
+      "text": "okay folks welcome back this teachings cannot be specifically dealing with secrets of swing trading",
+      "timestamp": "0:10"
+    },
+    {
+      "start": 22.09,
+      "text": "all right swing trading okay the points of focus in this module okay I'm going to teach you how to map buy conditions and implementing the optimal trade entry and we teaching you how to map sell conditions and implement the optimal trade entry okay folks we're looking at the Aussie dollar this is a daily chart and I'm going to be using this currency pair this works on all currency pairs all markets all asset classes as well so before we get into it I think one of the most repeating questions I get by way of folks that are follow me on Twitter Facebook and on YouTube is they need to know where they feel they need to know the daily bias you know what should i do today if I just knew ICT if I just knew what the bias is gonna be tomorrow I knew I would be speed profitable in my demo account I knew I'd see the positive return in my time and while there's several things that we can do to arrive at daily bias in my mentorship I teach institutional order flow in great detail but that's not what I'm teaching you here but I will give you a real quick approach that it's not going to be as time-sensitive and by that I mean you won't catch the turning points with it okay you're gonna get the meat of the moves and that's all that you're really required to find really they do very well there's other tools and concepts that we can use to warn ourselves potential turning points of the likelihood of a reversal but before we get into it I just wanted to make of that because I knew there's a lot of folks that see my videos and they come away with the understanding that you have to have the bias every single day and you don't you don't need to know that you just need to know the few times a month or a couple times a week when it's really loaded in one direction over the other and in trade in those conditions and I think if you do that your demo account results we'd be much more encouraging and your time spent practicing will be a lot more fruitful so when we look at price action there's a couple things that I want to kind of remind you of there are times when the market moves in trending environments where it moves directionally then the market goes into consolidation and then it trends again well those two conditions are very easy to see if you just relax and try not to over complicate it now there are specific rules in finding key support resistance levels and we mentioned a few of those in the higher time frame concepts video that you should have watched prior to this one but I believe that it's easier for me to teach you how to find the bias by teaching you how to stay on the side of higher timeframe momentum okay and while I am NOT a supporter if you will of indicators it's gonna seem sacrilegious for me the foot an indicator on my chart like you're gonna see tonight but I think it's a good crutch it helps traders find their way if you will on a directionally I guess trending environment so the way I use this as I incorporate two moving averages okay now I don't require using a moving average but I think the smoothing effect of the moving average over price action on a higher time frame daily chart will help at least build an understanding of where you should really quickly just look at your chart real quick with the moving averages it'll help you stay on one side of the marketplace now the benefit of it is only arrived at by having it on a daily chart as soon as you start applying this to like a five minute or one minute chart the reliability really goes out the window in my opinion so why is there any significance of a moving average or two moving averages placed on a daily chart well because the daily chart really is the most widely followed chart in the banking sector so when we're looking for an intermediate term level of momentum it's going to be found on the daily chart so if we want to be trading in an immediate term momentum and it's exactly where the banks are we looking at that time frame then it goes without saying that there should be a high probability of well confluence with that idea and what we see in price action so I've taught in the past the 9 and 18 in an 18 and 40 but I'm gonna give you one that's really simple and it's the 10 and 20 period okay and the red line here is going to delineate the 20 period okay and the green level here is gone to delineate the 10 level okay so it's 10 period and a 20-period moving average okay and I'll let you see what these settings are so that way you guys can relax and know what they are it's exponential moving average 20 period on the close and the other one is a 10 period exponential on the close okay so that way you have everything that's on my chart now now on a daily chart all we're looking for is preferably the market leaving a consolidation I think everyone would agree that this is a consolidation here and price has left the consolidation by breaking a swing high here and also we have the crossover on the moving average so right there this is what I want you to do this is how you map out your bullish um in this case it's a bullish condition and you drag that rectangle all the way up until a point of which where it crosses below the 20 so in other words 10 drops down below we can't look for any buys in here after this point until we see the daily trade back above with the 10 period of of the 20 period okay it's a real simple little momentum filter okay it's not to hang everything on it okay but for sake of finding swing trades I'm gonna incorporate a couple things here and you'll see how fast and easy you can get to a bias trading on one side of the marketplace only and incorporating some of the things I've already taught you so we have the bias shifting to a bullish condition here with the 10 period going over the 20 period on a daily chart again it's important that you only do this on the daily chart try not to do this on your 5 and 15 and 1 minute charts but we have this condition we can drop down into an hourly chart now why an hourly chart hourly chart to me is a real good swing trading time frame okay so you'll be able to see everything that's important from a weekly basis or a daily basis but to me 60-minute more swing trading ideal scenario so what we're gonna do is we're gonna go over here in the lower left-hand corner there's a little tiny I guess it's a little half triangle you drag that over to the beginning of your shaded area that you've deleted where the 10 crosses over the 20 and we're leaving okay a consolidation we have a break and market structure here so we have potential bullishness and it's important the 10 period is pointing higher and the 20 period is pointing higher and the 10 is opening up and spreading away from the 20 okay this is called stacking ok so whenever these two averages are opening up and pointing up its stacking when it's bearish like it is over here when the 10 periods below the 20 period and it's opening up and both are pointing down again it's called stacking that's when the conditions are optimal ok so we have really strong momentum here so now if we drop down into a 60-minute chart it'll take us immediately down into in this shaded point here now here's where it's important that you follow along with the optimal trade entry once we're in this shaded area price has to be above the red line and have moved away made a swing high after an impulse like moving higher so they're no works we have to see price moving higher above the red line and we're gonna be looking for awesome trade entries when it reaches back into a previous swing low here prices below the red line we cannot take anything there so we missed this move here which is fine if we look at this scenario back here I kind of like want to bring this retention here if we look at this move up if we drop our fib on that I'm going to show you what you would have had to sit through if you did something like this okay here's your swing impulse leg and optimal trade entries down here you'd have to sit through all of this before finally the move takes place okay I don't want you doing it even though this is a scenario that worked out pretty good and we've gotten a symmetrical price swing that's not the setups I want you to see or at least hunt what I want you to look for is when price is above the red 20 period and it makes an impulse leg and it comes back down to an optimal trade entry too long okay we don't have it here I'm gonna spare you putting the FIB line because this doesn't get down to it and price is gone below the red line or below the red line here okay and all through he we're filtering we can't take anything here and finally watch what happens we start seeing impulse swings and price moves away from the red line comes back to it but now watch it happens see we have the price dip below the 20 but the 10 has not crossed over so this can happen on the one-hour chart do not do this when it doesn't on the daily chart price has to be above both the 20 and 10 but on the 1 our price can stab below the red line during the retracement only violet when the 10 period has not crossed over the red though so as soon as this occurs and then the 10 period trades below or marks below the 20-period moving average if we got that cross over we can't take too long ok so we'll have the Fibonacci here you're probably thinking oh well this has been several days now Michael did you know this isn't giving me a treat every single day right this is just that one pair so we have a nun post leg here comes back down into optimal trade entry perfect delivery and we have symmetrical price swing here ok really nice little swing trade here and it started on the 26 and is on to 27th so basically one day of a hold for a nice little swing trade putting the trade on here at the round 75 70 and getting out at approximately 76 10 so not a bad little move you can leave a small portion one as it is a swing trade and leave your stop down here ok do not trail your stop-loss you want to be taking partials ok and then once we get a run away from a consolidation like we have here price has to show a willingness to want to run me remember inside this green shaded area we are bullish on the daily so we're anticipating this type of a move here we want to see it you're starting to run higher so when consolidations occur if we take that trade we want to leave our stop loss in until we start leaving the consolidation ok and then we can start trailing it up behind to swing lows from market action and I'll explain that in a second but taking a portion off here and then letting the remainder go you can see how we have really nice extensions up here at to 500% and then price drops down in here so we can't take a new set up here but we can hold on to the one we did in here price starts to run and now we have another one right in here we have a potential swing up and down and I'll show you that one right here right there it's just the highest body closed or open trades back down into it not over shoots it a little bit okay because we are on a one-hour chart and I'm not using the wick but your stop-loss would be below here it came close but ultimately it spreads that gives us symmetrical price swing price drops down below the red line we can't take anything in here no long trades in here got to stay trimmer inside this green shaded area we're looking for Long's so wild prices below the red line we can't take anything along we had to wait until price gets back above the red line as it does here but then price goes below the red line and so does the 10 period so we can't take this scenario at the wait price trades higher disc back down not deep enough for optimal trade entry in here so nothing would have happened there price here gives us a nice little so now I gotta get this in how early chart so there's a little bit more pips in this if you look at a 15 minute time frame or a 5 minute time frame so here we have our impulse leg retraces optimal trade entry symmetrical price swing leave a little portion on why because we are inside the green shaded area and we're anticipating that daily chart to expand on the up side so this is an area where we could have taken another long or we could have added more from our original position",
+      "timestamp": "0:22"
+    },
+    {
+      "start": 912.9,
+      "text": "okay and we can't use this one even though we have equal highs let you know about this would be a run on that week if we could do a fib from this level here up to this Bobby you'll see it is actually a perfect optimal trade entry but the filtering process we can't take it so nothing there nothing there price trades below the red line can't trade there can't trade there and price meanders sideways in here we get above it but doesn't give us anything to trade there and we're still below the red line can't take any trades there long or below the red line we're still filtering nothing this is something you can go through all the majors with okay or if you'd like to trade exotics which I don't like to do that in the States I don't get to tax treatment for anything that's not coupled with a dollar so you guys can look for every tool every pair out there twenty-eight pairs you can go through this and find a scenario where a swing trade will be forming with this insight and again we're inside the green shaded area so there's nothing we can do in terms of a buy while prices below the red line and we miss all that okay now we go back out to a daily timeframe so we had a couple in there for swing trades not in every day trade okay and this whole movement here was about about a month in two weeks or so so we had a couple swing trade now swing trades are about that length they're not every day trades you want to put them one and hold on for them for a while now we're look at when we look for mapping out a bearish condition okay and we're gonna look for the crossover here and we're gonna drag that down until we get across over on the upside and I'm going to change this to red so that way everything inside this red shaded area we will keep our focus on only looking for optimal trade entry cells when prices move that's a little too much nails in it let's do this let's go - yeah that's a little bit friendlier on the eye all right and again we're in consolidation so we want to see price breakdown on the moving average yes and show willingness to want to leave the consolidation that happens here comes back up retest the consolidation and now we can start to look for optimal trade entries right in here so we're going to take this little toggle thing here put it and I'll start here so you guys can see the contrast but really when we get about the 11th of October that's when it would be an ideal scenario because every time you leave a consolidation you want to wait for it to potentially retrace back to it much like we saw it here it left the consolidating back down potentially retesting the point which it left and then we can start seeing it really start to tear up higher so we're going to drop down to an hourly chart now and we can start looking for price staying below the red line and giving optimal trade entry cells okay now notice we can spike through it that's like we just said before when the buys but if we go through it the 10 period has to remain below it - cannot cross over so we have an optimal trade entry cell here and again this is not an everyday setup your swings so we have Athol trade entry here body the body cell tends below 220 you're both stacking this is a sell at optimal trade entry and target 2 is hit beautifully you can leave a little portion on with a stop up here but swing trading you do not want to aggressively trail your stop you want to be taking partials and looking to add new positions when you can here's another scenario okay no can't do it we're above the red line",
+      "timestamp": "15:12"
+    },
+    {
+      "start": 1163.75,
+      "text": "or about the red line in here can't do that now we're above it for a long period of time so we can't do anything that we get back below it does it here price stays below it we climb back above it again we're in a Cell scenario so we have to wait for price to get below both the red line and see the 10 and 20 period exponential stacking lower and we have something in here let's take a look at that we have a swing high here see that I have an indecisive candle here and a bullish up close camera on the lower closed candle here the highest portion is the body on this one we're going to drag it down to this lowest body here trade out the optimal trade entry and we get target one fall short of target two that does give us an awesome tray - you just sell there and the next ideal one is here we have price below both moving averages they're stacking here it does punch up through it but we don't get the tent ready to cross over and we have to",
+      "timestamp": "19:23"
+    },
+    {
+      "start": 1245.97,
+      "text": "put that down right on the lowest body portion here comes up Nick's the to 62% tradesman level there's a cell we could look for target one target two symmetrical to our extension eventually here's another one in here or price trades back up to here but we cross over so we probably not going to take that one you have to hold on to the original one we had up here and another one now we don't get up high enough to get into that one yeah it didn't retrace deep enough there so we would still be holding some portion on that we entered back there and we don't have anything here",
+      "timestamp": "20:45"
+    },
+    {
+      "start": 1297.42,
+      "text": "back above the red line starts consolidating and then we have price really not doing too much so I'll take that Avinash you know so it's clear to see what's going on and price starts to move back in our favor here again we're waiting for these scenarios this is what you look for you wait for these types of setups here so we have both the averages moving lower even though we spike through the red line the ten period has not crossed over to the twenty looking for inside this red shaded area again we're anticipating a daily chart to expands going lower so we put our short on here stop will be above the high here and we can see target one target two symmetrical price swing beautifully hit eventually later on we get to our extension hit we have another scenario now even though we spiked through the tenth area has not crossed over the twenty period so everything is still valid here else we'll trade entries sell target one hit target to hit eventually symmetrical price swing as hit as well and we can hold on to a portion now we have a consolidation when price leaves the consolidation then and only then do we consider looking to lower our protective stop-loss and I'll just bring that over here a little bit and we don't go anything more towards an auto trade entry until we start seeing price back above the red line and now we're consolidating again I think we're probably going to run in a cell condition before long yeah we have another one in here here's a nice one have a nice swing high here price trades down right to here awesome trade entry sell and we can see symmetrical price swing boom really nice little swing trade their price trades above the red line so we were on the sidelines until we get back in sync again right in here another scenario so what this does is actually gives us a context to work within and then we use this body here and we're going to drag it down to the lowest open or close which is right there I'll still trade actually right there sell beautiful expense expansion down to set metrical pricing and 200 extension and doesn't give us much more below that before we started going consolidating and back above the red line so we're neutral and then everything has reversed until recent current price action now so you can see it gives you a context to work within now it's not perfect nothing's guide we're going to be perfect but it gives you a quick down and dirty way to apply to simple moving averages of twenty and ten period exponential moving average on a daily and on an hourly chart and it frames your context of what side of the marketplace should you be waiting to only trade on now go back through here and you'll see obviously there's a few times where if we are in this environment where we're in the red shaded area the ideal scenario would be to be looking for selling short but right away you can look for like this here this scenario this is a buy here and that runs up what would this be if it's not a swing trade what could this potentially be I'll just throw this in here as a bonus this could be a day trade okay you could be a day trader here because it's counter what you're waiting for for a swing trade going short if you see these scenarios well you can take a long why because you have equal highs here okay what's what's the high on this candle seventy eight thirty so what's twenty cuts above that 7850 okay so we could look for an area to go up to there okay so we could be a buyer here and take our profits here okay or we can look over here and take a portion of it off here and leave a small portion alone to see if we can get it run about 10 20 50 baht as a day traders mindset okay that type of thing so we can do things both directions even though we have a sell model okay or sell program they'll be working inside of with this red shaded area relative to the daily chart okay doesn't negate you not being able to do anything it just means it for a swing trade you have to wait for price to give you scenarios as we outlined for bearishness like here okay optimal trade entry so and then leaving portions on a lot longer than you would with day trades so in other words for a swing trade you can take off like 50% leave the remaining 50% on whereas a day trade if it goes to your first objective you want to think about 75 to 80% off and leave a small portion on because it's a day trade so I think this is going to pretty much to do this video here and watch it a couple times you'll see it's not complicated it's not you know acrobatics it's very simple approach to using a retail tool a moving average but underneath is tell you moving averages are actually used on large funds and they're trend-following in nature so the reason why I'm telling you how to use it like this because this is very close to one of the long-term trending models that a large fun uses that I know of okay folks hopefully you enjoyed this presentation if you'd like to find more you can visit my website at the inner circle trader.com",
+      "timestamp": "21:37"
+    }
+  ],
+  "title": "ICT Forex - Secrets To Swing Trading",
+  "playlistName": "Market Maker Series (ICT ForeXmas)",
+  "extractedAt": "2026-01-11T07:55:15.719Z"
+}

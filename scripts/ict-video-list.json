@@ -1,0 +1,307 @@
+{
+  "playlists": {
+    "if-i-could-go-back": {
+      "name": "If I Could Go Back Series",
+      "playlistUrl": "https://www.youtube.com/playlist?list=PLrlNxdU85imVq0g0_F6l2S1gz6-cHfvyN",
+      "videoCount": 4,
+      "phase": "Phase 1: Foundation",
+      "focus": "Smart money, liquidity, stop hunts, market manipulation",
+      "videos": [
+        {
+          "id": "yW2ADr7hG0E",
+          "title": "If I Could Go Back & Tell Myself What I Know Now... Part 1 of 4"
+        },
+        {
+          "id": "cwoBv5aI0Vk",
+          "title": "If I Could Go Back & Tell Myself What I Know Now... Part 2 of 4"
+        },
+        {
+          "id": "MPlNRxHkh_M",
+          "title": "If I Could Go Back & Tell Myself What I Know Now... Part 3 of 4"
+        },
+        {
+          "id": "aGdx-YmxawQ",
+          "title": "If I Could Go Back & Tell Myself What I Know Now... Part 4 of 4"
+        }
+      ]
+    },
+    "market-maker-series": {
+      "name": "Market Maker Series (ICT ForeXmas)",
+      "playlistUrl": "https://www.youtube.com/playlist?list=PLVgHx4Z63paah1dHyad1OMJQJdm6iP2Yn",
+      "videoCount": 24,
+      "phase": "Phase 2: Core Concepts",
+      "focus": "Market structure, liquidity, premium/discount, BOS/CHoCH",
+      "videos": [
+        {
+          "id": "7WM8qdkanIY",
+          "title": "ICT Forex - What New Traders Should Focus On"
+        },
+        {
+          "id": "tlKC9nvLRK0",
+          "title": "ICT Forex - Considerations In Risk Management"
+        },
+        {
+          "id": "xGFCIUFxsbw",
+          "title": "Essentials To ICT Market Structure"
+        },
+        {
+          "id": "ley5HZs4bUM",
+          "title": "ICT Forex - The ICT Asian Killzone"
+        },
+        {
+          "id": "G8OEsUAoIWE",
+          "title": "ICT Forex - The ICT London Killzone"
+        },
+        {
+          "id": "plNN9n7nrxc",
+          "title": "ICT Forex - The ICT New York Killzone"
+        },
+        {
+          "id": "3OEUIkkcmLE",
+          "title": "ICT Forex - The ICT London Close Killzone"
+        },
+        {
+          "id": "Yqio1Ja0lIQ",
+          "title": "ICT Forex - The Weekly Bias - Excellence In Short Term Trading"
+        },
+        {
+          "id": "Sb9m_dxr4bI",
+          "title": "ICT Forex - Time & Price Theory"
+        },
+        {
+          "id": "dIT4HTFYGGo",
+          "title": "ICT Forex - Accumulation - Manipulation - Distribution"
+        },
+        {
+          "id": "JA0mLNJeytY",
+          "title": "ICT Forex - Implementing The Asian Range"
+        },
+        {
+          "id": "xJMbva8SjzE",
+          "title": "ICT Forex - Understanding The ICT Judas Swing"
+        },
+        {
+          "id": "vJvcZGGeTZU",
+          "title": "ICT Forex - Essentials To Trading The Daily Bias"
+        },
+        {
+          "id": "T0JyGdJ28fM",
+          "title": "ICT Forex - Trading The Key Swing Points"
+        },
+        {
+          "id": "RtMRykCZtC4",
+          "title": "ICT Forex - Money Management That Works"
+        },
+        {
+          "id": "isXicdayBwA",
+          "title": "ICT Forex - The ICT Smart Money Technique or SMT"
+        },
+        {
+          "id": "30petm6SZz0",
+          "title": "ICT Forex - The ICT ATM Method"
+        },
+        {
+          "id": "Cg0-CFJOJvg",
+          "title": "OTE Primer - Intro To ICT Optimal Trade Entry"
+        },
+        {
+          "id": "nNEt9QTCTtk",
+          "title": "ICT Forex - Target Selection & Profit Objectives"
+        },
+        {
+          "id": "QSqIeu9tjek",
+          "title": "ICT Forex - Trade Psychology & Effective Journaling"
+        },
+        {
+          "id": "aWgYCfvnlqM",
+          "title": "ICT Forex - COT Insights For Effective Price Action Analysis"
+        },
+        {
+          "id": "uxsmSMsuleY",
+          "title": "ICT Forex - How To Find Explosive Price Moves Before They Happen"
+        },
+        {
+          "id": "YcAfcpUCbDw",
+          "title": "ICT Forex - Higher Time Frame Concepts"
+        },
+        {
+          "id": "9CCrlTIrkxw",
+          "title": "ICT Forex - Secrets To Swing Trading"
+        }
+      ]
+    },
+    "2022-mentorship": {
+      "name": "ICT 2022 Mentorship",
+      "playlistUrl": "https://www.youtube.com/playlist?list=PLVgHx4Z63paYiFGQ56PjTF1PGePL3r69s",
+      "videoCount": 41,
+      "phase": "Phase 4: Entry Models + Advanced",
+      "focus": "AMD, OTE, Kill Zones, Time Theory, Trading Models",
+      "videos": [
+        {
+          "id": "kt6V4ai60fI",
+          "title": "ICT Mentorship 2022 Introduction"
+        },
+        {
+          "id": "tmeCWULSTHc",
+          "title": "2022 ICT Mentorship Episode 2"
+        },
+        {
+          "id": "nQfHZ2DEJ8c",
+          "title": "2022 ICT Mentorship Episode 3"
+        },
+        {
+          "id": "L-ReMHiavPM",
+          "title": "2022 ICT Mentorship Episode 4"
+        },
+        {
+          "id": "N29ZJ-o31xs",
+          "title": "2022 ICT Mentorship Episode 5"
+        },
+        {
+          "id": "Bkt8B3kLATQ",
+          "title": "2022 ICT Mentorship Episode 6"
+        },
+        {
+          "id": "G8-z91acgG4",
+          "title": "2022 ICT Mentorship Episode 7"
+        },
+        {
+          "id": "7rbV8aWkcqY",
+          "title": "2022 ICT Mentorship Episode 8"
+        },
+        {
+          "id": "iZLXnNiZm_s",
+          "title": "2022 ICT Mentorship Episode 9"
+        },
+        {
+          "id": "S9ORTYmXwdE",
+          "title": "2022 ICT Mentorship Episode 10"
+        },
+        {
+          "id": "Sqw2bww93Zo",
+          "title": "2022 ICT Mentorship Episode 11"
+        },
+        {
+          "id": "8GkQfdAXZP0",
+          "title": "2022 ICT Mentorship Episode 12"
+        },
+        {
+          "id": "tpPtItWqmlg",
+          "title": "2022 ICT Mentorship Episode 13"
+        },
+        {
+          "id": "NUdu1n-ML98",
+          "title": "2022 ICT Mentorship Episode 14"
+        },
+        {
+          "id": "tGxuitjtO88",
+          "title": "2022 ICT Mentorship Episode 15"
+        },
+        {
+          "id": "EpGQnhjXBq8",
+          "title": "2022 ICT Mentorship Episode 16"
+        },
+        {
+          "id": "5WIqHJDQ_p4",
+          "title": "2022 ICT Mentorship Episode 17"
+        },
+        {
+          "id": "eai0nHhAC8w",
+          "title": "2022 ICT Mentorship Episode 18"
+        },
+        {
+          "id": "IEa1N0rTtbc",
+          "title": "2022 ICT Mentorship Episode 19"
+        },
+        {
+          "id": "Q6GFu8-Z4rY",
+          "title": "2022 ICT Mentorship Episode 20"
+        },
+        {
+          "id": "kmVXVJE08eQ",
+          "title": "2022 ICT Mentorship Episode 21"
+        },
+        {
+          "id": "QKc_i90chVg",
+          "title": "2022 ICT Mentorship Episode 22"
+        },
+        {
+          "id": "TV9TfwHXuqs",
+          "title": "2022 ICT Mentorship Episode 23"
+        },
+        {
+          "id": "nv0ey5UyOmY",
+          "title": "2022 ICT Mentorship Episode 24"
+        },
+        {
+          "id": "CnTXwAuDi9Y",
+          "title": "2022 ICT Mentorship Episode 25"
+        },
+        {
+          "id": "k26euOG6zAk",
+          "title": "2022 ICT Mentorship Episode 26 - Example Of Tape Reading Practice"
+        },
+        {
+          "id": "gLK4Qm6jte8",
+          "title": "2022 ICT Mentorship Episode 27 - Counter Trend Ideas"
+        },
+        {
+          "id": "j0Z2EbuJXGU",
+          "title": "2022 ICT Mentorship Episode 28"
+        },
+        {
+          "id": "QkokVv0owSE",
+          "title": "2022 ICT Mentorship Episode 29"
+        },
+        {
+          "id": "CL94EnGqB4Q",
+          "title": "2022 ICT Mentorship Episode 30"
+        },
+        {
+          "id": "OYNpIeu9czw",
+          "title": "2022 ICT Mentorship Episode 31"
+        },
+        {
+          "id": "hzoMJQlEv5M",
+          "title": "2022 ICT Mentorship Episode 32"
+        },
+        {
+          "id": "8z6My18WZqA",
+          "title": "2022 ICT Mentorship Episode 33"
+        },
+        {
+          "id": "t8flQP5jy-Q",
+          "title": "2022 ICT Mentorship Episode 34"
+        },
+        {
+          "id": "MdYrslpUezU",
+          "title": "2022 ICT Mentorship Episode 35"
+        },
+        {
+          "id": "pWnMpdN_g98",
+          "title": "2022 ICT Mentorship Episode 36"
+        },
+        {
+          "id": "HuZurY0ghDI",
+          "title": "2022 ICT Mentorship Episode 37"
+        },
+        {
+          "id": "36184dDAqtM",
+          "title": "2022 ICT Mentorship Episode 38"
+        },
+        {
+          "id": "yFpHbBnsK_c",
+          "title": "2022 ICT Mentorship Episode 39"
+        },
+        {
+          "id": "koN1ge8bewI",
+          "title": "2022 ICT Mentorship Episode 40"
+        },
+        {
+          "id": "2XhDi5GoNUI",
+          "title": "2022 ICT Mentorship - Episode 41 & Final"
+        }
+      ]
+    }
+  }
+}

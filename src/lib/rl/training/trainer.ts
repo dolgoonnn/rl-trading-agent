@@ -28,12 +28,12 @@ const DEFAULT_CONFIG: TrainingConfig = {
   trainSplit: 0.8,
   logInterval: 10,
   verbose: true,
-  trainFrequency: 8, // Train every N steps - increased to reduce overfitting
-  // Walk-forward validation (optional - if not set, uses static split)
-  useRollingValidation: false,
-  rollingTrainWindow: 500,
-  rollingTestWindow: 100,
-  rollingStepSize: 100,
+  trainFrequency: 8, // Train every N steps
+  // Walk-forward validation (enabled by default for better generalization)
+  useRollingValidation: true,
+  rollingTrainWindow: 8000, // Large train window for better learning
+  rollingTestWindow: 2000, // Proportional test window
+  rollingStepSize: 3000, // Fewer windows = more episodes per window
 };
 
 export interface TrainerCallbacks {
@@ -57,6 +57,8 @@ export class Trainer {
 
   // Rolling window state (for walk-forward validation)
   private rollingWindows: { train: Candle[]; test: Candle[] }[] = [];
+  private currentWindowIndex: number = 0;
+  private windowMetrics: { window: number; trainWinRate: number; valWinRate: number; valSharpe: number }[] = [];
 
   // Training state
   private bestSharpe: number = -Infinity;
@@ -141,10 +143,45 @@ export class Trainer {
     const results: TrainingMetrics[] = [];
     const evaluations: EvaluationResult[] = [];
 
+    // For walk-forward: calculate episodes per window
+    const episodesPerWindow = this.config.useRollingValidation && this.rollingWindows.length > 1
+      ? Math.ceil(this.config.episodes / this.rollingWindows.length)
+      : this.config.episodes;
+
     for (let episode = 1; episode <= this.config.episodes; episode++) {
       if (this.stopped) {
         this.log('Training stopped by user');
         break;
+      }
+
+      // Walk-forward: rotate windows periodically
+      if (this.config.useRollingValidation && this.rollingWindows.length > 1) {
+        const newWindowIndex = Math.floor((episode - 1) / episodesPerWindow);
+        if (newWindowIndex !== this.currentWindowIndex && newWindowIndex < this.rollingWindows.length) {
+          // Log metrics for the current window before rotating
+          if (this.currentWindowIndex >= 0) {
+            const windowEval = this.evaluate(episode - 1);
+            const trainMetrics = results.slice(-Math.min(10, results.length));
+            const avgTrainWinRate = trainMetrics.reduce((a, m) => a + m.winRate, 0) / trainMetrics.length;
+
+            this.windowMetrics.push({
+              window: this.currentWindowIndex,
+              trainWinRate: avgTrainWinRate,
+              valWinRate: windowEval.metrics.winRate,
+              valSharpe: windowEval.metrics.sharpeRatio,
+            });
+
+            const gap = avgTrainWinRate - windowEval.metrics.winRate;
+            this.log(`Window ${this.currentWindowIndex} complete: Train=${avgTrainWinRate.toFixed(1)}% Val=${windowEval.metrics.winRate.toFixed(1)}% Gap=${gap.toFixed(1)}% Sharpe=${windowEval.metrics.sharpeRatio.toFixed(2)}`);
+          }
+
+          // Rotate to next window
+          this.currentWindowIndex = newWindowIndex;
+          const window = this.rollingWindows[this.currentWindowIndex]!;
+          this.trainCandles = window.train;
+          this.valCandles = window.test;
+          this.log(`Rotating to window ${this.currentWindowIndex + 1}/${this.rollingWindows.length}`);
+        }
       }
 
       // Run episode
@@ -189,6 +226,22 @@ export class Trainer {
       }
     }
 
+    // Log final window metrics for walk-forward
+    if (this.config.useRollingValidation && this.rollingWindows.length > 1) {
+      const windowEval = this.evaluate(results.length);
+      const trainMetrics = results.slice(-Math.min(10, results.length));
+      const avgTrainWinRate = trainMetrics.reduce((a, m) => a + m.winRate, 0) / trainMetrics.length;
+
+      this.windowMetrics.push({
+        window: this.currentWindowIndex,
+        trainWinRate: avgTrainWinRate,
+        valWinRate: windowEval.metrics.winRate,
+        valSharpe: windowEval.metrics.sharpeRatio,
+      });
+
+      this.logWalkForwardSummary();
+    }
+
     // Final evaluation
     const finalEval = this.evaluate(results.length);
 
@@ -197,7 +250,55 @@ export class Trainer {
       evaluations,
       finalEvaluation: finalEval,
       agent: this.agent,
+      walkForwardMetrics: this.windowMetrics.length > 0 ? [...this.windowMetrics] : undefined,
     };
+  }
+
+  /**
+   * Log walk-forward validation summary
+   */
+  private logWalkForwardSummary(): void {
+    if (this.windowMetrics.length === 0) return;
+
+    this.log('\n' + '='.repeat(60));
+    this.log('WALK-FORWARD VALIDATION SUMMARY');
+    this.log('='.repeat(60));
+
+    let totalGap = 0;
+    let positiveSharpCount = 0;
+
+    this.log('| Window | Train WR | Val WR | Gap    | Val Sharpe |');
+    this.log('|--------|----------|--------|--------|------------|');
+
+    for (const m of this.windowMetrics) {
+      const gap = m.trainWinRate - m.valWinRate;
+      totalGap += gap;
+      if (m.valSharpe > 0) positiveSharpCount++;
+
+      const gapStr = gap >= 0 ? `+${gap.toFixed(1)}%` : `${gap.toFixed(1)}%`;
+      this.log(`|   ${m.window + 1}    | ${m.trainWinRate.toFixed(1).padStart(7)}% | ${m.valWinRate.toFixed(1).padStart(5)}% | ${gapStr.padStart(6)} | ${m.valSharpe.toFixed(2).padStart(10)} |`);
+    }
+
+    const avgGap = totalGap / this.windowMetrics.length;
+    const avgValSharpe = this.windowMetrics.reduce((a, m) => a + m.valSharpe, 0) / this.windowMetrics.length;
+    const avgValWinRate = this.windowMetrics.reduce((a, m) => a + m.valWinRate, 0) / this.windowMetrics.length;
+
+    this.log('|--------|----------|--------|--------|------------|');
+    this.log(`| AVG    |          | ${avgValWinRate.toFixed(1).padStart(5)}% | ${(avgGap >= 0 ? '+' : '') + avgGap.toFixed(1).padStart(5)}% | ${avgValSharpe.toFixed(2).padStart(10)} |`);
+    this.log('');
+
+    // Success criteria check
+    this.log('SUCCESS CRITERIA:');
+    const gapOk = Math.abs(avgGap) < 20;
+    const sharpeOk = positiveSharpCount >= 1;
+    this.log(`  ${gapOk ? '✓' : '✗'} Average Gap < 20%: ${avgGap.toFixed(1)}%`);
+    this.log(`  ${sharpeOk ? '✓' : '✗'} At least 1 window with positive Sharpe: ${positiveSharpCount}/${this.windowMetrics.length}`);
+
+    if (gapOk && sharpeOk) {
+      this.log('\n✓ Walk-forward validation PASSED - model shows generalization');
+    } else {
+      this.log('\n✗ Walk-forward validation FAILED - consider expanding data (Phase 2)');
+    }
   }
 
   /**
@@ -208,7 +309,8 @@ export class Trainer {
       this.trainCandles,
       { ...this.envConfig, randomStart: true },
       this.stateConfig,
-      this.rewardConfig
+      this.rewardConfig,
+      true // Training mode - enables feature noise
     );
 
     let state = env.reset();
@@ -282,7 +384,8 @@ export class Trainer {
       this.valCandles,
       { ...this.envConfig, randomStart: false },
       this.stateConfig,
-      this.rewardConfig
+      this.rewardConfig,
+      false // Evaluation mode - no feature noise
     );
 
     let state = env.reset();
@@ -328,6 +431,13 @@ export class Trainer {
   }
 
   /**
+   * Get walk-forward metrics (only available after training with useRollingValidation)
+   */
+  getWalkForwardMetrics(): WalkForwardMetrics[] {
+    return [...this.windowMetrics];
+  }
+
+  /**
    * Log message
    */
   private log(message: string): void {
@@ -338,11 +448,19 @@ export class Trainer {
   }
 }
 
+export interface WalkForwardMetrics {
+  window: number;
+  trainWinRate: number;
+  valWinRate: number;
+  valSharpe: number;
+}
+
 export interface TrainingResult {
   metrics: TrainingMetrics[];
   evaluations: EvaluationResult[];
   finalEvaluation: EvaluationResult;
   agent: DQNAgent;
+  walkForwardMetrics?: WalkForwardMetrics[];
 }
 
 /**
@@ -355,7 +473,7 @@ export function backtestAgent(
   stateConfig: Partial<StateBuilderConfig> = {},
   rewardConfig: Partial<RewardConfig> = {}
 ): BacktestResult {
-  const env = new TradingEnvironment(candles, envConfig, stateConfig, rewardConfig);
+  const env = new TradingEnvironment(candles, envConfig, stateConfig, rewardConfig, false); // Backtest mode - no noise
   const evaluator = new Evaluator();
 
   let state = env.reset();

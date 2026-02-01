@@ -1,10 +1,11 @@
 #!/usr/bin/env npx tsx
 /**
  * Train Agent
- * CLI script for training the RL trading agent
+ * CLI script for training the RL trading agent with walk-forward validation
  *
  * Usage:
- *   npx tsx scripts/train-agent.ts --data ./data/BTCUSDT_1h.json --episodes 1000 --output ./models/agent-v1.json
+ *   npx tsx scripts/train-agent.ts --data ./data/BTCUSDT_1h.json --episodes 100
+ *   npx tsx scripts/train-agent.ts --data ./data/BTCUSDT_1h.json --episodes 500 --no-walkforward
  */
 
 import fs from 'fs';
@@ -32,6 +33,10 @@ interface Args {
   gamma: number;
   epsilonDecay: number;
   verbose: boolean;
+  walkforward: boolean;
+  trainWindow: number;
+  testWindow: number;
+  stepSize: number;
 }
 
 function parseArgs(): Args {
@@ -54,15 +59,20 @@ function parseArgs(): Args {
 
   return {
     data: options['data'] || './data/BTCUSDT_1h.json',
-    episodes: parseInt(options['episodes'] || '500', 10),
+    episodes: parseInt(options['episodes'] || '100', 10),
     output: options['output'] || './models/agent.json',
     validateSplit: parseFloat(options['validate-split'] || '0.2'),
     initialCapital: parseFloat(options['initial-capital'] || '10000'),
     positionSize: parseFloat(options['position-size'] || '0.1'),
-    learningRate: parseFloat(options['learning-rate'] || '0.001'),
+    learningRate: parseFloat(options['learning-rate'] || '0.0003'),
     gamma: parseFloat(options['gamma'] || '0.99'),
     epsilonDecay: parseFloat(options['epsilon-decay'] || '0.995'),
     verbose: options['verbose'] !== 'false',
+    // Walk-forward validation (enabled by default)
+    walkforward: options['no-walkforward'] !== 'true',
+    trainWindow: parseInt(options['train-window'] || '4000', 10),
+    testWindow: parseInt(options['test-window'] || '1000', 10),
+    stepSize: parseInt(options['step-size'] || '500', 10),
   };
 }
 
@@ -131,6 +141,11 @@ async function main() {
     logInterval: 5,
     verbose: args.verbose,
     earlyStoppingPatience: 30,
+    // Walk-forward validation
+    useRollingValidation: args.walkforward,
+    rollingTrainWindow: args.trainWindow,
+    rollingTestWindow: args.testWindow,
+    rollingStepSize: args.stepSize,
   };
 
   const envConfig: Partial<EnvironmentConfig> = {
@@ -138,6 +153,13 @@ async function main() {
     positionSize: args.positionSize,
     randomStart: true,
     maxDrawdownLimit: 0.25,
+    // Near-zero costs
+    spread: 0.00001,
+    commission: 0.0001,
+    slippage: 0.00001,
+    // Tight SL/TP to limit loss size and lock profits
+    stopLossPercent: 0.015, // 1.5% stop - smaller to limit losses
+    takeProfitPercent: 0.03, // 3% TP - 2:1 risk-reward
   };
 
   const dqnConfig: Partial<DQNConfig> = {
@@ -148,7 +170,14 @@ async function main() {
 
   console.log('Training configuration:');
   console.log(`  Episodes: ${args.episodes}`);
-  console.log(`  Train/Val split: ${(1 - args.validateSplit) * 100}%/${args.validateSplit * 100}%`);
+  console.log(`  Walk-forward: ${args.walkforward ? 'ENABLED' : 'disabled'}`);
+  if (args.walkforward) {
+    console.log(`    Train window: ${args.trainWindow} candles`);
+    console.log(`    Test window: ${args.testWindow} candles`);
+    console.log(`    Step size: ${args.stepSize} candles`);
+  } else {
+    console.log(`  Train/Val split: ${(1 - args.validateSplit) * 100}%/${args.validateSplit * 100}%`);
+  }
   console.log(`  Initial capital: $${args.initialCapital}`);
   console.log(`  Position size: ${args.positionSize * 100}%`);
   console.log(`  Learning rate: ${args.learningRate}`);
@@ -224,6 +253,21 @@ async function main() {
     console.log(`  Sharpe Ratio: ${final.metrics.sharpeRatio.toFixed(3)}`);
     console.log(`  Max Drawdown: ${final.metrics.maxDrawdown.toFixed(1)}%`);
     console.log();
+
+    // Walk-forward summary if available
+    if (result.walkForwardMetrics && result.walkForwardMetrics.length > 0) {
+      const wf = result.walkForwardMetrics;
+      const avgGap = wf.reduce((a, m) => a + (m.trainWinRate - m.valWinRate), 0) / wf.length;
+      const avgValSharpe = wf.reduce((a, m) => a + m.valSharpe, 0) / wf.length;
+      const positiveSharpWindows = wf.filter(m => m.valSharpe > 0).length;
+
+      console.log('Walk-Forward Summary:');
+      console.log(`  Windows tested: ${wf.length}`);
+      console.log(`  Avg train/val gap: ${avgGap.toFixed(1)}%`);
+      console.log(`  Avg validation Sharpe: ${avgValSharpe.toFixed(2)}`);
+      console.log(`  Windows with positive Sharpe: ${positiveSharpWindows}/${wf.length}`);
+      console.log();
+    }
 
     // Save model
     const weights = await result.agent.saveWeights();

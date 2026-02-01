@@ -1,0 +1,462 @@
+[
+  {
+    "content": "## Section 1 [0:10]\n\nokay folks welcome back this teaching is going to be specifically dealing with implementing the Asian range alright the Asian range notice it does not say ICT Asian range I did not create this or author this concept my first introduction to it was from another trader which I'll mention later on in the presentation but what ICT concepts are going to be used in this module we're gonna be introducing the Asian range I'm going to be defining what the Asian range is in charts and I want to teach you how to utilize it in bullish conditions and how to utilize it in bearish conditions all right introducing the Asian range now what is the Asian range well the price action prior to the Frankfurt open or London opening can be very indicative of the future intraday",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 1 [0:10]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 191,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 2 [1:10]\n\nprice movement now when we have a directional bias you can use this Asian range to build or frame a context or story line to the markets likely intentions there is a stillness in price many times right before the intraday directional impulse price swing you look at the chart here on the right this is an Aussie dollar chart you can see that there is a little shaded area right in here and it's delineate 'add with the gray shaded box and I've labeled it not surprisingly the Asian range so this little piece of price action okay I actually learned about this from Chris Laurie and I'll show you what I was doing before I learned this so that way you can see I already had a beat on what price should be doing but when I first saw him refer to it in his free",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 2 [1:10]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 190,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 3 [2:07]\n\nteachings he has a website Chris Laurie comm it's changed and morphed a little bit over time but folks that have gone through his material didn't know who I'm referring to they would not an agreement that they would know what I'm saying is true he taught about the Asian range many times in free teachings so it's not like I'm taking anything away from him in fact if you're not happy with what you see in my content but you do want to take some advice from someone that has seen a lot of things out there Chris Laurie has a lot of good price action study and his methods while they are not mine there's some similarities to what Chris does but I'm going to show you what I took away from him this is the only thing I really learned from",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 3 [2:07]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 185,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 4 [2:54]\n\nChris Laurie really but yeah that's not to diminish his importance as a teacher or what he knows I'm just saying that this is what I gleaned from his material I liked it because I was already familiar with using consolidations in certain periods of a training 24-hour period if you take certain ranges you can do some magical things with them and I teach you that in the mentorship and it goes well beyond what I've done in YouTube videos over the past couple of years so what I liked about it was I've seen a lot of context right away when I seen how that the range is applied to the chart so I will give you what I used to do and how I used entry techniques to do it so that way you have a little bit of a takeaway you not only just talked",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 4 [2:54]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 186,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 5 [3:40]\n\nabout the range itself but what we can do with it and then I'll show you what I've done with it to incorporate it now I'm not teaching you everything I know about this range and what I've done with it over the last mmm ten years or so the the implementation of it I think is useful for a developing trader but there has to be some context behind it the range itself doesn't produce anything magical but if you have a storyline behind what price should be doing that particular day it is unbelievably helpful okay so let's define the Asian range of work what is it that we can do in our charts to make it up here and draw attention to it well the range begins at 7:00 p.m. New York time and it ends at midnight New York time now a special inclusion here Chris Laurie",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 5 [3:40]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 192,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 6 [4:40]\n\nhad his Asian Range pushed beyond midnight if my if memory serves me correct I believe he had 12:30 a.m. and to me the financial markets really begin at midnight New York time and it probably sounds pretty arrogant of a gang like me being in the States but if you just study what I'm teaching you folks you'll see right away what I'm telling you is the gospel as it relates to intraday price actions only now everything else might be something different but as far as intraday price action I think I've cornered the market in intraday price action so the height of the range is the highest high between 7:00 p.m. to midnight in New York time to the lowest low between 7:00 p.m. and midnight New York time the width of the range is obviously the duration of 7:00",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 6 [4:40]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 191,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 7 [5:29]\n\np.m. to midnight New York time so let's take a look at this chart here and we'll get a little bit closer zoom in on it okay I'll cover some points here now right away when you see this it probably still doesn't give you any kind of insight and that's fine but I'm gonna build on it and show you how useful it is but we're gonna build the model with specific buy and sell conditions later on in this video but for now take a look at what you see here okay and kind of like Burness in your mind your focus should every single day be zeroed in on 7:00 p.m. New York and whatever that time is on your broker's platform whatever your charting platform or package shows find out what time it is at 7:00 p.m. New York time and then find that same time on your charts that's",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 7 [5:29]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 192,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 8 [6:23]\n\nwhere you put a vertical line at and that begins the asian session and then five hours later it'll be midnight in New York time put another vertical line in and there's your Asian range defined by the duration the highest high and the lowest low is what we would use to frame out the range now there's a lot of Voodoo that you can do with this range okay and again I'm not teaching it here but believe me it can take you to the highest in the lowest pit of the day there's some things you have to incorporate in that and I teach that in the mentorship but for now let's teach you a very simple approach to how to use this and when you can filter out trades and not do anything that may end up taking a loss if you do otherwise so let's take a",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 8 [6:23]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 186,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 9 [7:10]\n\ncloser look and remove all of the benefit of seeing the price action there okay now we do have the benefit of hindsight but nonetheless I want to kind of build an understanding about what this range does or at least my interpretation of it now I was able to see right away the importance of utilizing it in my view on price action during this range what's actually happening is there's orders that are coming in and they're stacking up above the market and below the market relative to that range and it's also building up a market sentiment now this compression of market participation starts to build up closer and closer and closer until we get to midnight in New York soon as we cross over midnight time in New York we are in fertile ground for price movement",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 9 [7:10]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 191,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 10 [8:03]\n\nwe're going to assume that everyone in this listening audience is familiar with channels ok or trading ranges the idea is above this range there's going to be buy orders those buy odors are going to act as breakout artists ok in other words they are not astute to know how to buy when it's a low price or technically oversold without the use of indicators so they just want to be buying on strength and there's really nothing inherently wrong about that if you know what you're looking for but most traders don't know what you're looking for and they just go in any willy nilly and entry based on breaking out above a know high they'll buy that and view that as strengths and I'll put the stop-loss right below the low which would be here short sellers would do the opposite they",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 10 [8:03]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 195,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 11 [8:56]\n\nwould have their sell orders below this range so any movement lower would hopefully put them in a short position and they would take the other end of that range and put their protective by stop so buyers that want to break out above this consolidation are going to buy want to stop with a protective cell stop below the low short sellers want to sell on a stop and use a protective buy stop above the high okay so the storyline is what are we gonna do after midnight which is this vertical line here what's the storyline where are we going to go my whole entire career has been based on understanding dis phenomena and it's been a more or less a pursuit of excellence so I want to know with the highest probability which side are they",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 11 [8:56]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 184,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 12 [9:49]\n\ngonna work on okay and what I mean by that is are they going to try to put a specific party of traders whether people wish or bearish traders in on the wrong side right before London creates what the higher low of the day so the key is and this is to take away so far in us this is what should be even in your notes right now is what you're looking for what sets up the opportunity if you will for the particular trading day is if we have a very narrow consolidated range between 7:00 p.m. and midnight or what would be deemed as the Asian range so if we have a very narrow consolidation there that sets up a huge possibility of the algorithm going into a trending model okay so in other words without going into IFTA and teaching anything really about that the market",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 12 [9:49]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 192,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 13 [10:42]\n\nwill seek the liquidity above or below this range with a premise that it's going to put them in the wrong side and then it'll go the other way for the remainder of the trading day okay so let's take a look at how it can utilize it in a bullish condition now the periods when price is bullish we can extend the age and range high and low into the future when price returns back to the Asian range high we can anticipate institutional buying let's take a look at that as an example here we're going to assume that we have in understanding our expectation if you will that the Aussie dollar was bullish for this particular day now if you want to know what would blend well to coming to that conclusion of being bullish if you look at the daily chart you'll see",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 13 [10:42]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 190,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 14 [11:39]\n\nthat there was a reason for the Aussie dollar reached up to a equal high okay and go down to a four hour or one hour chart you'll see also that it's obvious you can see it so far what we've shown in the teachings in this series it's been pretty obvious to know where the liquidity is and that's what this whole day was reaching for the buy stops above equal high now again I want to take off the Asian range and provide just a blank chart okay and assume for a moment pre my exposure okay to asian range this is what I used to do okay this is how I actually traded and I was doing this since 1994 so you'll appreciate hopefully the evolution if you will of my understanding about how this whole buying below the open when it's bullish or selling above the open when it's",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 14 [11:39]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 193,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 15 [12:39]\n\nbearish all those ideas came from this individual specific element that I'm going to show you now I would have on my chart a list of all kinds of indicators okay so I'm gonna spare you all that but if we just look at price actions as a naked form of open high low and close it can be rather well confusing but if you look for specific times of the day and specific generic concepts or characteristics that should manifest themselves then there's a storyline that will start to develop and you get this over the years many times it's referred to as tapereading many times it's referred to as gut feeling or just triggers intuition or just last I call it intuition and experience if you will once you know what you're looking for you wait for",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 15 [12:39]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 185,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 16 [13:36]\n\nthat scenario to unfold so this is what I would have done without the Asian range this is how I always treated the SP the bond market and currency futures I would get the opening price at midnight okay and that opening price is seen here right there and all I do is draw that opening price out all the way out until 11 o'clock in the morning New York time now the reason why I would draw it out to 11 o'clock in the morning New York time is because that would be the end of the morning trend for the S&P 500 okay so that there's a reason for that hour it's not that I'm just pulling it number out of the air it's also very close to what was taught in the previous teaching the London close so that's what makes that London close scenario it's the end of the a.m. trend when the stock",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 16 [13:36]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 196,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 17 [14:26]\n\nmarket or equities market in the states also it overlaps conveniently enough with the close of London trading so there's a little bit of manipulation that goes on in there and some profit taking so it creates an opportunity but for opening range concepts I draw it out to 11 o'clock in the morning New York time okay so if we are looking for a bullish scenario and I'm gonna just make the case that we would be expecting a higher Aussie dollar here I want to see price initially drop down below that opening price because I want to be buying below the opening price the understanding is is I want to figure out what Larry Williams said he couldn't do as a teacher I took it as a challenge as a student that that's what I'm gonna look for I'm gonna figure that out and",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 17 [14:26]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 192,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 18 [15:17]\n\nthis is what my interpretation of how to do that very thing was seen in price action I would use the opening price and as it dropped down I would buy right there now if I either did not have the guts to do that or I missed the opportunity sometimes I would wait for a specific price it wouldn't get there and then it would take off if I saw a reversal or potential reversal I would look at the high rate but right before the drop down in here you can see there was a small little segment of price action right before that drop down I would put a buy stop right there now as I graduated in my understanding I would look to get in as price was dropping down but I'd also have this buy stop in place even if I was able to get in many times price",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 18 [15:17]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 186,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 19 [16:11]\n\nwould sometimes snap me in and put me in own a buy stop and on my marker order as price was dropping down so in other words what I was doing was I was waiting for price to drop down below this horizontal line or a trend line segment here okay that's delineating open price at midnight in New York time the drop down below that I'm hopefully trying to buy that now as it starts to drop my eye goes right here because now we're below the opening price it may go lower and give me my ultimate price of entry but it may not so as soon as it starts to break down after midnight and it goes back to back down below the opening price I immediately add a buy stop to half the position I want to trade at this point here so in other words if my full position down here was say ten",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 19 [16:11]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 193,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 20 [16:56]\n\nstandard Lots I would go in with a buy stop at five standard Lots right here so that way at worst case scenario if I don't get my fill here and it reverses if you will and runs real quick for these highs it'll put me at least half the position I wanted to get on down here so half of something is better than nothing if I were able to put on the full position down here I would still try to take this stop-off if I get my full position on down here sometimes I wasn't able to do that now the problem is and your mind is okay what happens if you put your pole position down here and you're risking 2% well I wasn't risking 2% so I'm trading at 1% 1/2 percent and then this position here if it fills me I'm not over leverage or if I do get one",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 20 [16:56]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 186,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 21 [17:46]\n\nhalf percent on here and this half here it would technically put me over two-and-a-half percent risk but I'm gonna be more aggressive about trying my initial stop-loss up to try to pare that down to 2% okay and that's really what I was doing now let's contrast what I just did here with the implementation of the agent range and this is exactly where price would fill you with that buy stop being tripped so now I would be long here if I didn't get filled down here below the opening price at midnight this would be where my buy stop with filming and my stop loss would be below the low and you can see I had to weather this retracement here and then because he gets the move later on in the day now let's take this discussion back the implementation of the Asian range and",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 21 [17:46]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 194,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 22 [18:31]\n\nI'll show you how I evolved and seen a much clearer view on price action using the range as I define it here 7 o'clock p.m. New York time to midnight zero zero level not like 12:30 or 1:00 o'clock in the morning on that stuff exactly at midnight ok because what we're banking on is the midnight opening price that's what sets the algorithm it goes through it goes to a reset if basically if you if you want to think of it like that so if we're bullish it's going to go below that opening price to seek liquidity and then go higher and spend the rest of the day going higher when it's bearish it'll go above the opening price at midnight to reach for liquidity and then move lower for several hours going into London closed or New York open so let's take a look at what's going on",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 22 [18:31]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 195,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 23 [19:26]\n\nwith the implementation of the agent range now we have a tight asian range in here okay and again by odors are above the range sellers are below the range price right after midnight does what goes up and taps the asian range high now you're saying okay well it didn't go above it let your stop be there and I guarantee you the broker spread will open up wide enough to get that and you'll be in long and your stop-loss which will be right that low or just below it will be tagged right there even though it reflects here your broker and this is what you sign up with when you open up your account you are giving them permission to open the spreads up on you everybody makes this big complaint about oh well they did this they did that you sign it and you agree to it so when you",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 23 [19:26]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 195,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 24 [20:19]\n\nsee people online saying a date rig with three pip stop losses that's not true it's not accurate and they are not doing it with live accounts because believe me in-house plenty money gains with the brokers would eat them up immediately it would not happen okay I think personally with a stop loss of anything less than 10 pips is just ludicrous it's stupid okay because Begley is from a retail brokers standpoint you're inviting them to take your stock it's just way it is you can argue with me and give me all kinds of track history and say well I'm trading with a five pip stop here and there it's fine do it ten years and see how many times get burned the point is why offer yourself up on the altar for that sacrifice when there's better ways of",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 24 [20:19]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 188,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 25 [21:06]\n\ndoing it you don't have to have less than 10 pip stop losses to do very well we have an Asian range in here with the understanding or in this model we're gonna expect bullishness okay and price starts to go up initially and comes back down and breaks the asian range down here so we take out the low on the asian range that's been extended beyond midnight that trips in sellers and it also knocks out individuals that would have been pulled in on a buy stop right at this level so long holders are in and now they're out short holders are in now and their stop-loss is above here or here so they're taking both sides of the marketplace in and out and then the market takes off goes higher what we look for is this little movement right here that movement is what sets the tone",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 25 [21:06]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 194,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 26 [22:02]\n\nwhen we're bullish we want to be buying there or we can do what I showed earlier you can put a buy stop right here if it gets filled a contingent order that would be if I'm filled with your broker for cancer order basically if we have a parent contingent order suggesting they who buy on a stop if that stock gets filled if it happens then we would place a sell stop below this low at some specific price level and you could leave that in the marketplace and go to sleep and don't even worry about watching all this stuff okay that's one way you can apply a day traders model and/or enter with a long term model but using a day traders approach to trading that whole entry if you've missed this one okay and price starts to rally away we have to have the story line behind this example",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 26 [22:02]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 197,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 27 [22:56]\n\nof being bullish otherwise this could be an easy sell as you'll see when we talk about when the conditions are bearish but knowing where the market is most likely trying to go from a higher time frame standpoint is significant and crucial and utilization of the Asian range otherwise you're just going to do some things that aren't going to be profitable so if we're bullish we'd like to see this element here and then this here no problem we don't need to get that and we don't need to be a part of this movie or okay we wouldn't wait for price to come back down and touch the Asian range high now it does so here that's a little early and then we do it again in the New York open so New York open we see price trading back to the Asian range high right there is where",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 27 [22:56]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 193,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 28 [23:43]\n\ninstitutional buying is going to step in why are they doing that because the initial range that was set between 7:00 p.m. and midnight midnight is when HIPAA the interbank price delivery algorithm resets and then it it attacks open liquidity or the open flow which would be the order table of the agent range and below the agent range all right you know you're gonna know 15 different people that work at a bank or they know somebody they smoke cigars with on the weekends in the air market maker they're gonna say what I just said to you is nonsense but I'm telling you they don't know what you're talking about because I'm doing this daily to the PIP week after week day after day and I'm telling you it's not based on",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 28 [23:43]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 180,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 29 [24:26]\n\nanything else except for what I learned okay and some of the things are gonna go in the category of tinfoil hat and I'll just let you wrestle with that I don't really care about your opinion just know that what I'm suggesting to you here if you look at it in price action it's there so we can see the optimal trade entry from this low to this high retrace back down New York open overlap with the Asian range high with the story line is that we're bullish on the higher time frame beautiful illustration of a Asian range application in bullish conditions in an off to the races we go so we have two opportunities in here in the New York open and we have one set up here that gives us a really really low and entry point with very little risk in terms of our entry and then the",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 29 [24:26]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 194,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 30 [25:18]\n\nsubsequent move higher the other portion would be entering on a stop here above the Asian range but you wait you have to sit up and you have to wait for price to drop down below the Asian range then you buy want to break above the asian range high but the conditions have to be bullish and we have to first see Asian range low break then a buy stock can be placed at the Asian range high if you do this before the Asian range low is taken you will get burned you will get stopped out you will send me email saying doesn't work I'm telling you there's rules here and it just gave them to you rewind the video and listen to it again it's very clear all right say utilization of the Asian range in bears conditions okay again",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 30 [25:18]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 181,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 31 [26:06]\n\nlike we said but when it's bullish there's a period it's quiet right before the Frankfurt and London open and we wouldn't focusing on that and when it's in a tight narrow consolidation we're gonna be looking for some measure of manipulation if you will on price action so what we're going to doing is waiting for a break in the Asian range low and then when price trades back up to it we're going to be anticipating institutional selling so let's take a closer look at this example here zoom in here get some more detail now let this image burnin for a minute okay and now we're going to take it off and go to an element of naked price action and I'm gonna show you what I was doing prior to learning about the Asian range there's the opening price again this",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 31 [26:06]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 190,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 32 [26:58]\n\ncandle and I would be looking for bearish price movement and if we're going to just suspend your disbelief whether or not I was actually bears before this day or not trust me and go through my Twitter you'll see all kinds of examples of me doing this very thing but nonetheless we're gonna sue for sake of argument that we're bearish on this particular currency that day okay we're gonna be looking for price movement above the opening price that's what I'm looking for here okay now I learned early on that these levels these double tops they were fake outz and that's why I loved the turtle soup trading pattern that I learned in a book called street smarts and if you don't have it you should buy it's a very very good book but that pattern in there resonated with",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 32 [26:58]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 192,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 33 [27:46]\n\nme because I was already doing things similar to that and I would just look for those equal highs and equal lows which I've already taught you in this series and right away there's a large number of you in our community that are just going through the roof right now with excitement cuz now you see something that's always been there but now you see it and it's useful to you you can see where price is drawn to well if we see this time of day this is midnight and we're bearish we have equal highs in here right away I want to know there's going to be a rally above the opening price and I extend that out in time about love o'clock in the morning New York time and any time price trades above that opening price and it's inside of a kill zone that means the London or",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 33 [27:46]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 193,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 34 [28:30]\n\nNew York open kill zone if it trades above that opening price I will look to go short now if we go above it and this is what I was doing before I started incorporating the Asian range concept I would just simply look for this rally above if I got this scenario here I was selling right there I would sell short the SP I would sell short Deutschmark I would sell short the Swiss franc I would swell the and all those commodity futures contracts that's what I would that was my entry technique right there and then I would go to sleep and wake up around 5 o'clock and more and hopefully I'd get some profit and I would take something off try my stop-loss really really tight sometimes get stopped out other times it would carry right on over into Globex into",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 34 [28:30]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 189,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 35 [29:13]\n\nopen outcry in the pits and then I would catch some more follow-through in the day session hours in the New York session but if that's my entry point there just like anybody else life may get in the way I may get sick my kids may be complaining about growing pains and I can't be in front of my charts you know this happens you know I'm a dad I'm a husband I own - I'm a pet parent own two boxers and anything can happen okay the distract me from actually getting in where I want to get in it I don't always use limit orders there are certain conditions where I want to use a limit order but mainly I want to be executing rate when the markets happening to be trading against my directional bias for the day I don't mind market order some folks that say",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 35 [29:13]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 189,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 36 [30:04]\n\nyou shouldn't be using market orders you know they should be using limit orders again that goes along with not knowing what I do I'm actually trading aggressively rate as the markets screaming higher I go marketing selling short rate than in there and you seen my examples I'm getting in there rate to highs and order very lows so I don't care what anybody else's opinion is I can do it over and over again you're not repeatedly showing it week after week if you are up in a week looking at lemon you can use market orders but if I am NOT going to be awake I will put a limit order in about two pips above these equal highs my limit order would be about bear and my stop-loss will be about 35 to 40 pips and I would go to sleep and be comfortable with that ok I",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 36 [30:04]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 191,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 37 [30:48]\n\nwould have an 80 pip take profit on the full position that way if I did wake up and it moved an accelerated pace and move 80 pips that would be 5 pips over my weekly objective which is 75 pips I'm always aiming for fifty seventy five pips only for a weekly objective once I do that I'm done trading I don't do anything else but I leave myself the opportunity to catch a tiger by the tail if I wake up and the markets already moved 80 pips I'm done for the week and I didn't do anything but sleep in the whole process but if I miss this opportunity okay if I miss it my eyes go rate to the low that form prior to that run above the opening price when I'm bearish so I'm going to place a sell stop to get me in now sell stops gentlemen you understand them as a",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 37 [30:48]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 190,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 38 [31:37]\n\nprotective basis or mechanism to protect your long position if there is no long position and you place a sell stop it's going to put you in short and that's what I'd be expecting to see happen here so in price drops down I could be short there and my stop-loss would be above the high today so let's assume for a moment that I missed this opportunity here and I just can't stay up something happens you know my wife is getting ready have a baby this has happened I had to take a trade so I'm you know I have to trade folks okay it is what it is okay and I had to hear about it on the way to the hospital that day but nonetheless you know this is this is real-life stuff here folks so if I miss the opportunity to get in okay and and the Swiss franc is looking to go",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 38 [31:37]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 192,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 39 [32:26]\n\nlower I'm gonna place a sell stop a little swing low right before the rally above the opening price with the expectation that if this order fails it will place a protective buy stop above the high + 3 pips and then again same scenario I would take profit of 50 tips which is a low and I make weekly objective and that's it I don't trail my stop I do not trail stops I do not have a mechanism that trails my stop-loss slower because I don't think it should be done okay I teach taking partials is the better way to go and leave your stop-loss where you initially put it manage the risk from taking partials and then slowly move it down after New York trading starts because if you're gonna get a big",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 39 [32:26]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 175,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 40 [33:08]\n\ngrain today like we see here you want to trail the stop-loss after New York has done its retracement if we take the conversation back to the utilization of the Asian range we can see here what's actually happening is we have a tight narrow consolidation and we're bearish now think we have folks that want to buy on the breakout they get tripped in with the move above the asian range high here so now what are they they're long wears their stuff lots gonna be at right below that low mark goes right down below there to take their stops notice it doesn't just go a little bit it goes conveniently 10 pips below it it's gonna sweep out anybody that has a stop loss at or just below that low and using that little tail over here they think that they're safe they're not the real move",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 40 [33:08]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 196,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 41 [33:51]\n\nis running above the asian range high after the buys have been put in then taken out driven back up again why because short sellers that we're lucky enough to try to sell short at the top of this channel or trading range they're making money here they're not going to be allowed to be profitable they run on their stops which would be a buy stop run above these highs that's where you're looking to be a seller this is the lowest risk high probability entry for using the Asian range if we wait for the Asian range low to be broken and it reads back up to it that's the other entry point using the Asian range so we can see there's two ways of using this range selling above the Asian range high when we're bearish best scenario especially if you have the centering",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 41 [33:51]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 192,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 42 [34:42]\n\nthat's been outlined here understand the storyline you have to have a bias on the day and do not change gears based on all this little movement here you have to stick to what your analysis is calling for our time frame is going to go lower so we want to be looking for the market to take out the Asian range high if that happens we could sell short there or the low risk confirmation trade is wait for the Asian range low the break and then trade back up to it and then we can sell there okay and if it happens to occur during an ICT kill zone London open or New York open their probabilities go through the roof in terms of being well accurate and then you can see that unfolding your charts if you go through the the charts with this in mind okay just put the asian range on and paint",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 42 [34:42]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 197,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 43 [35:37]\n\nthem manually I know you all want indicators and pop this up and empty for this and empty for that physically draw them in spend some time in the charts get intimate with price action because it's going to teach you a lot more I had to do this stuff with charts that were you know drew hand-drawn like I I had well session with printed charts so I would print out charts and I would do all these things by hand and a ruler and a magic marker and highlighter that's the stuff I used to do and then I'm convinced that's what made me good at it being lazy about this okay what you're really saying is is I don't really have time to really study it just give me the lipstick on the chart and then there it is you will not get the same level of appreciation or understanding if you",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 43 [35:37]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 194,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 44 [36:25]\n\nshort cut it draw the levels on as I taught so by taking the time to draw this out manually and reminding yourself okay maybe even be worth taking the time to type out a notation you know in this in this area here to not focus one two movements below the age range okay focus primarily on a move above the Asian range high when we're bearish and/or if we break the low the Asian range after midnight wait for a retest uniform for resistance now think about what you're seeing here if we look at price action like this if what if we don't use the asian range concept here as i'm outlining the question is is why would this be a selling point i mean granted you know you can go back to this low here and say well that's probably a reason for it but would you really look",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 44 [36:25]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 192,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 45 [37:28]\n\nat that after seeing this and then this movement through yeah without this in sight chances are you're probably not going to see this actual scenario and that's just a difference between understanding tape reading and building context behind price and also sticking with a bias it's important to know what a trading bias is for any given day and anyone that tells you don't trade with a bias they're the ones that are telling you that because they don't know how to do it I've given many examples on how you can arrive at a daily bias and you're not gonna get a daily bias that's accurate every single day so don't let me paint that picture for you but I can be in the upper 90s in terms of my probabilities and directional bias if you can get just 65 to 70 percent",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 45 [37:28]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 192,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  },
+  {
+    "content": "## Section 46 [38:12]\n\naccuracy with or with your bias and then wait for conditions like I'm showing you here adding time of day kill zones daily bias focusing was the Asian range we've already looked at power three it builds the entire model for the daily range and you are not surprised when certain things happen in fact you're anticipating them before they happen and by seeing day after day after day of doing this you become much better at well interpreting price action and forecasting which is a skill set that you cannot learn from reading books or watching my videos you have to spend time in the charts and if you do that I promise you you will glean more that than anything else that you would ever study I hope you enjoyed this presentation and if you did you can find",
+    "sourceType": "youtube",
+    "concept": "market-maker-series",
+    "section": "Section 46 [38:12]",
+    "filePath": "JA0mLNJeytY",
+    "tokenCount": 190,
+    "sourceUrl": "https://www.youtube.com/watch?v=JA0mLNJeytY",
+    "videoId": "JA0mLNJeytY"
+  }
+]

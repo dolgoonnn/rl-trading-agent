@@ -1,0 +1,3357 @@
+{
+  "videoId": "iZLXnNiZm_s",
+  "language": "en",
+  "segments": [
+    {
+      "text": "all right folks welcome back this is",
+      "start": 5.08,
+      "duration": 4.68
+    },
+    {
+      "text": "episode nine for the 2022 ICT mentorship",
+      "start": 6.6,
+      "duration": 4.6
+    },
+    {
+      "text": "on",
+      "start": 9.76,
+      "duration": 3.56
+    },
+    {
+      "text": "YouTube this lecture is going to be on",
+      "start": 11.2,
+      "duration": 3.599
+    },
+    {
+      "text": "Power Three which is accumulation",
+      "start": 13.32,
+      "duration": 4.28
+    },
+    {
+      "text": "manipulation and distribution and New",
+      "start": 14.799,
+      "duration": 5.921
+    },
+    {
+      "text": "York PM session",
+      "start": 17.6,
+      "duration": 3.12
+    },
+    {
+      "text": "opportunities all right so we're looking",
+      "start": 25.279,
+      "duration": 4.76
+    },
+    {
+      "text": "at the NASDAQ e- mini Futures this is",
+      "start": 26.96,
+      "duration": 6.16
+    },
+    {
+      "text": "The Continuous chart on trading",
+      "start": 30.039,
+      "duration": 6.36
+    },
+    {
+      "text": "view so if you look at the daily range",
+      "start": 33.12,
+      "duration": 5.68
+    },
+    {
+      "text": "where we've",
+      "start": 36.399,
+      "duration": 2.401
+    },
+    {
+      "text": "been we're inside this range here okay",
+      "start": 38.879,
+      "duration": 4.68
+    },
+    {
+      "text": "so we",
+      "start": 42.12,
+      "duration": 3.56
+    },
+    {
+      "text": "have this swing",
+      "start": 43.559,
+      "duration": 4.961
+    },
+    {
+      "text": "high and this swing low now why am I",
+      "start": 45.68,
+      "duration": 5.12
+    },
+    {
+      "text": "picking these two reference points well",
+      "start": 48.52,
+      "duration": 5.24
+    },
+    {
+      "text": "namely this is the low most recently",
+      "start": 50.8,
+      "duration": 5.36
+    },
+    {
+      "text": "after taking out this short-term low so",
+      "start": 53.76,
+      "duration": 5.04
+    },
+    {
+      "text": "we've dug into all the sell side",
+      "start": 56.16,
+      "duration": 4.8
+    },
+    {
+      "text": "liquidity resting below that",
+      "start": 58.8,
+      "duration": 5.6
+    },
+    {
+      "text": "low we retraced back up inside of this",
+      "start": 60.96,
+      "duration": 7.72
+    },
+    {
+      "text": "High to that low so we went back up",
+      "start": 64.4,
+      "duration": 8.96
+    },
+    {
+      "text": "into a premium the range high to low",
+      "start": 68.68,
+      "duration": 7.28
+    },
+    {
+      "text": "running a fib just to get the 50% level",
+      "start": 73.36,
+      "duration": 5.28
+    },
+    {
+      "text": "that gives us equilibrium anything below",
+      "start": 75.96,
+      "duration": 5.159
+    },
+    {
+      "text": "that is a",
+      "start": 78.64,
+      "duration": 4.839
+    },
+    {
+      "text": "discount notice how the market traded",
+      "start": 81.119,
+      "duration": 5.841
+    },
+    {
+      "text": "down on Monday into a deep",
+      "start": 83.479,
+      "duration": 6.721
+    },
+    {
+      "text": "discount but did not",
+      "start": 86.96,
+      "duration": 5.08
+    },
+    {
+      "text": "take out these lows over",
+      "start": 90.2,
+      "duration": 5.72
+    },
+    {
+      "text": "here but look how we closed on",
+      "start": 92.04,
+      "duration": 7.079
+    },
+    {
+      "text": "Monday we had an indecisive candle the",
+      "start": 95.92,
+      "duration": 5.36
+    },
+    {
+      "text": "body was basically absent the open and",
+      "start": 99.119,
+      "duration": 5.401
+    },
+    {
+      "text": "close was essentially you the same",
+      "start": 101.28,
+      "duration": 6.32
+    },
+    {
+      "text": "thing if we have that and the Market's",
+      "start": 104.52,
+      "duration": 6.84
+    },
+    {
+      "text": "trading down into a discount even though",
+      "start": 107.6,
+      "duration": 5.6
+    },
+    {
+      "text": "we might",
+      "start": 111.36,
+      "duration": 5.48
+    },
+    {
+      "text": "have a load down here that we're",
+      "start": 113.2,
+      "duration": 7.08
+    },
+    {
+      "text": "targeting this may require a retracement",
+      "start": 116.84,
+      "duration": 5.639
+    },
+    {
+      "text": "now notice at the close of Monday's",
+      "start": 120.28,
+      "duration": 4.68
+    },
+    {
+      "text": "trading we had an imbalance from this",
+      "start": 122.479,
+      "duration": 4.76
+    },
+    {
+      "text": "low and this",
+      "start": 124.96,
+      "duration": 5.44
+    },
+    {
+      "text": "high on Tuesday's trading",
+      "start": 127.239,
+      "duration": 6
+    },
+    {
+      "text": "overnight the equities",
+      "start": 130.4,
+      "duration": 5.44
+    },
+    {
+      "text": "markets had a run up into",
+      "start": 133.239,
+      "duration": 5.801
+    },
+    {
+      "text": "this imbalance here so this fair value",
+      "start": 135.84,
+      "duration": 7.24
+    },
+    {
+      "text": "Gap was ret traded to in",
+      "start": 139.04,
+      "duration": 6
+    },
+    {
+      "text": "here this",
+      "start": 143.08,
+      "duration": 5.28
+    },
+    {
+      "text": "low and this High we'll look at that in",
+      "start": 145.04,
+      "duration": 6.8
+    },
+    {
+      "text": "reference to the lower time frame",
+      "start": 148.36,
+      "duration": 3.48
+    },
+    {
+      "text": "this lower",
+      "start": 154,
+      "duration": 3.959
+    },
+    {
+      "text": "level is the low end of the fair value",
+      "start": 155.239,
+      "duration": 5.441
+    },
+    {
+      "text": "gap on the daily chart and this level up",
+      "start": 157.959,
+      "duration": 5.721
+    },
+    {
+      "text": "here is the upper end of the fair value",
+      "start": 160.68,
+      "duration": 5.639
+    },
+    {
+      "text": "Gap I'm taking your attention to",
+      "start": 163.68,
+      "duration": 4.839
+    },
+    {
+      "text": "Monday's",
+      "start": 166.319,
+      "duration": 4.121
+    },
+    {
+      "text": "trading and I want to talk a little bit",
+      "start": 168.519,
+      "duration": 4.64
+    },
+    {
+      "text": "about power three which is accumulation",
+      "start": 170.44,
+      "duration": 6.719
+    },
+    {
+      "text": "distribution and manipulation okay",
+      "start": 173.159,
+      "duration": 7.481
+    },
+    {
+      "text": "so generally my teachings are like this",
+      "start": 177.159,
+      "duration": 4.8
+    },
+    {
+      "text": "if I'm",
+      "start": 180.64,
+      "duration": 4.159
+    },
+    {
+      "text": "bullish I'm expecting the opening price",
+      "start": 181.959,
+      "duration": 6.041
+    },
+    {
+      "text": "to be near the low of the day or the",
+      "start": 184.799,
+      "duration": 6.281
+    },
+    {
+      "text": "session then it trades lower making some",
+      "start": 188,
+      "duration": 5.879
+    },
+    {
+      "text": "important low and then",
+      "start": 191.08,
+      "duration": 5.159
+    },
+    {
+      "text": "rallies creates a",
+      "start": 193.879,
+      "duration": 4.601
+    },
+    {
+      "text": "high and then closes near the high of",
+      "start": 196.239,
+      "duration": 5.441
+    },
+    {
+      "text": "the day now it's not important for you",
+      "start": 198.48,
+      "duration": 5.8
+    },
+    {
+      "text": "to try to predict the closing price what",
+      "start": 201.68,
+      "duration": 4.559
+    },
+    {
+      "text": "I'm trying to train you to",
+      "start": 204.28,
+      "duration": 4.039
+    },
+    {
+      "text": "anticipate is the likelihood of the",
+      "start": 206.239,
+      "duration": 4.881
+    },
+    {
+      "text": "market making some kind kind of a fake",
+      "start": 208.319,
+      "duration": 5.12
+    },
+    {
+      "text": "move like a Judas swing okay Judas swing",
+      "start": 211.12,
+      "duration": 7.039
+    },
+    {
+      "text": "is the false move typically in London",
+      "start": 213.439,
+      "duration": 7.961
+    },
+    {
+      "text": "and in New York session there are fake",
+      "start": 218.159,
+      "duration": 6.881
+    },
+    {
+      "text": "runs that start off a move and I walked",
+      "start": 221.4,
+      "duration": 6.199
+    },
+    {
+      "text": "you through it last week on my community",
+      "start": 225.04,
+      "duration": 5.04
+    },
+    {
+      "text": "tab where I outlined the actual Judas",
+      "start": 227.599,
+      "duration": 5.36
+    },
+    {
+      "text": "swing for that particular day using the",
+      "start": 230.08,
+      "duration": 6.12
+    },
+    {
+      "text": "fair value Gap outlin the the low I was",
+      "start": 232.959,
+      "duration": 5
+    },
+    {
+      "text": "only off by cor of a point for the low",
+      "start": 236.2,
+      "duration": 3.599
+    },
+    {
+      "text": "in that range and that created the low",
+      "start": 237.959,
+      "duration": 4.12
+    },
+    {
+      "text": "today the idea is what I'm going to show",
+      "start": 239.799,
+      "duration": 4.64
+    },
+    {
+      "text": "you here as",
+      "start": 242.079,
+      "duration": 6.8
+    },
+    {
+      "text": "well on Monday we had price Dro down",
+      "start": 244.439,
+      "duration": 6.44
+    },
+    {
+      "text": "overnight Consolidated and then we have",
+      "start": 248.879,
+      "duration": 3.841
+    },
+    {
+      "text": "a little bit of a rally ahead of the",
+      "start": 250.879,
+      "duration": 4.881
+    },
+    {
+      "text": "equities open okay so in here we have",
+      "start": 252.72,
+      "duration": 6.799
+    },
+    {
+      "text": "8:30 in the morning if you look at 8:30",
+      "start": 255.76,
+      "duration": 5.8
+    },
+    {
+      "text": "what do we have we have the highs over",
+      "start": 259.519,
+      "duration": 3.721
+    },
+    {
+      "text": "here they're suspect because they're",
+      "start": 261.56,
+      "duration": 3.84
+    },
+    {
+      "text": "relative equal highs there but look what",
+      "start": 263.24,
+      "duration": 5.399
+    },
+    {
+      "text": "we left here ahead of 8:30 we had this",
+      "start": 265.4,
+      "duration": 6.2
+    },
+    {
+      "text": "huge imbalance",
+      "start": 268.639,
+      "duration": 6.961
+    },
+    {
+      "text": "so if we run these highs out after the",
+      "start": 271.6,
+      "duration": 5.4
+    },
+    {
+      "text": "open at",
+      "start": 275.6,
+      "duration": 4.56
+    },
+    {
+      "text": "9:30 it's likely to trade down into that",
+      "start": 277,
+      "duration": 5.16
+    },
+    {
+      "text": "and rebounds but watch what it does it",
+      "start": 280.16,
+      "duration": 3.96
+    },
+    {
+      "text": "and we trade up into that level here",
+      "start": 282.16,
+      "duration": 4.12
+    },
+    {
+      "text": "which creates the fair value gaps",
+      "start": 284.12,
+      "duration": 3.56
+    },
+    {
+      "text": "low-end",
+      "start": 286.28,
+      "duration": 3.359
+    },
+    {
+      "text": "parameter remember this is Monday's",
+      "start": 287.68,
+      "duration": 4.84
+    },
+    {
+      "text": "trading it sells off so this line isn't",
+      "start": 289.639,
+      "duration": 5.601
+    },
+    {
+      "text": "here on Monday that's not what we're",
+      "start": 292.52,
+      "duration": 3.8
+    },
+    {
+      "text": "looking at we're looking at the",
+      "start": 295.24,
+      "duration": 3.36
+    },
+    {
+      "text": "likelihood of coming back down into this",
+      "start": 296.32,
+      "duration": 3.84
+    },
+    {
+      "text": "area here",
+      "start": 298.6,
+      "duration": 3.24
+    },
+    {
+      "text": "after taking these highs",
+      "start": 300.16,
+      "duration": 4.72
+    },
+    {
+      "text": "out if it does so if it trades back into",
+      "start": 301.84,
+      "duration": 6.4
+    },
+    {
+      "text": "this imbalance that's a good candidate",
+      "start": 304.88,
+      "duration": 4.28
+    },
+    {
+      "text": "to go",
+      "start": 308.24,
+      "duration": 4.36
+    },
+    {
+      "text": "long now the imbalance in here if you go",
+      "start": 309.16,
+      "duration": 4.759
+    },
+    {
+      "text": "to the left of it you can see the down",
+      "start": 312.6,
+      "duration": 3.08
+    },
+    {
+      "text": "close candles that's your bullish order",
+      "start": 313.919,
+      "duration": 4.241
+    },
+    {
+      "text": "block the market trades down hits the",
+      "start": 315.68,
+      "duration": 4.92
+    },
+    {
+      "text": "order block and it's an afternoon trade",
+      "start": 318.16,
+      "duration": 5
+    },
+    {
+      "text": "so it starts to rally and then",
+      "start": 320.6,
+      "duration": 5.76
+    },
+    {
+      "text": "consolidates since to close overnight we",
+      "start": 323.16,
+      "duration": 5.92
+    },
+    {
+      "text": "create a wicked run last night this was",
+      "start": 326.36,
+      "duration": 6.08
+    },
+    {
+      "text": "an it ran last night and most of all the",
+      "start": 329.08,
+      "duration": 6.28
+    },
+    {
+      "text": "move for today was done before we even",
+      "start": 332.44,
+      "duration": 5.64
+    },
+    {
+      "text": "got to the opening of the",
+      "start": 335.36,
+      "duration": 5.08
+    },
+    {
+      "text": "morning had a little bit of a",
+      "start": 338.08,
+      "duration": 6.92
+    },
+    {
+      "text": "retracement after 8:30 and at 9:30 we",
+      "start": 340.44,
+      "duration": 6.28
+    },
+    {
+      "text": "Consolidated I'll talk a little bit",
+      "start": 345,
+      "duration": 3.16
+    },
+    {
+      "text": "about that as a market profile in a",
+      "start": 346.72,
+      "duration": 4.96
+    },
+    {
+      "text": "moment but then we drop down create an",
+      "start": 348.16,
+      "duration": 4.879
+    },
+    {
+      "text": "important low of the day and then we",
+      "start": 351.68,
+      "duration": 4.04
+    },
+    {
+      "text": "rally it got real close to the fair",
+      "start": 353.039,
+      "duration": 6.081
+    },
+    {
+      "text": "value gaps high-end parameter but didn't",
+      "start": 355.72,
+      "duration": 4.8
+    },
+    {
+      "text": "get to it",
+      "start": 359.12,
+      "duration": 2.919
+    },
+    {
+      "text": "we don't need it's just like I was",
+      "start": 360.52,
+      "duration": 3.119
+    },
+    {
+      "text": "mentioning here you don't need to try to",
+      "start": 362.039,
+      "duration": 4.121
+    },
+    {
+      "text": "predict the closing price with power",
+      "start": 363.639,
+      "duration": 6.56
+    },
+    {
+      "text": "three which is accumulation manipulation",
+      "start": 366.16,
+      "duration": 5.28
+    },
+    {
+      "text": "so in other words if you're bullish it",
+      "start": 370.199,
+      "duration": 3.041
+    },
+    {
+      "text": "opens where you think it's going to",
+      "start": 371.44,
+      "duration": 3.84
+    },
+    {
+      "text": "trade higher it's going to be most",
+      "start": 373.24,
+      "duration": 5.16
+    },
+    {
+      "text": "likely a small little move lower that's",
+      "start": 375.28,
+      "duration": 4.8
+    },
+    {
+      "text": "the move you want to try to go in and",
+      "start": 378.4,
+      "duration": 4
+    },
+    {
+      "text": "Hunt along if you miss it you want to",
+      "start": 380.08,
+      "duration": 4.48
+    },
+    {
+      "text": "try to get long real close to where the",
+      "start": 382.4,
+      "duration": 3.919
+    },
+    {
+      "text": "opening price is now the question is",
+      "start": 384.56,
+      "duration": 3
+    },
+    {
+      "text": "going to be is where is the opening",
+      "start": 386.319,
+      "duration": 5.641
+    },
+    {
+      "text": "price well I like 830 okay you use the",
+      "start": 387.56,
+      "duration": 6.68
+    },
+    {
+      "text": "opening price here at 830 draw that out",
+      "start": 391.96,
+      "duration": 4.799
+    },
+    {
+      "text": "in time did we go below it yes did we go",
+      "start": 394.24,
+      "duration": 4.04
+    },
+    {
+      "text": "inside the imbalance yes did we take out",
+      "start": 396.759,
+      "duration": 3.481
+    },
+    {
+      "text": "a short-term low yes did we hit an order",
+      "start": 398.28,
+      "duration": 4.479
+    },
+    {
+      "text": "block yes was it an optimal trade entry",
+      "start": 400.24,
+      "duration": 6.28
+    },
+    {
+      "text": "yes lots of factors there over here same",
+      "start": 402.759,
+      "duration": 6.921
+    },
+    {
+      "text": "thing opening price here did we trade",
+      "start": 406.52,
+      "duration": 5.64
+    },
+    {
+      "text": "lower than that yes did it go even lower",
+      "start": 409.68,
+      "duration": 5.4
+    },
+    {
+      "text": "than that later on in the afternoon yes",
+      "start": 412.16,
+      "duration": 4.8
+    },
+    {
+      "text": "then it rallied taking out the relative",
+      "start": 415.08,
+      "duration": 3.72
+    },
+    {
+      "text": "equal highs here and again gravitating",
+      "start": 416.96,
+      "duration": 3.44
+    },
+    {
+      "text": "towards that upper end of that fair",
+      "start": 418.8,
+      "duration": 4.44
+    },
+    {
+      "text": "value gap on the daily",
+      "start": 420.4,
+      "duration": 2.84
+    },
+    {
+      "text": "chart now I'm in a 5 minute chart on",
+      "start": 425.28,
+      "duration": 5.8
+    },
+    {
+      "text": "that same February 14th and I want to",
+      "start": 427.639,
+      "duration": 5.921
+    },
+    {
+      "text": "take you closer to what price is done in",
+      "start": 431.08,
+      "duration": 5.76
+    },
+    {
+      "text": "here that imbalance the lowest portion",
+      "start": 433.56,
+      "duration": 5.28
+    },
+    {
+      "text": "of it here with all the down closed",
+      "start": 436.84,
+      "duration": 4.4
+    },
+    {
+      "text": "candles here now this is anchored to the",
+      "start": 438.84,
+      "duration": 5.079
+    },
+    {
+      "text": "Daily bullish order block but you can",
+      "start": 441.24,
+      "duration": 5.76
+    },
+    {
+      "text": "see how we traded into it here with one",
+      "start": 443.919,
+      "duration": 5.081
+    },
+    {
+      "text": "two three four down closed candles that",
+      "start": 447,
+      "duration": 4.12
+    },
+    {
+      "text": "is a",
+      "start": 449,
+      "duration": 4.52
+    },
+    {
+      "text": "complete order block on this time frame",
+      "start": 451.12,
+      "duration": 4.519
+    },
+    {
+      "text": "so consecutive down closed candles right",
+      "start": 453.52,
+      "duration": 5.88
+    },
+    {
+      "text": "before a price surge that has an",
+      "start": 455.639,
+      "duration": 5.721
+    },
+    {
+      "text": "imbalance that's how you find your order",
+      "start": 459.4,
+      "duration": 4.519
+    },
+    {
+      "text": "blocks okay so a high probability order",
+      "start": 461.36,
+      "duration": 5.08
+    },
+    {
+      "text": "block would be your narrative or your",
+      "start": 463.919,
+      "duration": 4.041
+    },
+    {
+      "text": "bias is",
+      "start": 466.44,
+      "duration": 3.8
+    },
+    {
+      "text": "bullish you're looking for displacement",
+      "start": 467.96,
+      "duration": 4.12
+    },
+    {
+      "text": "that's this right here where the market",
+      "start": 470.24,
+      "duration": 4.72
+    },
+    {
+      "text": "runs real quick higher and the down",
+      "start": 472.08,
+      "duration": 5.2
+    },
+    {
+      "text": "close candles you want to mark that out",
+      "start": 474.96,
+      "duration": 5.16
+    },
+    {
+      "text": "and anticipate a return back in to that",
+      "start": 477.28,
+      "duration": 5.199
+    },
+    {
+      "text": "now again this level is not there yet we",
+      "start": 480.12,
+      "duration": 4.16
+    },
+    {
+      "text": "don't know this level until Monday's",
+      "start": 482.479,
+      "duration": 4.481
+    },
+    {
+      "text": "close so don't be tricked thinking that",
+      "start": 484.28,
+      "duration": 4.479
+    },
+    {
+      "text": "I have this level here and I knew it was",
+      "start": 486.96,
+      "duration": 3.239
+    },
+    {
+      "text": "going to go right to that level in term",
+      "start": 488.759,
+      "duration": 3.16
+    },
+    {
+      "text": "I'm not suggesting that at all what I'm",
+      "start": 490.199,
+      "duration": 3.84
+    },
+    {
+      "text": "suggesting is is watch what happens when",
+      "start": 491.919,
+      "duration": 5.641
+    },
+    {
+      "text": "it creates that high it breaks",
+      "start": 494.039,
+      "duration": 7.681
+    },
+    {
+      "text": "down all this price action here gets",
+      "start": 497.56,
+      "duration": 6.359
+    },
+    {
+      "text": "overran into a retracement back down",
+      "start": 501.72,
+      "duration": 4.199
+    },
+    {
+      "text": "into this imbalance here the low of this",
+      "start": 503.919,
+      "duration": 4.041
+    },
+    {
+      "text": "candle and the high of this candle that",
+      "start": 505.919,
+      "duration": 4.161
+    },
+    {
+      "text": "right there that's your fair value",
+      "start": 507.96,
+      "duration": 5.199
+    },
+    {
+      "text": "got with an order",
+      "start": 510.08,
+      "duration": 5.68
+    },
+    {
+      "text": "block and optimal trade",
+      "start": 513.159,
+      "duration": 5.921
+    },
+    {
+      "text": "entry rallies even though it's sloppy",
+      "start": 515.76,
+      "duration": 7.12
+    },
+    {
+      "text": "it's still continuously driving",
+      "start": 519.08,
+      "duration": 3.8
+    },
+    {
+      "text": "higher this high at the close on this",
+      "start": 523,
+      "duration": 7.32
+    },
+    {
+      "text": "day here at say 4:30 okay 4:30 in",
+      "start": 527.6,
+      "duration": 4.2
+    },
+    {
+      "text": "afternoon to me that's like the close",
+      "start": 530.32,
+      "duration": 5.4
+    },
+    {
+      "text": "for me no it trades a little bit later",
+      "start": 531.8,
+      "duration": 5.28
+    },
+    {
+      "text": "than that and then closes for a little",
+      "start": 535.72,
+      "duration": 3.96
+    },
+    {
+      "text": "while and it also technically closes",
+      "start": 537.08,
+      "duration": 5.36
+    },
+    {
+      "text": "when the bell rings at 4:00 p.m. you",
+      "start": 539.68,
+      "duration": 4.68
+    },
+    {
+      "text": "local time in New",
+      "start": 542.44,
+      "duration": 3.76
+    },
+    {
+      "text": "York because there's a little bit of",
+      "start": 544.36,
+      "duration": 3.76
+    },
+    {
+      "text": "trading past that I like to just look at",
+      "start": 546.2,
+      "duration": 5.079
+    },
+    {
+      "text": "430 and just consider that where we are",
+      "start": 548.12,
+      "duration": 5.48
+    },
+    {
+      "text": "in terms of what we've done for the full",
+      "start": 551.279,
+      "duration": 4.281
+    },
+    {
+      "text": "range and then determine what I have",
+      "start": 553.6,
+      "duration": 6.72
+    },
+    {
+      "text": "left for maybe inbalance or liquidity",
+      "start": 555.56,
+      "duration": 4.76
+    },
+    {
+      "text": "pools here",
+      "start": 563.6,
+      "duration": 6.12
+    },
+    {
+      "text": "is that drop down",
+      "start": 566.36,
+      "duration": 5.24
+    },
+    {
+      "text": "here on a one minute",
+      "start": 569.72,
+      "duration": 5.44
+    },
+    {
+      "text": "chart it's digging into that order block",
+      "start": 571.6,
+      "duration": 4.4
+    },
+    {
+      "text": "right",
+      "start": 575.16,
+      "duration": 4
+    },
+    {
+      "text": "here if you look real close let me go",
+      "start": 576,
+      "duration": 4.56
+    },
+    {
+      "text": "back up one slide I want you to see what",
+      "start": 579.16,
+      "duration": 4.72
+    },
+    {
+      "text": "I'm showing you here right here this",
+      "start": 580.56,
+      "duration": 7.2
+    },
+    {
+      "text": "price action see 14140",
+      "start": 583.88,
+      "duration": 5.959
+    },
+    {
+      "text": "14120 this little area right here I'm",
+      "start": 587.76,
+      "duration": 3.72
+    },
+    {
+      "text": "looking at on a one minute",
+      "start": 589.839,
+      "duration": 7.321
+    },
+    {
+      "text": "chart 14140 14120 that in that vicinity",
+      "start": 591.48,
+      "duration": 8.4
+    },
+    {
+      "text": "see that small little Gap right there",
+      "start": 597.16,
+      "duration": 6.48
+    },
+    {
+      "text": "see that see the swing High we trade",
+      "start": 599.88,
+      "duration": 6.36
+    },
+    {
+      "text": "above it create a fair value Gap there",
+      "start": 603.64,
+      "duration": 5.04
+    },
+    {
+      "text": "trade down into it this is an afternoon",
+      "start": 606.24,
+      "duration": 4.96
+    },
+    {
+      "text": "trade this is 2:00 in the afternoon",
+      "start": 608.68,
+      "duration": 5.159
+    },
+    {
+      "text": "local time in New York inside the order",
+      "start": 611.2,
+      "duration": 7.4
+    },
+    {
+      "text": "block inside the fair value Gap inside a",
+      "start": 613.839,
+      "duration": 7.761
+    },
+    {
+      "text": "retracement of the fair value Gap that",
+      "start": 618.6,
+      "duration": 6.919
+    },
+    {
+      "text": "sets the stage of a market run up",
+      "start": 621.6,
+      "duration": 9
+    },
+    {
+      "text": "into a higher retracement",
+      "start": 625.519,
+      "duration": 8.44
+    },
+    {
+      "text": "now we don't know if this is going to be",
+      "start": 630.6,
+      "duration": 4.919
+    },
+    {
+      "text": "the",
+      "start": 633.959,
+      "duration": 4.721
+    },
+    {
+      "text": "closing parameter for a daily fair value",
+      "start": 635.519,
+      "duration": 6.161
+    },
+    {
+      "text": "Gap we don't need to know that yet but",
+      "start": 638.68,
+      "duration": 5.599
+    },
+    {
+      "text": "this is a likely scenario to go long and",
+      "start": 641.68,
+      "duration": 5.76
+    },
+    {
+      "text": "we can look for a run back up into this",
+      "start": 644.279,
+      "duration": 4.521
+    },
+    {
+      "text": "range",
+      "start": 647.44,
+      "duration": 4.44
+    },
+    {
+      "text": "here or run the buy stops above here or",
+      "start": 648.8,
+      "duration": 5.159
+    },
+    {
+      "text": "maybe inside",
+      "start": 651.88,
+      "duration": 5.36
+    },
+    {
+      "text": "here sloppy run but nonetheless it's",
+      "start": 653.959,
+      "duration": 6.841
+    },
+    {
+      "text": "still pressing higher",
+      "start": 657.24,
+      "duration": 3.56
+    },
+    {
+      "text": "now here's today on the 15th of February",
+      "start": 661.16,
+      "duration": 5.919
+    },
+    {
+      "text": "2022 notice what we had with had this",
+      "start": 663.639,
+      "duration": 6.44
+    },
+    {
+      "text": "enormous price run overnight in",
+      "start": 667.079,
+      "duration": 4.76
+    },
+    {
+      "text": "technically the London",
+      "start": 670.079,
+      "duration": 3.281
+    },
+    {
+      "text": "session",
+      "start": 671.839,
+      "duration": 3.921
+    },
+    {
+      "text": "now a lot of you going to ask would I",
+      "start": 673.36,
+      "duration": 5.08
+    },
+    {
+      "text": "have caught this no no I wouldn't have",
+      "start": 675.76,
+      "duration": 4.759
+    },
+    {
+      "text": "caught it I would have missed it and I",
+      "start": 678.44,
+      "duration": 3.28
+    },
+    {
+      "text": "would if I was awake I wouldn't have",
+      "start": 680.519,
+      "duration": 2.641
+    },
+    {
+      "text": "seen it coming let's just put it that",
+      "start": 681.72,
+      "duration": 4.88
+    },
+    {
+      "text": "way so this right here was a complete",
+      "start": 683.16,
+      "duration": 6.6
+    },
+    {
+      "text": "surprise to me when I woke up saw it",
+      "start": 686.6,
+      "duration": 4.6
+    },
+    {
+      "text": "but I want you to think about when you",
+      "start": 689.76,
+      "duration": 3.44
+    },
+    {
+      "text": "have these overnight runs that were",
+      "start": 691.2,
+      "duration": 4.52
+    },
+    {
+      "text": "basically these big moves overnight",
+      "start": 693.2,
+      "duration": 4.879
+    },
+    {
+      "text": "before the session begins in New York",
+      "start": 695.72,
+      "duration": 4.559
+    },
+    {
+      "text": "when you're trading equities this also",
+      "start": 698.079,
+      "duration": 3.921
+    },
+    {
+      "text": "works with Forex too so it's important",
+      "start": 700.279,
+      "duration": 3.481
+    },
+    {
+      "text": "try not to chase price this is what I",
+      "start": 702,
+      "duration": 4.2
+    },
+    {
+      "text": "mean by don't chase it don't chase it",
+      "start": 703.76,
+      "duration": 4.319
+    },
+    {
+      "text": "last week when I was commenting and",
+      "start": 706.2,
+      "duration": 4.4
+    },
+    {
+      "text": "outlining the NASDAQ and giving you a",
+      "start": 708.079,
+      "duration": 4.401
+    },
+    {
+      "text": "fair value Gap real time explaining to",
+      "start": 710.6,
+      "duration": 2.76
+    },
+    {
+      "text": "where I thought it was going to draw",
+      "start": 712.48,
+      "duration": 2.84
+    },
+    {
+      "text": "down to and it created the New York",
+      "start": 713.36,
+      "duration": 4.479
+    },
+    {
+      "text": "session low of the day okay that's what",
+      "start": 715.32,
+      "duration": 4.16
+    },
+    {
+      "text": "I was outlining just take a look at go",
+      "start": 717.839,
+      "duration": 3.161
+    },
+    {
+      "text": "back and look at you'll see it's it's",
+      "start": 719.48,
+      "duration": 4
+    },
+    {
+      "text": "pretty obvious the same logic I'm",
+      "start": 721,
+      "duration": 5.399
+    },
+    {
+      "text": "amplifying that here okay overnight what",
+      "start": 723.48,
+      "duration": 4.799
+    },
+    {
+      "text": "was the market doing it was rallying so",
+      "start": 726.399,
+      "duration": 5.401
+    },
+    {
+      "text": "when we open up at 8:30 do we go in here",
+      "start": 728.279,
+      "duration": 5.24
+    },
+    {
+      "text": "and start buying it just because it's",
+      "start": 731.8,
+      "duration": 4.2
+    },
+    {
+      "text": "gone up overnight no we don't chase it",
+      "start": 733.519,
+      "duration": 4.68
+    },
+    {
+      "text": "you have to wait no we don't chase it we",
+      "start": 736,
+      "duration": 3.8
+    },
+    {
+      "text": "have to wait for more information what",
+      "start": 738.199,
+      "duration": 3.601
+    },
+    {
+      "text": "information are we waiting for well",
+      "start": 739.8,
+      "duration": 3.68
+    },
+    {
+      "text": "typically whenever you see a big run up",
+      "start": 741.8,
+      "duration": 3.56
+    },
+    {
+      "text": "or a big run down there's a",
+      "start": 743.48,
+      "duration": 3.64
+    },
+    {
+      "text": "consolidation that takes place shortly",
+      "start": 745.36,
+      "duration": 4.52
+    },
+    {
+      "text": "after now not always it just keeps on",
+      "start": 747.12,
+      "duration": 5.44
+    },
+    {
+      "text": "ripping higher or lower and you'll",
+      "start": 749.88,
+      "duration": 5
+    },
+    {
+      "text": "either miss a move or if you get lucky",
+      "start": 752.56,
+      "duration": 4.839
+    },
+    {
+      "text": "maybe you can participate in it but this",
+      "start": 754.88,
+      "duration": 4.399
+    },
+    {
+      "text": "is what I typically look for so if",
+      "start": 757.399,
+      "duration": 3.641
+    },
+    {
+      "text": "there's a lot of range movement",
+      "start": 759.279,
+      "duration": 4.92
+    },
+    {
+      "text": "overnight which overnight um 2 o'cl in",
+      "start": 761.04,
+      "duration": 6.2
+    },
+    {
+      "text": "the morning to 5 o' in the morning okay",
+      "start": 764.199,
+      "duration": 4.76
+    },
+    {
+      "text": "if we get a big run like that which is",
+      "start": 767.24,
+      "duration": 2.92
+    },
+    {
+      "text": "what we're seeing",
+      "start": 768.959,
+      "duration": 4.761
+    },
+    {
+      "text": "here right away in my mind I'm thinking",
+      "start": 770.16,
+      "duration": 6.28
+    },
+    {
+      "text": "don't trade a lot don't",
+      "start": 773.72,
+      "duration": 5.6
+    },
+    {
+      "text": "expect a lot of in and out in and out",
+      "start": 776.44,
+      "duration": 5.519
+    },
+    {
+      "text": "perect you know perfect Precision wait",
+      "start": 779.32,
+      "duration": 4.92
+    },
+    {
+      "text": "for a real significant price move",
+      "start": 781.959,
+      "duration": 4.44
+    },
+    {
+      "text": "otherwise you're going to get chopped up",
+      "start": 784.24,
+      "duration": 3.719
+    },
+    {
+      "text": "now what does that mean well when we",
+      "start": 786.399,
+      "duration": 4
+    },
+    {
+      "text": "have it opening here at 830 look to the",
+      "start": 787.959,
+      "duration": 4.801
+    },
+    {
+      "text": "left what do we have we have this High",
+      "start": 790.399,
+      "duration": 6.401
+    },
+    {
+      "text": "here and we have the low over",
+      "start": 792.76,
+      "duration": 4.04
+    },
+    {
+      "text": "here we can use this one because they're",
+      "start": 797.56,
+      "duration": 4.079
+    },
+    {
+      "text": "relative equal but I like this one why",
+      "start": 799.6,
+      "duration": 5.44
+    },
+    {
+      "text": "why do I like this one what's below it",
+      "start": 801.639,
+      "duration": 7.241
+    },
+    {
+      "text": "fair value got see that so it's likely a",
+      "start": 805.04,
+      "duration": 6.08
+    },
+    {
+      "text": "trade down after it creates this sloppy",
+      "start": 808.88,
+      "duration": 4.04
+    },
+    {
+      "text": "opening look at all this movement in",
+      "start": 811.12,
+      "duration": 6.88
+    },
+    {
+      "text": "here now as a personal study there's two",
+      "start": 812.92,
+      "duration": 6.919
+    },
+    {
+      "text": "or three YouTubers that I watch that",
+      "start": 818,
+      "duration": 6.56
+    },
+    {
+      "text": "trade the equities market indices and",
+      "start": 819.839,
+      "duration": 6.841
+    },
+    {
+      "text": "I'm not trying to say anything bad about",
+      "start": 824.56,
+      "duration": 3.959
+    },
+    {
+      "text": "them I just like to listen to what",
+      "start": 826.68,
+      "duration": 4.279
+    },
+    {
+      "text": "they're thinking because they don't look",
+      "start": 828.519,
+      "duration": 4.601
+    },
+    {
+      "text": "at the market like I do I'm not",
+      "start": 830.959,
+      "duration": 3.56
+    },
+    {
+      "text": "suggesting that they're not profitable",
+      "start": 833.12,
+      "duration": 2.92
+    },
+    {
+      "text": "because they show live trades they get",
+      "start": 834.519,
+      "duration": 3.841
+    },
+    {
+      "text": "into trades they take them and sometimes",
+      "start": 836.04,
+      "duration": 4.919
+    },
+    {
+      "text": "they win and sometimes they don't but",
+      "start": 838.36,
+      "duration": 5.839
+    },
+    {
+      "text": "I'd like to read kind of like a a Squawk",
+      "start": 840.959,
+      "duration": 5.721
+    },
+    {
+      "text": "Box what their interpretation of price",
+      "start": 844.199,
+      "duration": 5.361
+    },
+    {
+      "text": "is and they're looking at this area in",
+      "start": 846.68,
+      "duration": 5.36
+    },
+    {
+      "text": "here and",
+      "start": 849.56,
+      "duration": 5.079
+    },
+    {
+      "text": "it's back and forth they think if it go",
+      "start": 852.04,
+      "duration": 3.799
+    },
+    {
+      "text": "if it goes here it's going to go there",
+      "start": 854.639,
+      "duration": 2.241
+    },
+    {
+      "text": "if it goes here if it's going to go",
+      "start": 855.839,
+      "duration": 2.601
+    },
+    {
+      "text": "there it's all these scenarios are going",
+      "start": 856.88,
+      "duration": 5.36
+    },
+    {
+      "text": "through you know randomly in their live",
+      "start": 858.44,
+      "duration": 7.44
+    },
+    {
+      "text": "streams so when I'm watching price I'm",
+      "start": 862.24,
+      "duration": 7.2
+    },
+    {
+      "text": "listening for them to want to be a buyer",
+      "start": 865.88,
+      "duration": 5.84
+    },
+    {
+      "text": "so when they're trying to be a buyer",
+      "start": 869.44,
+      "duration": 3.56
+    },
+    {
+      "text": "that means they're they're already",
+      "start": 871.72,
+      "duration": 4.88
+    },
+    {
+      "text": "hunting a continuation of this move here",
+      "start": 873,
+      "duration": 6.199
+    },
+    {
+      "text": "I want to see a low",
+      "start": 876.6,
+      "duration": 5.56
+    },
+    {
+      "text": "form now this is what we have for the",
+      "start": 879.199,
+      "duration": 6.041
+    },
+    {
+      "text": "today we we start going lower first so",
+      "start": 882.16,
+      "duration": 5.679
+    },
+    {
+      "text": "that's good we create a pseudo Judas",
+      "start": 885.24,
+      "duration": 5.399
+    },
+    {
+      "text": "swing but did it create a nice low and",
+      "start": 887.839,
+      "duration": 5.401
+    },
+    {
+      "text": "turn away from itm look at all this back",
+      "start": 890.639,
+      "duration": 5.241
+    },
+    {
+      "text": "and forth and it created these suspect",
+      "start": 893.24,
+      "duration": 4.719
+    },
+    {
+      "text": "lows in here relative equal lows there's",
+      "start": 895.88,
+      "duration": 3.92
+    },
+    {
+      "text": "going to be sell side building up below",
+      "start": 897.959,
+      "duration": 4.68
+    },
+    {
+      "text": "that sell stops okay when it starts to",
+      "start": 899.8,
+      "duration": 5.76
+    },
+    {
+      "text": "go higher anyone that was long overnight",
+      "start": 902.639,
+      "duration": 4.681
+    },
+    {
+      "text": "they're going to jam their stop loss",
+      "start": 905.56,
+      "duration": 3.079
+    },
+    {
+      "text": "right underneath",
+      "start": 907.32,
+      "duration": 5.4
+    },
+    {
+      "text": "that okay when this occurs that's the",
+      "start": 908.639,
+      "duration": 6.56
+    },
+    {
+      "text": "very scenario I'm looking for now right",
+      "start": 912.72,
+      "duration": 3.799
+    },
+    {
+      "text": "away in my mind here's what I want you",
+      "start": 915.199,
+      "duration": 4.281
+    },
+    {
+      "text": "to understand if there's a big move",
+      "start": 916.519,
+      "duration": 5.76
+    },
+    {
+      "text": "overnight for equities this is not Forex",
+      "start": 919.48,
+      "duration": 4.279
+    },
+    {
+      "text": "okay this part is not Forex it's just",
+      "start": 922.279,
+      "duration": 5.36
+    },
+    {
+      "text": "for trading like NASDAQ Dow and e- mini",
+      "start": 923.759,
+      "duration": 6.64
+    },
+    {
+      "text": "S&P if there a big run",
+      "start": 927.639,
+      "duration": 5.481
+    },
+    {
+      "text": "overnight avoid the New York session",
+      "start": 930.399,
+      "duration": 4.161
+    },
+    {
+      "text": "don't even mess with the New York",
+      "start": 933.12,
+      "duration": 4
+    },
+    {
+      "text": "session wait until the other side of",
+      "start": 934.56,
+      "duration": 4.959
+    },
+    {
+      "text": "lunch at 1:00 in the afternoon New York",
+      "start": 937.12,
+      "duration": 6.56
+    },
+    {
+      "text": "time and then anticipate the New York",
+      "start": 939.519,
+      "duration": 7.281
+    },
+    {
+      "text": "lunch lows taken out or the New York",
+      "start": 943.68,
+      "duration": 5.04
+    },
+    {
+      "text": "morning session lows which is what we",
+      "start": 946.8,
+      "duration": 3.2
+    },
+    {
+      "text": "have",
+      "start": 948.72,
+      "duration": 4.4
+    },
+    {
+      "text": "here notice how we rallied up we didn't",
+      "start": 950,
+      "duration": 4.519
+    },
+    {
+      "text": "take out the relative equal highs here",
+      "start": 953.12,
+      "duration": 3.24
+    },
+    {
+      "text": "that was formed ahead of 7 o'clock in",
+      "start": 954.519,
+      "duration": 5.12
+    },
+    {
+      "text": "the morning notice that now this over",
+      "start": 956.36,
+      "duration": 6.919
+    },
+    {
+      "text": "here we know this range up here is the",
+      "start": 959.639,
+      "duration": 5.32
+    },
+    {
+      "text": "high end of that fair value Gap why do",
+      "start": 963.279,
+      "duration": 4.36
+    },
+    {
+      "text": "we know that because the 14th stopped",
+      "start": 964.959,
+      "duration": 4.921
+    },
+    {
+      "text": "trading and it had the indecisive candle",
+      "start": 967.639,
+      "duration": 4.481
+    },
+    {
+      "text": "in the daily chart so it's likely that",
+      "start": 969.88,
+      "duration": 4.879
+    },
+    {
+      "text": "we might trade up into this Range High",
+      "start": 972.12,
+      "duration": 5.04
+    },
+    {
+      "text": "and this is that range low so if we can",
+      "start": 974.759,
+      "duration": 4.721
+    },
+    {
+      "text": "draw down below that low it was formed",
+      "start": 977.16,
+      "duration": 4.44
+    },
+    {
+      "text": "initially in New York",
+      "start": 979.48,
+      "duration": 4.32
+    },
+    {
+      "text": "session we have a fair value Gap over",
+      "start": 981.6,
+      "duration": 5.479
+    },
+    {
+      "text": "here with sell side while we have yet to",
+      "start": 983.8,
+      "duration": 5.959
+    },
+    {
+      "text": "take out the buy side theity here",
+      "start": 987.079,
+      "duration": 5.281
+    },
+    {
+      "text": "at around I don't know",
+      "start": 989.759,
+      "duration": 5.681
+    },
+    {
+      "text": "14575 and then get up to that fair value",
+      "start": 992.36,
+      "duration": 6.24
+    },
+    {
+      "text": "Gap high or the the boundary of it okay",
+      "start": 995.44,
+      "duration": 5.04
+    },
+    {
+      "text": "kind of like the resistance level of",
+      "start": 998.6,
+      "duration": 4.64
+    },
+    {
+      "text": "it so this is the draw in liquidity and",
+      "start": 1000.48,
+      "duration": 4.799
+    },
+    {
+      "text": "we have a minor draw in liquidity here",
+      "start": 1003.24,
+      "duration": 5.399
+    },
+    {
+      "text": "with Bice liquidity look what we have in",
+      "start": 1005.279,
+      "duration": 6.961
+    },
+    {
+      "text": "terms of price action the NASDAQ drops",
+      "start": 1008.639,
+      "duration": 5.961
+    },
+    {
+      "text": "down taking out the cell side digging",
+      "start": 1012.24,
+      "duration": 4.68
+    },
+    {
+      "text": "into that fair value Gap see that look",
+      "start": 1014.6,
+      "duration": 3.56
+    },
+    {
+      "text": "at the bodies of the candles isn't that",
+      "start": 1016.92,
+      "duration": 4.56
+    },
+    {
+      "text": "neat how just respects that level back",
+      "start": 1018.16,
+      "duration": 5.599
+    },
+    {
+      "text": "here now that's not random okay these",
+      "start": 1021.48,
+      "duration": 4.52
+    },
+    {
+      "text": "are algorithmic principles that are in",
+      "start": 1023.759,
+      "duration": 5.44
+    },
+    {
+      "text": "play and these markets are unbelievably",
+      "start": 1026,
+      "duration": 5.88
+    },
+    {
+      "text": "precise when they are in better",
+      "start": 1029.199,
+      "duration": 4.76
+    },
+    {
+      "text": "conditions right now if you've been",
+      "start": 1031.88,
+      "duration": 3.64
+    },
+    {
+      "text": "trading with live funds or if you've",
+      "start": 1033.959,
+      "duration": 4.041
+    },
+    {
+      "text": "been trying to follow price action",
+      "start": 1035.52,
+      "duration": 4.36
+    },
+    {
+      "text": "there's been a lot of it makes a run",
+      "start": 1038,
+      "duration": 4
+    },
+    {
+      "text": "then it goes into this choppy sideways",
+      "start": 1039.88,
+      "duration": 3.439
+    },
+    {
+      "text": "and it's very frustrating if you're",
+      "start": 1042,
+      "duration": 3.76
+    },
+    {
+      "text": "trying to get like sustained price moves",
+      "start": 1043.319,
+      "duration": 3.88
+    },
+    {
+      "text": "or if you don't know how to operate in",
+      "start": 1045.76,
+      "duration": 3.6
+    },
+    {
+      "text": "these like these sloppy little ranges",
+      "start": 1047.199,
+      "duration": 4.961
+    },
+    {
+      "text": "like this I personally don't think that",
+      "start": 1049.36,
+      "duration": 4.48
+    },
+    {
+      "text": "this is high probability trading you can",
+      "start": 1052.16,
+      "duration": 4.28
+    },
+    {
+      "text": "get chopped up you can get losing trades",
+      "start": 1053.84,
+      "duration": 5
+    },
+    {
+      "text": "you can draw your account down if you",
+      "start": 1056.44,
+      "duration": 4.04
+    },
+    {
+      "text": "don't control yourself you can blow your",
+      "start": 1058.84,
+      "duration": 4.199
+    },
+    {
+      "text": "account in these types of conditions how",
+      "start": 1060.48,
+      "duration": 4.64
+    },
+    {
+      "text": "do you avoid that how do you avoid",
+      "start": 1063.039,
+      "duration": 3.961
+    },
+    {
+      "text": "running out your account and then",
+      "start": 1065.12,
+      "duration": 4
+    },
+    {
+      "text": "scaling back if you're a high frequency",
+      "start": 1067,
+      "duration": 4.76
+    },
+    {
+      "text": "type of a Trader how do you draw back on",
+      "start": 1069.12,
+      "duration": 4.24
+    },
+    {
+      "text": "the frequency and look for the better",
+      "start": 1071.76,
+      "duration": 4.24
+    },
+    {
+      "text": "setups what I'm showing you here you",
+      "start": 1073.36,
+      "duration": 5.76
+    },
+    {
+      "text": "wait you don't chase the overnight run",
+      "start": 1076,
+      "duration": 5.76
+    },
+    {
+      "text": "and you wait for them to give you a low",
+      "start": 1079.12,
+      "duration": 5.2
+    },
+    {
+      "text": "that everybody overnight will want to",
+      "start": 1081.76,
+      "duration": 4.2
+    },
+    {
+      "text": "put their stop loss right beneath that",
+      "start": 1084.32,
+      "duration": 3.92
+    },
+    {
+      "text": "after it starts a rally above it it's",
+      "start": 1085.96,
+      "duration": 4.64
+    },
+    {
+      "text": "even better when you don't have this",
+      "start": 1088.24,
+      "duration": 3.919
+    },
+    {
+      "text": "High taken out yet see how I took it up",
+      "start": 1090.6,
+      "duration": 4.4
+    },
+    {
+      "text": "here and it just went right down for him",
+      "start": 1092.159,
+      "duration": 4.921
+    },
+    {
+      "text": "that's engineering",
+      "start": 1095,
+      "duration": 5.4
+    },
+    {
+      "text": "liquidity it runs up consolidates",
+      "start": 1097.08,
+      "duration": 5.959
+    },
+    {
+      "text": "creates a low starts to rally and",
+      "start": 1100.4,
+      "duration": 4.159
+    },
+    {
+      "text": "everybody's thinking I don't want to",
+      "start": 1103.039,
+      "duration": 4.401
+    },
+    {
+      "text": "lose my profits I don't want to lose out",
+      "start": 1104.559,
+      "duration": 5.281
+    },
+    {
+      "text": "on making more money but I had to put a",
+      "start": 1107.44,
+      "duration": 3.64
+    },
+    {
+      "text": "stop loss right here because the books",
+      "start": 1109.84,
+      "duration": 3.24
+    },
+    {
+      "text": "tell me I had to do that so I did the",
+      "start": 1111.08,
+      "duration": 4
+    },
+    {
+      "text": "same kind of stuff folks I'm not trying",
+      "start": 1113.08,
+      "duration": 4.2
+    },
+    {
+      "text": "to talk down anybody but I'm just",
+      "start": 1115.08,
+      "duration": 5.599
+    },
+    {
+      "text": "repeating what a retail Trader's mindset",
+      "start": 1117.28,
+      "duration": 6.08
+    },
+    {
+      "text": "would be and the logic behind this okay",
+      "start": 1120.679,
+      "duration": 5.401
+    },
+    {
+      "text": "so the narrative with this day was the",
+      "start": 1123.36,
+      "duration": 5.84
+    },
+    {
+      "text": "stocks were trailed below these lows the",
+      "start": 1126.08,
+      "duration": 5.52
+    },
+    {
+      "text": "afternoon session again creates the low",
+      "start": 1129.2,
+      "duration": 3.24
+    },
+    {
+      "text": "of the",
+      "start": 1131.6,
+      "duration": 3.48
+    },
+    {
+      "text": "day takes the sell side liquidity out",
+      "start": 1132.44,
+      "duration": 5.479
+    },
+    {
+      "text": "into a fair value Gap and then rallies",
+      "start": 1135.08,
+      "duration": 4.719
+    },
+    {
+      "text": "now in here I'm going to teach you a",
+      "start": 1137.919,
+      "duration": 4.601
+    },
+    {
+      "text": "little bit more about that",
+      "start": 1139.799,
+      "duration": 4.801
+    },
+    {
+      "text": "watch notice we don't really have a fair",
+      "start": 1142.52,
+      "duration": 3.96
+    },
+    {
+      "text": "value gap down here but it gives us the",
+      "start": 1144.6,
+      "duration": 4.24
+    },
+    {
+      "text": "basis for expecting the price to start",
+      "start": 1146.48,
+      "duration": 6.04
+    },
+    {
+      "text": "to Rally into the afternoon now at 2:00",
+      "start": 1148.84,
+      "duration": 7.28
+    },
+    {
+      "text": "in the afternoon 1,400 on",
+      "start": 1152.52,
+      "duration": 7.159
+    },
+    {
+      "text": "this trading view chart that starts 2",
+      "start": 1156.12,
+      "duration": 5.08
+    },
+    {
+      "text": "o'clock in the afternoon New York local",
+      "start": 1159.679,
+      "duration": 4.161
+    },
+    {
+      "text": "time we have the market trading down",
+      "start": 1161.2,
+      "duration": 5.359
+    },
+    {
+      "text": "into an imbalance over here liquidity",
+      "start": 1163.84,
+      "duration": 4.24
+    },
+    {
+      "text": "resting below these relative equal lows",
+      "start": 1166.559,
+      "duration": 2.801
+    },
+    {
+      "text": "is taken out",
+      "start": 1168.08,
+      "duration": 3.28
+    },
+    {
+      "text": "so what are we looking at we've seen a",
+      "start": 1169.36,
+      "duration": 3.52
+    },
+    {
+      "text": "price run that we don't think needs to",
+      "start": 1171.36,
+      "duration": 3.679
+    },
+    {
+      "text": "come back down here because the logic is",
+      "start": 1172.88,
+      "duration": 3.64
+    },
+    {
+      "text": "the overnight stops have been ran out",
+      "start": 1175.039,
+      "duration": 2.601
+    },
+    {
+      "text": "down here there's no reason for the",
+      "start": 1176.52,
+      "duration": 3.24
+    },
+    {
+      "text": "market to want to come back down there",
+      "start": 1177.64,
+      "duration": 6.36
+    },
+    {
+      "text": "but we have this low and these relative",
+      "start": 1179.76,
+      "duration": 7.96
+    },
+    {
+      "text": "equal lows here Post New York lunch New",
+      "start": 1184,
+      "duration": 5.48
+    },
+    {
+      "text": "York lunch is noon to 1:00 in the",
+      "start": 1187.72,
+      "duration": 3.4
+    },
+    {
+      "text": "afternoon New York local",
+      "start": 1189.48,
+      "duration": 4.4
+    },
+    {
+      "text": "time so the imbalance we trade down into",
+      "start": 1191.12,
+      "duration": 4.64
+    },
+    {
+      "text": "that what's the likelihood of it coming",
+      "start": 1193.88,
+      "duration": 3.08
+    },
+    {
+      "text": "all the way through the imbalance and",
+      "start": 1195.76,
+      "duration": 3.919
+    },
+    {
+      "text": "then going after that low not likely not",
+      "start": 1196.96,
+      "duration": 5.32
+    },
+    {
+      "text": "likely not after seeing this run here",
+      "start": 1199.679,
+      "duration": 4.081
+    },
+    {
+      "text": "they don't want to give these Traders",
+      "start": 1202.28,
+      "duration": 3.32
+    },
+    {
+      "text": "another chance to get back in they got",
+      "start": 1203.76,
+      "duration": 3.799
+    },
+    {
+      "text": "stopped out so it's going to be a little",
+      "start": 1205.6,
+      "duration": 3.8
+    },
+    {
+      "text": "bit more sneakier when they make these",
+      "start": 1207.559,
+      "duration": 3.841
+    },
+    {
+      "text": "new setups that continue into a higher",
+      "start": 1209.4,
+      "duration": 4.44
+    },
+    {
+      "text": "run so they take out the sell side below",
+      "start": 1211.4,
+      "duration": 4.84
+    },
+    {
+      "text": "these relative equal lows take those",
+      "start": 1213.84,
+      "duration": 4.839
+    },
+    {
+      "text": "stops out and then it rallies and then",
+      "start": 1216.24,
+      "duration": 5
+    },
+    {
+      "text": "drops back down now here watch we have a",
+      "start": 1218.679,
+      "duration": 6.681
+    },
+    {
+      "text": "swing high right here it breaks it does",
+      "start": 1221.24,
+      "duration": 6.84
+    },
+    {
+      "text": "it trade above that yes was it energetic",
+      "start": 1225.36,
+      "duration": 6
+    },
+    {
+      "text": "yes does it have a fair value Gap yes so",
+      "start": 1228.08,
+      "duration": 6.64
+    },
+    {
+      "text": "now the market trades down into it here",
+      "start": 1231.36,
+      "duration": 5.319
+    },
+    {
+      "text": "creates a short-term low you could be a",
+      "start": 1234.72,
+      "duration": 3.079
+    },
+    {
+      "text": "buyer there there's nothing wrong with",
+      "start": 1236.679,
+      "duration": 2.801
+    },
+    {
+      "text": "that but say you missed it say you just",
+      "start": 1237.799,
+      "duration": 3.041
+    },
+    {
+      "text": "I mean this is a one minute chart say",
+      "start": 1239.48,
+      "duration": 3.64
+    },
+    {
+      "text": "you missed it and the market starts to",
+      "start": 1240.84,
+      "duration": 4.319
+    },
+    {
+      "text": "run off like this but then it gives you",
+      "start": 1243.12,
+      "duration": 4.4
+    },
+    {
+      "text": "another opportunity I've had many times",
+      "start": 1245.159,
+      "duration": 5.161
+    },
+    {
+      "text": "trades formed just like this where I was",
+      "start": 1247.52,
+      "duration": 4.44
+    },
+    {
+      "text": "looking for something I was waiting for",
+      "start": 1250.32,
+      "duration": 5.32
+    },
+    {
+      "text": "a setup to happen either my cell phone's",
+      "start": 1251.96,
+      "duration": 7.44
+    },
+    {
+      "text": "buzzing or I grab a drink is just",
+      "start": 1255.64,
+      "duration": 5.68
+    },
+    {
+      "text": "outside of reach I got to go walk over",
+      "start": 1259.4,
+      "duration": 3.88
+    },
+    {
+      "text": "to the other end of the desk and grab it",
+      "start": 1261.32,
+      "duration": 3.88
+    },
+    {
+      "text": "and then all of a sudden here you go I",
+      "start": 1263.28,
+      "duration": 3.48
+    },
+    {
+      "text": "miss it takes",
+      "start": 1265.2,
+      "duration": 6.24
+    },
+    {
+      "text": "off the fair value Gap is even better",
+      "start": 1266.76,
+      "duration": 5.919
+    },
+    {
+      "text": "when you have the sell side liquidity",
+      "start": 1271.44,
+      "duration": 2.92
+    },
+    {
+      "text": "resting below short-term",
+      "start": 1272.679,
+      "duration": 5.321
+    },
+    {
+      "text": "low and the drop down into it here you",
+      "start": 1274.36,
+      "duration": 7.04
+    },
+    {
+      "text": "can use that low as your entry or minus",
+      "start": 1278,
+      "duration": 6.88
+    },
+    {
+      "text": "one tick okay this short-term low",
+      "start": 1281.4,
+      "duration": 7.36
+    },
+    {
+      "text": "forms at 2:34 p.m. now if you look at",
+      "start": 1284.88,
+      "duration": 6.32
+    },
+    {
+      "text": "the low figure up here that value",
+      "start": 1288.76,
+      "duration": 4.2
+    },
+    {
+      "text": "represents that candle right there so",
+      "start": 1291.2,
+      "duration": 3.44
+    },
+    {
+      "text": "that's why you see it highlighter here",
+      "start": 1292.96,
+      "duration": 3.719
+    },
+    {
+      "text": "when I took a screenshot I'm holding",
+      "start": 1294.64,
+      "duration": 3.48
+    },
+    {
+      "text": "underneath this candle so that way the",
+      "start": 1296.679,
+      "duration": 3.641
+    },
+    {
+      "text": "reference points up here are directly",
+      "start": 1298.12,
+      "duration": 4.4
+    },
+    {
+      "text": "related to this candle so you can see",
+      "start": 1300.32,
+      "duration": 3.599
+    },
+    {
+      "text": "the low is",
+      "start": 1302.52,
+      "duration": 4.44
+    },
+    {
+      "text": "14528 and a half so you could be a buyer",
+      "start": 1303.919,
+      "duration": 5.601
+    },
+    {
+      "text": "on a limit at",
+      "start": 1306.96,
+      "duration": 5.36
+    },
+    {
+      "text": "14,520 and a quarter or maybe if you",
+      "start": 1309.52,
+      "duration": 5.519
+    },
+    {
+      "text": "want to try to reach for the you the 28",
+      "start": 1312.32,
+      "duration": 3.8
+    },
+    {
+      "text": "even",
+      "start": 1315.039,
+      "duration": 4
+    },
+    {
+      "text": "number either way that's a nice",
+      "start": 1316.12,
+      "duration": 5.2
+    },
+    {
+      "text": "place to put a limit order",
+      "start": 1319.039,
+      "duration": 6.12
+    },
+    {
+      "text": "in the short-term low down here after",
+      "start": 1321.32,
+      "duration": 6
+    },
+    {
+      "text": "the fair value Gap forms that's where",
+      "start": 1325.159,
+      "duration": 5.041
+    },
+    {
+      "text": "your stop loss is that's the rules so",
+      "start": 1327.32,
+      "duration": 7.839
+    },
+    {
+      "text": "you have an entry point your stop and",
+      "start": 1330.2,
+      "duration": 6.92
+    },
+    {
+      "text": "between the two of them it works out to",
+      "start": 1335.159,
+      "duration": 5
+    },
+    {
+      "text": "be okay let's say you",
+      "start": 1337.12,
+      "duration": 5.039
+    },
+    {
+      "text": "have",
+      "start": 1340.159,
+      "duration": 4.12
+    },
+    {
+      "text": "14 14 and a",
+      "start": 1342.159,
+      "duration": 6.441
+    },
+    {
+      "text": "quarter in terms of risk okay so 14 and",
+      "start": 1344.279,
+      "duration": 6.961
+    },
+    {
+      "text": "a quarter points or handles of total",
+      "start": 1348.6,
+      "duration": 4.48
+    },
+    {
+      "text": "risk and let's assume that you were",
+      "start": 1351.24,
+      "duration": 4.12
+    },
+    {
+      "text": "trading I don't know six contracts on",
+      "start": 1353.08,
+      "duration": 3.12
+    },
+    {
+      "text": "the",
+      "start": 1355.36,
+      "duration": 4.12
+    },
+    {
+      "text": "micro you're essentially looking",
+      "start": 1356.2,
+      "duration": 7.44
+    },
+    {
+      "text": "at buying and",
+      "start": 1359.48,
+      "duration": 5.679
+    },
+    {
+      "text": "risking",
+      "start": 1363.64,
+      "duration": 4.56
+    },
+    {
+      "text": "$85 to make about",
+      "start": 1365.159,
+      "duration": 8.921
+    },
+    {
+      "text": "$300 so it's about 3.5 to one reward the",
+      "start": 1368.2,
+      "duration": 8.079
+    },
+    {
+      "text": "risk thereabouts I'm roughing I don't",
+      "start": 1374.08,
+      "duration": 3.28
+    },
+    {
+      "text": "have calculator in front of me folks",
+      "start": 1376.279,
+      "duration": 3.801
+    },
+    {
+      "text": "just you do the math",
+      "start": 1377.36,
+      "duration": 4.6
+    },
+    {
+      "text": "now here this value is important because",
+      "start": 1380.08,
+      "duration": 4.76
+    },
+    {
+      "text": "I want you to see in these conditions",
+      "start": 1381.96,
+      "duration": 4.64
+    },
+    {
+      "text": "you can't expect it to be perfect you",
+      "start": 1384.84,
+      "duration": 4.48
+    },
+    {
+      "text": "can't be you know expecting to be in",
+      "start": 1386.6,
+      "duration": 4.64
+    },
+    {
+      "text": "there at the lowest point no draw down",
+      "start": 1389.32,
+      "duration": 3.839
+    },
+    {
+      "text": "no heat on the position and then it just",
+      "start": 1391.24,
+      "duration": 4.039
+    },
+    {
+      "text": "goes in your favor don't think like",
+      "start": 1393.159,
+      "duration": 4.4
+    },
+    {
+      "text": "that you can see on this candle if you",
+      "start": 1395.279,
+      "duration": 4.161
+    },
+    {
+      "text": "would have bought here you would have",
+      "start": 1397.559,
+      "duration": 5.48
+    },
+    {
+      "text": "had nine points of heat okay or",
+      "start": 1399.44,
+      "duration": 7.68
+    },
+    {
+      "text": "basically $54 if you were trading six",
+      "start": 1403.039,
+      "duration": 6.481
+    },
+    {
+      "text": "micros now obviously it goes up more",
+      "start": 1407.12,
+      "duration": 5.039
+    },
+    {
+      "text": "than that if you're trading One Mini",
+      "start": 1409.52,
+      "duration": 3.56
+    },
+    {
+      "text": "because it's",
+      "start": 1412.159,
+      "duration": 4.961
+    },
+    {
+      "text": "$20 per",
+      "start": 1413.08,
+      "duration": 4.04
+    },
+    {
+      "text": "handle but overall this is a nice little",
+      "start": 1417.24,
+      "duration": 6.08
+    },
+    {
+      "text": "setup with the afternoon using the logic",
+      "start": 1420.08,
+      "duration": 4.959
+    },
+    {
+      "text": "over here even though it doesn't give us",
+      "start": 1423.32,
+      "duration": 4.4
+    },
+    {
+      "text": "a fair value Gap the you know the setups",
+      "start": 1425.039,
+      "duration": 5.401
+    },
+    {
+      "text": "that I'm teaching you to use using the",
+      "start": 1427.72,
+      "duration": 5.72
+    },
+    {
+      "text": "fair value Gap afternoon taking the",
+      "start": 1430.44,
+      "duration": 6.88
+    },
+    {
+      "text": "stops it provides the Baseline for bias",
+      "start": 1433.44,
+      "duration": 6.239
+    },
+    {
+      "text": "for the afternoon now what did I teach",
+      "start": 1437.32,
+      "duration": 5.92
+    },
+    {
+      "text": "you here I taught you that you can use",
+      "start": 1439.679,
+      "duration": 7
+    },
+    {
+      "text": "these reference points with the",
+      "start": 1443.24,
+      "duration": 5.84
+    },
+    {
+      "text": "underlying sentiment that's already in",
+      "start": 1446.679,
+      "duration": 4.521
+    },
+    {
+      "text": "motion if you didn't trade overnight and",
+      "start": 1449.08,
+      "duration": 4.079
+    },
+    {
+      "text": "take that big run I didn't get any of",
+      "start": 1451.2,
+      "duration": 4.92
+    },
+    {
+      "text": "that run I didn't do anything with that",
+      "start": 1453.159,
+      "duration": 5.961
+    },
+    {
+      "text": "if you miss that it doesn't matter",
+      "start": 1456.12,
+      "duration": 4.12
+    },
+    {
+      "text": "because that is something that's going",
+      "start": 1459.12,
+      "duration": 2.96
+    },
+    {
+      "text": "to give you more insight and it tells",
+      "start": 1460.24,
+      "duration": 4.48
+    },
+    {
+      "text": "you when to avoid the morning session",
+      "start": 1462.08,
+      "duration": 4.839
+    },
+    {
+      "text": "don't trade it everybody's going to be",
+      "start": 1464.72,
+      "duration": 5.4
+    },
+    {
+      "text": "doing what think about it everybody woke",
+      "start": 1466.919,
+      "duration": 5.681
+    },
+    {
+      "text": "up and saw these markets and they all",
+      "start": 1470.12,
+      "duration": 4.559
+    },
+    {
+      "text": "wanted to do what they wanted to buy it",
+      "start": 1472.6,
+      "duration": 4.16
+    },
+    {
+      "text": "because it's going up a lot and they",
+      "start": 1474.679,
+      "duration": 4.761
+    },
+    {
+      "text": "want to chase it that idea leads many",
+      "start": 1476.76,
+      "duration": 3.96
+    },
+    {
+      "text": "times",
+      "start": 1479.44,
+      "duration": 5.4
+    },
+    {
+      "text": "to losing trades and then it's starts",
+      "start": 1480.72,
+      "duration": 7.16
+    },
+    {
+      "text": "this cycle where you go into this",
+      "start": 1484.84,
+      "duration": 4.92
+    },
+    {
+      "text": "chasing chasing chasing and then when",
+      "start": 1487.88,
+      "duration": 3.32
+    },
+    {
+      "text": "the market does these sideways",
+      "start": 1489.76,
+      "duration": 4.96
+    },
+    {
+      "text": "consolidations and sloppy choppy market",
+      "start": 1491.2,
+      "duration": 5.8
+    },
+    {
+      "text": "conditions it it's literally like a",
+      "start": 1494.72,
+      "duration": 5.28
+    },
+    {
+      "text": "blowtorch on your account if you don't",
+      "start": 1497,
+      "duration": 4.88
+    },
+    {
+      "text": "know how to stop or if you don't know",
+      "start": 1500,
+      "duration": 4.279
+    },
+    {
+      "text": "what you're doing you can literally talk",
+      "start": 1501.88,
+      "duration": 4.96
+    },
+    {
+      "text": "yourself into millions of Trades and",
+      "start": 1504.279,
+      "duration": 5.12
+    },
+    {
+      "text": "then draw your",
+      "start": 1506.84,
+      "duration": 2.559
+    },
+    {
+      "text": "countdown last slide and just to hammer",
+      "start": 1511.48,
+      "duration": 5.24
+    },
+    {
+      "text": "this down this is zoomed in on a one",
+      "start": 1514.159,
+      "duration": 4.161
+    },
+    {
+      "text": "minute",
+      "start": 1516.72,
+      "duration": 5.439
+    },
+    {
+      "text": "chart swing High broken fair value G",
+      "start": 1518.32,
+      "duration": 5.959
+    },
+    {
+      "text": "right there and we have that shortterm",
+      "start": 1522.159,
+      "duration": 4.321
+    },
+    {
+      "text": "low here I'm noted in here so that's",
+      "start": 1524.279,
+      "duration": 3.561
+    },
+    {
+      "text": "where you would be basically entering",
+      "start": 1526.48,
+      "duration": 3
+    },
+    {
+      "text": "one with that idea trading below that is",
+      "start": 1527.84,
+      "duration": 4.199
+    },
+    {
+      "text": "where the sell stops are trading below",
+      "start": 1529.48,
+      "duration": 5
+    },
+    {
+      "text": "that now it goes below that now some of",
+      "start": 1532.039,
+      "duration": 3.88
+    },
+    {
+      "text": "you have mentioned in the comment",
+      "start": 1534.48,
+      "duration": 3.76
+    },
+    {
+      "text": "section does this invalidate the fair",
+      "start": 1535.919,
+      "duration": 4.841
+    },
+    {
+      "text": "value Gap no it does",
+      "start": 1538.24,
+      "duration": 5.72
+    },
+    {
+      "text": "not the idea is the fair value gaps we",
+      "start": 1540.76,
+      "duration": 4.68
+    },
+    {
+      "text": "look at the look at the body of this",
+      "start": 1543.96,
+      "duration": 4.28
+    },
+    {
+      "text": "candle here isn't that respecting that",
+      "start": 1545.44,
+      "duration": 5.239
+    },
+    {
+      "text": "yes so in my mind I'm thinking well I",
+      "start": 1548.24,
+      "duration": 4.52
+    },
+    {
+      "text": "know prices sometimes especially the way",
+      "start": 1550.679,
+      "duration": 5.081
+    },
+    {
+      "text": "it is right now it's very volatile so",
+      "start": 1552.76,
+      "duration": 5.96
+    },
+    {
+      "text": "I'm permitting a greater level of",
+      "start": 1555.76,
+      "duration": 6.639
+    },
+    {
+      "text": "imperfection in price delivery and",
+      "start": 1558.72,
+      "duration": 6.199
+    },
+    {
+      "text": "then using the logic of the fair value",
+      "start": 1562.399,
+      "duration": 5.801
+    },
+    {
+      "text": "Gap as the basis for my entry idea and",
+      "start": 1564.919,
+      "duration": 5.681
+    },
+    {
+      "text": "then using the stop premise which it",
+      "start": 1568.2,
+      "duration": 4.16
+    },
+    {
+      "text": "didn't get it didn't get here it didn't",
+      "start": 1570.6,
+      "duration": 5.4
+    },
+    {
+      "text": "stop you out you had basically",
+      "start": 1572.36,
+      "duration": 6.64
+    },
+    {
+      "text": "what",
+      "start": 1576,
+      "duration": 3
+    },
+    {
+      "text": "five what was that five or so uh more",
+      "start": 1579.12,
+      "duration": 6.24
+    },
+    {
+      "text": "handles before you would have been",
+      "start": 1582.559,
+      "duration": 5.401
+    },
+    {
+      "text": "stopped now watching it live might make",
+      "start": 1585.36,
+      "duration": 4.96
+    },
+    {
+      "text": "you look little nervous but at some",
+      "start": 1587.96,
+      "duration": 3.52
+    },
+    {
+      "text": "point folks you're going to have to get",
+      "start": 1590.32,
+      "duration": 2.839
+    },
+    {
+      "text": "used to if you're going to trade like",
+      "start": 1591.48,
+      "duration": 4.48
+    },
+    {
+      "text": "this in these really little time frames",
+      "start": 1593.159,
+      "duration": 4.64
+    },
+    {
+      "text": "and you're trying to be very Nimble",
+      "start": 1595.96,
+      "duration": 2.839
+    },
+    {
+      "text": "you're going to have",
+      "start": 1597.799,
+      "duration": 4.88
+    },
+    {
+      "text": "to learn to trust the setups and let the",
+      "start": 1598.799,
+      "duration": 6.561
+    },
+    {
+      "text": "stops do their jobs and if it if it gets",
+      "start": 1602.679,
+      "duration": 4.36
+    },
+    {
+      "text": "stopped out that's just one trade you",
+      "start": 1605.36,
+      "duration": 3.72
+    },
+    {
+      "text": "got wrong it's not your",
+      "start": 1607.039,
+      "duration": 5.721
+    },
+    {
+      "text": "career look for the next one now I'm",
+      "start": 1609.08,
+      "duration": 5.079
+    },
+    {
+      "text": "going to throw this in here as a bonus",
+      "start": 1612.76,
+      "duration": 5.639
+    },
+    {
+      "text": "but you know take it for what it is it r",
+      "start": 1614.159,
+      "duration": 6.24
+    },
+    {
+      "text": "is here takes off and does not take out",
+      "start": 1618.399,
+      "duration": 4.361
+    },
+    {
+      "text": "that the buy side liquidity resting",
+      "start": 1620.399,
+      "duration": 4.76
+    },
+    {
+      "text": "above here did not get taken here yet",
+      "start": 1622.76,
+      "duration": 4.96
+    },
+    {
+      "text": "and then we had this",
+      "start": 1625.159,
+      "duration": 5.041
+    },
+    {
+      "text": "imbalance and it trades down into it and",
+      "start": 1627.72,
+      "duration": 4.12
+    },
+    {
+      "text": "then hits what the order",
+      "start": 1630.2,
+      "duration": 4.359
+    },
+    {
+      "text": "block that's a buy and you can if you",
+      "start": 1631.84,
+      "duration": 4.719
+    },
+    {
+      "text": "miss this one you can pick up this one",
+      "start": 1634.559,
+      "duration": 3.24
+    },
+    {
+      "text": "based on the logic I teach on the",
+      "start": 1636.559,
+      "duration": 2.641
+    },
+    {
+      "text": "YouTube channel so this is actually",
+      "start": 1637.799,
+      "duration": 2.641
+    },
+    {
+      "text": "something that's taught in the YouTube",
+      "start": 1639.2,
+      "duration": 4.479
+    },
+    {
+      "text": "channel okay uh this whole pattern here",
+      "start": 1640.44,
+      "duration": 4.16
+    },
+    {
+      "text": "is",
+      "start": 1643.679,
+      "duration": 3.841
+    },
+    {
+      "text": "exactly right out of my high probability",
+      "start": 1644.6,
+      "duration": 4.52
+    },
+    {
+      "text": "short-term",
+      "start": 1647.52,
+      "duration": 3.279
+    },
+    {
+      "text": "trading or scalping series I can't",
+      "start": 1649.12,
+      "duration": 3.76
+    },
+    {
+      "text": "remember exactly what the title was but",
+      "start": 1650.799,
+      "duration": 4.161
+    },
+    {
+      "text": "uh this pattern has right in that and",
+      "start": 1652.88,
+      "duration": 3.84
+    },
+    {
+      "text": "then it runs for that liquidity there so",
+      "start": 1654.96,
+      "duration": 3.8
+    },
+    {
+      "text": "there's two setups there so I've took",
+      "start": 1656.72,
+      "duration": 4.12
+    },
+    {
+      "text": "something from the free lessons that's",
+      "start": 1658.76,
+      "duration": 3.72
+    },
+    {
+      "text": "already on the YouTube channel and also",
+      "start": 1660.84,
+      "duration": 3
+    },
+    {
+      "text": "amplifying something I've been teaching",
+      "start": 1662.48,
+      "duration": 3.559
+    },
+    {
+      "text": "in this mentorship series hopefully you",
+      "start": 1663.84,
+      "duration": 3.959
+    },
+    {
+      "text": "found this one insightful and until talk",
+      "start": 1666.039,
+      "duration": 5.921
+    },
+    {
+      "text": "to you next time be safe",
+      "start": 1667.799,
+      "duration": 4.161
+    }
+  ],
+  "fullText": "all right folks welcome back this is episode nine for the 2022 ICT mentorship on YouTube this lecture is going to be on Power Three which is accumulation manipulation and distribution and New York PM session opportunities all right so we're looking at the NASDAQ e- mini Futures this is The Continuous chart on trading view so if you look at the daily range where we've been we're inside this range here okay so we have this swing high and this swing low now why am I picking these two reference points well namely this is the low most recently after taking out this short-term low so we've dug into all the sell side liquidity resting below that low we retraced back up inside of this High to that low so we went back up into a premium the range high to low running a fib just to get the 50% level that gives us equilibrium anything below that is a discount notice how the market traded down on Monday into a deep discount but did not take out these lows over here but look how we closed on Monday we had an indecisive candle the body was basically absent the open and close was essentially you the same thing if we have that and the Market's trading down into a discount even though we might have a load down here that we're targeting this may require a retracement now notice at the close of Monday's trading we had an imbalance from this low and this high on Tuesday's trading overnight the equities markets had a run up into this imbalance here so this fair value Gap was ret traded to in here this low and this High we'll look at that in reference to the lower time frame this lower level is the low end of the fair value gap on the daily chart and this level up here is the upper end of the fair value Gap I'm taking your attention to Monday's trading and I want to talk a little bit about power three which is accumulation distribution and manipulation okay so generally my teachings are like this if I'm bullish I'm expecting the opening price to be near the low of the day or the session then it trades lower making some important low and then rallies creates a high and then closes near the high of the day now it's not important for you to try to predict the closing price what I'm trying to train you to anticipate is the likelihood of the market making some kind kind of a fake move like a Judas swing okay Judas swing is the false move typically in London and in New York session there are fake runs that start off a move and I walked you through it last week on my community tab where I outlined the actual Judas swing for that particular day using the fair value Gap outlin the the low I was only off by cor of a point for the low in that range and that created the low today the idea is what I'm going to show you here as well on Monday we had price Dro down overnight Consolidated and then we have a little bit of a rally ahead of the equities open okay so in here we have 8:30 in the morning if you look at 8:30 what do we have we have the highs over here they're suspect because they're relative equal highs there but look what we left here ahead of 8:30 we had this huge imbalance so if we run these highs out after the open at 9:30 it's likely to trade down into that and rebounds but watch what it does it and we trade up into that level here which creates the fair value gaps low-end parameter remember this is Monday's trading it sells off so this line isn't here on Monday that's not what we're looking at we're looking at the likelihood of coming back down into this area here after taking these highs out if it does so if it trades back into this imbalance that's a good candidate to go long now the imbalance in here if you go to the left of it you can see the down close candles that's your bullish order block the market trades down hits the order block and it's an afternoon trade so it starts to rally and then consolidates since to close overnight we create a wicked run last night this was an it ran last night and most of all the move for today was done before we even got to the opening of the morning had a little bit of a retracement after 8:30 and at 9:30 we Consolidated I'll talk a little bit about that as a market profile in a moment but then we drop down create an important low of the day and then we rally it got real close to the fair value gaps high-end parameter but didn't get to it we don't need it's just like I was mentioning here you don't need to try to predict the closing price with power three which is accumulation manipulation so in other words if you're bullish it opens where you think it's going to trade higher it's going to be most likely a small little move lower that's the move you want to try to go in and Hunt along if you miss it you want to try to get long real close to where the opening price is now the question is going to be is where is the opening price well I like 830 okay you use the opening price here at 830 draw that out in time did we go below it yes did we go inside the imbalance yes did we take out a short-term low yes did we hit an order block yes was it an optimal trade entry yes lots of factors there over here same thing opening price here did we trade lower than that yes did it go even lower than that later on in the afternoon yes then it rallied taking out the relative equal highs here and again gravitating towards that upper end of that fair value gap on the daily chart now I'm in a 5 minute chart on that same February 14th and I want to take you closer to what price is done in here that imbalance the lowest portion of it here with all the down closed candles here now this is anchored to the Daily bullish order block but you can see how we traded into it here with one two three four down closed candles that is a complete order block on this time frame so consecutive down closed candles right before a price surge that has an imbalance that's how you find your order blocks okay so a high probability order block would be your narrative or your bias is bullish you're looking for displacement that's this right here where the market runs real quick higher and the down close candles you want to mark that out and anticipate a return back in to that now again this level is not there yet we don't know this level until Monday's close so don't be tricked thinking that I have this level here and I knew it was going to go right to that level in term I'm not suggesting that at all what I'm suggesting is is watch what happens when it creates that high it breaks down all this price action here gets overran into a retracement back down into this imbalance here the low of this candle and the high of this candle that right there that's your fair value got with an order block and optimal trade entry rallies even though it's sloppy it's still continuously driving higher this high at the close on this day here at say 4:30 okay 4:30 in afternoon to me that's like the close for me no it trades a little bit later than that and then closes for a little while and it also technically closes when the bell rings at 4:00 p.m. you local time in New York because there's a little bit of trading past that I like to just look at 430 and just consider that where we are in terms of what we've done for the full range and then determine what I have left for maybe inbalance or liquidity pools here is that drop down here on a one minute chart it's digging into that order block right here if you look real close let me go back up one slide I want you to see what I'm showing you here right here this price action see 14140 14120 this little area right here I'm looking at on a one minute chart 14140 14120 that in that vicinity see that small little Gap right there see that see the swing High we trade above it create a fair value Gap there trade down into it this is an afternoon trade this is 2:00 in the afternoon local time in New York inside the order block inside the fair value Gap inside a retracement of the fair value Gap that sets the stage of a market run up into a higher retracement now we don't know if this is going to be the closing parameter for a daily fair value Gap we don't need to know that yet but this is a likely scenario to go long and we can look for a run back up into this range here or run the buy stops above here or maybe inside here sloppy run but nonetheless it's still pressing higher now here's today on the 15th of February 2022 notice what we had with had this enormous price run overnight in technically the London session now a lot of you going to ask would I have caught this no no I wouldn't have caught it I would have missed it and I would if I was awake I wouldn't have seen it coming let's just put it that way so this right here was a complete surprise to me when I woke up saw it but I want you to think about when you have these overnight runs that were basically these big moves overnight before the session begins in New York when you're trading equities this also works with Forex too so it's important try not to chase price this is what I mean by don't chase it don't chase it last week when I was commenting and outlining the NASDAQ and giving you a fair value Gap real time explaining to where I thought it was going to draw down to and it created the New York session low of the day okay that's what I was outlining just take a look at go back and look at you'll see it's it's pretty obvious the same logic I'm amplifying that here okay overnight what was the market doing it was rallying so when we open up at 8:30 do we go in here and start buying it just because it's gone up overnight no we don't chase it you have to wait no we don't chase it we have to wait for more information what information are we waiting for well typically whenever you see a big run up or a big run down there's a consolidation that takes place shortly after now not always it just keeps on ripping higher or lower and you'll either miss a move or if you get lucky maybe you can participate in it but this is what I typically look for so if there's a lot of range movement overnight which overnight um 2 o'cl in the morning to 5 o' in the morning okay if we get a big run like that which is what we're seeing here right away in my mind I'm thinking don't trade a lot don't expect a lot of in and out in and out perect you know perfect Precision wait for a real significant price move otherwise you're going to get chopped up now what does that mean well when we have it opening here at 830 look to the left what do we have we have this High here and we have the low over here we can use this one because they're relative equal but I like this one why why do I like this one what's below it fair value got see that so it's likely a trade down after it creates this sloppy opening look at all this movement in here now as a personal study there's two or three YouTubers that I watch that trade the equities market indices and I'm not trying to say anything bad about them I just like to listen to what they're thinking because they don't look at the market like I do I'm not suggesting that they're not profitable because they show live trades they get into trades they take them and sometimes they win and sometimes they don't but I'd like to read kind of like a a Squawk Box what their interpretation of price is and they're looking at this area in here and it's back and forth they think if it go if it goes here it's going to go there if it goes here if it's going to go there it's all these scenarios are going through you know randomly in their live streams so when I'm watching price I'm listening for them to want to be a buyer so when they're trying to be a buyer that means they're they're already hunting a continuation of this move here I want to see a low form now this is what we have for the today we we start going lower first so that's good we create a pseudo Judas swing but did it create a nice low and turn away from itm look at all this back and forth and it created these suspect lows in here relative equal lows there's going to be sell side building up below that sell stops okay when it starts to go higher anyone that was long overnight they're going to jam their stop loss right underneath that okay when this occurs that's the very scenario I'm looking for now right away in my mind here's what I want you to understand if there's a big move overnight for equities this is not Forex okay this part is not Forex it's just for trading like NASDAQ Dow and e- mini S&P if there a big run overnight avoid the New York session don't even mess with the New York session wait until the other side of lunch at 1:00 in the afternoon New York time and then anticipate the New York lunch lows taken out or the New York morning session lows which is what we have here notice how we rallied up we didn't take out the relative equal highs here that was formed ahead of 7 o'clock in the morning notice that now this over here we know this range up here is the high end of that fair value Gap why do we know that because the 14th stopped trading and it had the indecisive candle in the daily chart so it's likely that we might trade up into this Range High and this is that range low so if we can draw down below that low it was formed initially in New York session we have a fair value Gap over here with sell side while we have yet to take out the buy side theity here at around I don't know 14575 and then get up to that fair value Gap high or the the boundary of it okay kind of like the resistance level of it so this is the draw in liquidity and we have a minor draw in liquidity here with Bice liquidity look what we have in terms of price action the NASDAQ drops down taking out the cell side digging into that fair value Gap see that look at the bodies of the candles isn't that neat how just respects that level back here now that's not random okay these are algorithmic principles that are in play and these markets are unbelievably precise when they are in better conditions right now if you've been trading with live funds or if you've been trying to follow price action there's been a lot of it makes a run then it goes into this choppy sideways and it's very frustrating if you're trying to get like sustained price moves or if you don't know how to operate in these like these sloppy little ranges like this I personally don't think that this is high probability trading you can get chopped up you can get losing trades you can draw your account down if you don't control yourself you can blow your account in these types of conditions how do you avoid that how do you avoid running out your account and then scaling back if you're a high frequency type of a Trader how do you draw back on the frequency and look for the better setups what I'm showing you here you wait you don't chase the overnight run and you wait for them to give you a low that everybody overnight will want to put their stop loss right beneath that after it starts a rally above it it's even better when you don't have this High taken out yet see how I took it up here and it just went right down for him that's engineering liquidity it runs up consolidates creates a low starts to rally and everybody's thinking I don't want to lose my profits I don't want to lose out on making more money but I had to put a stop loss right here because the books tell me I had to do that so I did the same kind of stuff folks I'm not trying to talk down anybody but I'm just repeating what a retail Trader's mindset would be and the logic behind this okay so the narrative with this day was the stocks were trailed below these lows the afternoon session again creates the low of the day takes the sell side liquidity out into a fair value Gap and then rallies now in here I'm going to teach you a little bit more about that watch notice we don't really have a fair value gap down here but it gives us the basis for expecting the price to start to Rally into the afternoon now at 2:00 in the afternoon 1,400 on this trading view chart that starts 2 o'clock in the afternoon New York local time we have the market trading down into an imbalance over here liquidity resting below these relative equal lows is taken out so what are we looking at we've seen a price run that we don't think needs to come back down here because the logic is the overnight stops have been ran out down here there's no reason for the market to want to come back down there but we have this low and these relative equal lows here Post New York lunch New York lunch is noon to 1:00 in the afternoon New York local time so the imbalance we trade down into that what's the likelihood of it coming all the way through the imbalance and then going after that low not likely not likely not after seeing this run here they don't want to give these Traders another chance to get back in they got stopped out so it's going to be a little bit more sneakier when they make these new setups that continue into a higher run so they take out the sell side below these relative equal lows take those stops out and then it rallies and then drops back down now here watch we have a swing high right here it breaks it does it trade above that yes was it energetic yes does it have a fair value Gap yes so now the market trades down into it here creates a short-term low you could be a buyer there there's nothing wrong with that but say you missed it say you just I mean this is a one minute chart say you missed it and the market starts to run off like this but then it gives you another opportunity I've had many times trades formed just like this where I was looking for something I was waiting for a setup to happen either my cell phone's buzzing or I grab a drink is just outside of reach I got to go walk over to the other end of the desk and grab it and then all of a sudden here you go I miss it takes off the fair value Gap is even better when you have the sell side liquidity resting below short-term low and the drop down into it here you can use that low as your entry or minus one tick okay this short-term low forms at 2:34 p.m. now if you look at the low figure up here that value represents that candle right there so that's why you see it highlighter here when I took a screenshot I'm holding underneath this candle so that way the reference points up here are directly related to this candle so you can see the low is 14528 and a half so you could be a buyer on a limit at 14,520 and a quarter or maybe if you want to try to reach for the you the 28 even number either way that's a nice place to put a limit order in the short-term low down here after the fair value Gap forms that's where your stop loss is that's the rules so you have an entry point your stop and between the two of them it works out to be okay let's say you have 14 14 and a quarter in terms of risk okay so 14 and a quarter points or handles of total risk and let's assume that you were trading I don't know six contracts on the micro you're essentially looking at buying and risking $85 to make about $300 so it's about 3.5 to one reward the risk thereabouts I'm roughing I don't have calculator in front of me folks just you do the math now here this value is important because I want you to see in these conditions you can't expect it to be perfect you can't be you know expecting to be in there at the lowest point no draw down no heat on the position and then it just goes in your favor don't think like that you can see on this candle if you would have bought here you would have had nine points of heat okay or basically $54 if you were trading six micros now obviously it goes up more than that if you're trading One Mini because it's $20 per handle but overall this is a nice little setup with the afternoon using the logic over here even though it doesn't give us a fair value Gap the you know the setups that I'm teaching you to use using the fair value Gap afternoon taking the stops it provides the Baseline for bias for the afternoon now what did I teach you here I taught you that you can use these reference points with the underlying sentiment that's already in motion if you didn't trade overnight and take that big run I didn't get any of that run I didn't do anything with that if you miss that it doesn't matter because that is something that's going to give you more insight and it tells you when to avoid the morning session don't trade it everybody's going to be doing what think about it everybody woke up and saw these markets and they all wanted to do what they wanted to buy it because it's going up a lot and they want to chase it that idea leads many times to losing trades and then it's starts this cycle where you go into this chasing chasing chasing and then when the market does these sideways consolidations and sloppy choppy market conditions it it's literally like a blowtorch on your account if you don't know how to stop or if you don't know what you're doing you can literally talk yourself into millions of Trades and then draw your countdown last slide and just to hammer this down this is zoomed in on a one minute chart swing High broken fair value G right there and we have that shortterm low here I'm noted in here so that's where you would be basically entering one with that idea trading below that is where the sell stops are trading below that now it goes below that now some of you have mentioned in the comment section does this invalidate the fair value Gap no it does not the idea is the fair value gaps we look at the look at the body of this candle here isn't that respecting that yes so in my mind I'm thinking well I know prices sometimes especially the way it is right now it's very volatile so I'm permitting a greater level of imperfection in price delivery and then using the logic of the fair value Gap as the basis for my entry idea and then using the stop premise which it didn't get it didn't get here it didn't stop you out you had basically what five what was that five or so uh more handles before you would have been stopped now watching it live might make you look little nervous but at some point folks you're going to have to get used to if you're going to trade like this in these really little time frames and you're trying to be very Nimble you're going to have to learn to trust the setups and let the stops do their jobs and if it if it gets stopped out that's just one trade you got wrong it's not your career look for the next one now I'm going to throw this in here as a bonus but you know take it for what it is it r is here takes off and does not take out that the buy side liquidity resting above here did not get taken here yet and then we had this imbalance and it trades down into it and then hits what the order block that's a buy and you can if you miss this one you can pick up this one based on the logic I teach on the YouTube channel so this is actually something that's taught in the YouTube channel okay uh this whole pattern here is exactly right out of my high probability short-term trading or scalping series I can't remember exactly what the title was but uh this pattern has right in that and then it runs for that liquidity there so there's two setups there so I've took something from the free lessons that's already on the YouTube channel and also amplifying something I've been teaching in this mentorship series hopefully you found this one insightful and until talk to you next time be safe",
+  "grouped_segments": [
+    {
+      "start": 5.08,
+      "text": "all right folks welcome back this is episode nine for the 2022 ICT mentorship on YouTube this lecture is going to be on Power Three which is accumulation manipulation and distribution and New York PM session",
+      "timestamp": "0:05"
+    },
+    {
+      "start": 25.279,
+      "text": "opportunities all right so we're looking at the NASDAQ e- mini Futures this is The Continuous chart on trading view so if you look at the daily range where we've been we're inside this range here okay so we have this swing high and this swing low now why am I picking these two reference points well namely this is the low most recently after taking out this short-term low so we've dug into all the sell side liquidity resting below that low we retraced back up inside of this High to that low so we went back up into a premium the range high to low running a fib just to get the 50% level that gives us equilibrium anything below that is a discount notice how the market traded down on Monday into a deep discount but did not take out these lows over here but look how we closed on Monday we had an indecisive candle the body was basically absent the open and close was essentially you the same thing if we have that and the Market's trading down into a discount even though we might have a load down here that we're targeting this may require a retracement now notice at the close of Monday's trading we had an imbalance from this low and this high on Tuesday's trading overnight the equities markets had a run up into this imbalance here so this fair value Gap was ret traded to in here this low and this High we'll look at that in reference to the lower time frame",
+      "timestamp": "0:25"
+    },
+    {
+      "start": 154,
+      "text": "this lower level is the low end of the fair value gap on the daily chart and this level up here is the upper end of the fair value Gap I'm taking your attention to Monday's trading and I want to talk a little bit about power three which is accumulation distribution and manipulation okay so generally my teachings are like this if I'm bullish I'm expecting the opening price to be near the low of the day or the session then it trades lower making some important low and then rallies creates a high and then closes near the high of the day now it's not important for you to try to predict the closing price what I'm trying to train you to anticipate is the likelihood of the market making some kind kind of a fake move like a Judas swing okay Judas swing is the false move typically in London and in New York session there are fake runs that start off a move and I walked you through it last week on my community tab where I outlined the actual Judas swing for that particular day using the fair value Gap outlin the the low I was only off by cor of a point for the low in that range and that created the low today the idea is what I'm going to show you here as well on Monday we had price Dro down overnight Consolidated and then we have a little bit of a rally ahead of the equities open okay so in here we have 8:30 in the morning if you look at 8:30 what do we have we have the highs over here they're suspect because they're relative equal highs there but look what we left here ahead of 8:30 we had this huge imbalance so if we run these highs out after the open at 9:30 it's likely to trade down into that and rebounds but watch what it does it and we trade up into that level here which creates the fair value gaps low-end parameter remember this is Monday's trading it sells off so this line isn't here on Monday that's not what we're looking at we're looking at the likelihood of coming back down into this area here after taking these highs out if it does so if it trades back into this imbalance that's a good candidate to go long now the imbalance in here if you go to the left of it you can see the down close candles that's your bullish order block the market trades down hits the order block and it's an afternoon trade so it starts to rally and then consolidates since to close overnight we create a wicked run last night this was an it ran last night and most of all the move for today was done before we even got to the opening of the morning had a little bit of a retracement after 8:30 and at 9:30 we Consolidated I'll talk a little bit about that as a market profile in a moment but then we drop down create an important low of the day and then we rally it got real close to the fair value gaps high-end parameter but didn't get to it we don't need it's just like I was mentioning here you don't need to try to predict the closing price with power three which is accumulation manipulation so in other words if you're bullish it opens where you think it's going to trade higher it's going to be most likely a small little move lower that's the move you want to try to go in and Hunt along if you miss it you want to try to get long real close to where the opening price is now the question is going to be is where is the opening price well I like 830 okay you use the opening price here at 830 draw that out in time did we go below it yes did we go inside the imbalance yes did we take out a short-term low yes did we hit an order block yes was it an optimal trade entry yes lots of factors there over here same thing opening price here did we trade lower than that yes did it go even lower than that later on in the afternoon yes then it rallied taking out the relative equal highs here and again gravitating towards that upper end of that fair value gap on the daily",
+      "timestamp": "2:34"
+    },
+    {
+      "start": 425.28,
+      "text": "chart now I'm in a 5 minute chart on that same February 14th and I want to take you closer to what price is done in here that imbalance the lowest portion of it here with all the down closed candles here now this is anchored to the Daily bullish order block but you can see how we traded into it here with one two three four down closed candles that is a complete order block on this time frame so consecutive down closed candles right before a price surge that has an imbalance that's how you find your order blocks okay so a high probability order block would be your narrative or your bias is bullish you're looking for displacement that's this right here where the market runs real quick higher and the down close candles you want to mark that out and anticipate a return back in to that now again this level is not there yet we don't know this level until Monday's close so don't be tricked thinking that I have this level here and I knew it was going to go right to that level in term I'm not suggesting that at all what I'm suggesting is is watch what happens when it creates that high it breaks down all this price action here gets overran into a retracement back down into this imbalance here the low of this candle and the high of this candle that right there that's your fair value got with an order block and optimal trade entry rallies even though it's sloppy it's still continuously driving higher this high at the close on this day here at say 4:30 okay 4:30 in afternoon to me that's like the close for me no it trades a little bit later than that and then closes for a little while and it also technically closes when the bell rings at 4:00 p.m. you local time in New York because there's a little bit of trading past that I like to just look at 430 and just consider that where we are in terms of what we've done for the full range and then determine what I have left for maybe inbalance or liquidity",
+      "timestamp": "7:05"
+    },
+    {
+      "start": 563.6,
+      "text": "pools here is that drop down here on a one minute chart it's digging into that order block right here if you look real close let me go back up one slide I want you to see what I'm showing you here right here this price action see 14140 14120 this little area right here I'm looking at on a one minute chart 14140 14120 that in that vicinity see that small little Gap right there see that see the swing High we trade above it create a fair value Gap there trade down into it this is an afternoon trade this is 2:00 in the afternoon local time in New York inside the order block inside the fair value Gap inside a retracement of the fair value Gap that sets the stage of a market run up into a higher retracement now we don't know if this is going to be the closing parameter for a daily fair value Gap we don't need to know that yet but this is a likely scenario to go long and we can look for a run back up into this range here or run the buy stops above here or maybe inside here sloppy run but nonetheless it's still pressing higher now here's today on the 15th of February 2022 notice what we had with had this enormous price run overnight in technically the London session now a lot of you going to ask would I have caught this no no I wouldn't have caught it I would have missed it and I would if I was awake I wouldn't have seen it coming let's just put it that way so this right here was a complete surprise to me when I woke up saw it but I want you to think about when you have these overnight runs that were basically these big moves overnight before the session begins in New York when you're trading equities this also works with Forex too so it's important try not to chase price this is what I mean by don't chase it don't chase it last week when I was commenting and outlining the NASDAQ and giving you a fair value Gap real time explaining to where I thought it was going to draw down to and it created the New York session low of the day okay that's what I was outlining just take a look at go back and look at you'll see it's it's pretty obvious the same logic I'm amplifying that here okay overnight what was the market doing it was rallying so when we open up at 8:30 do we go in here and start buying it just because it's gone up overnight no we don't chase it you have to wait no we don't chase it we have to wait for more information what information are we waiting for well typically whenever you see a big run up or a big run down there's a consolidation that takes place shortly after now not always it just keeps on ripping higher or lower and you'll either miss a move or if you get lucky maybe you can participate in it but this is what I typically look for so if there's a lot of range movement overnight which overnight um 2 o'cl in the morning to 5 o' in the morning okay if we get a big run like that which is what we're seeing here right away in my mind I'm thinking don't trade a lot don't expect a lot of in and out in and out perect you know perfect Precision wait for a real significant price move otherwise you're going to get chopped up now what does that mean well when we have it opening here at 830 look to the left what do we have we have this High here and we have the low over here we can use this one because they're relative equal but I like this one why why do I like this one what's below it fair value got see that so it's likely a trade down after it creates this sloppy opening look at all this movement in here now as a personal study there's two or three YouTubers that I watch that trade the equities market indices and I'm not trying to say anything bad about them I just like to listen to what they're thinking because they don't look at the market like I do I'm not suggesting that they're not profitable because they show live trades they get into trades they take them and sometimes they win and sometimes they don't but I'd like to read kind of like a a Squawk Box what their interpretation of price is and they're looking at this area in here and it's back and forth they think if it go if it goes here it's going to go there if it goes here if it's going to go there it's all these scenarios are going through you know randomly in their live streams so when I'm watching price I'm listening for them to want to be a buyer so when they're trying to be a buyer that means they're they're already hunting a continuation of this move here I want to see a low form now this is what we have for the today we we start going lower first so that's good we create a pseudo Judas swing but did it create a nice low and turn away from itm look at all this back and forth and it created these suspect lows in here relative equal lows there's going to be sell side building up below that sell stops okay when it starts to go higher anyone that was long overnight they're going to jam their stop loss right underneath that okay when this occurs that's the very scenario I'm looking for now right away in my mind here's what I want you to understand if there's a big move overnight for equities this is not Forex okay this part is not Forex it's just for trading like NASDAQ Dow and e- mini S&P if there a big run overnight avoid the New York session don't even mess with the New York session wait until the other side of lunch at 1:00 in the afternoon New York time and then anticipate the New York lunch lows taken out or the New York morning session lows which is what we have here notice how we rallied up we didn't take out the relative equal highs here that was formed ahead of 7 o'clock in the morning notice that now this over here we know this range up here is the high end of that fair value Gap why do we know that because the 14th stopped trading and it had the indecisive candle in the daily chart so it's likely that we might trade up into this Range High and this is that range low so if we can draw down below that low it was formed initially in New York session we have a fair value Gap over here with sell side while we have yet to take out the buy side theity here at around I don't know 14575 and then get up to that fair value Gap high or the the boundary of it okay kind of like the resistance level of it so this is the draw in liquidity and we have a minor draw in liquidity here with Bice liquidity look what we have in terms of price action the NASDAQ drops down taking out the cell side digging into that fair value Gap see that look at the bodies of the candles isn't that neat how just respects that level back here now that's not random okay these are algorithmic principles that are in play and these markets are unbelievably precise when they are in better conditions right now if you've been trading with live funds or if you've been trying to follow price action there's been a lot of it makes a run then it goes into this choppy sideways and it's very frustrating if you're trying to get like sustained price moves or if you don't know how to operate in these like these sloppy little ranges like this I personally don't think that this is high probability trading you can get chopped up you can get losing trades you can draw your account down if you don't control yourself you can blow your account in these types of conditions how do you avoid that how do you avoid running out your account and then scaling back if you're a high frequency type of a Trader how do you draw back on the frequency and look for the better setups what I'm showing you here you wait you don't chase the overnight run and you wait for them to give you a low that everybody overnight will want to put their stop loss right beneath that after it starts a rally above it it's even better when you don't have this High taken out yet see how I took it up here and it just went right down for him that's engineering liquidity it runs up consolidates creates a low starts to rally and everybody's thinking I don't want to lose my profits I don't want to lose out on making more money but I had to put a stop loss right here because the books tell me I had to do that so I did the same kind of stuff folks I'm not trying to talk down anybody but I'm just repeating what a retail Trader's mindset would be and the logic behind this okay so the narrative with this day was the stocks were trailed below these lows the afternoon session again creates the low of the day takes the sell side liquidity out into a fair value Gap and then rallies now in here I'm going to teach you a little bit more about that watch notice we don't really have a fair value gap down here but it gives us the basis for expecting the price to start to Rally into the afternoon now at 2:00 in the afternoon 1,400 on this trading view chart that starts 2 o'clock in the afternoon New York local time we have the market trading down into an imbalance over here liquidity resting below these relative equal lows is taken out so what are we looking at we've seen a price run that we don't think needs to come back down here because the logic is the overnight stops have been ran out down here there's no reason for the market to want to come back down there but we have this low and these relative equal lows here Post New York lunch New York lunch is noon to 1:00 in the afternoon New York local time so the imbalance we trade down into that what's the likelihood of it coming all the way through the imbalance and then going after that low not likely not likely not after seeing this run here they don't want to give these Traders another chance to get back in they got stopped out so it's going to be a little bit more sneakier when they make these new setups that continue into a higher run so they take out the sell side below these relative equal lows take those stops out and then it rallies and then drops back down now here watch we have a swing high right here it breaks it does it trade above that yes was it energetic yes does it have a fair value Gap yes so now the market trades down into it here creates a short-term low you could be a buyer there there's nothing wrong with that but say you missed it say you just I mean this is a one minute chart say you missed it and the market starts to run off like this but then it gives you another opportunity I've had many times trades formed just like this where I was looking for something I was waiting for a setup to happen either my cell phone's buzzing or I grab a drink is just outside of reach I got to go walk over to the other end of the desk and grab it and then all of a sudden here you go I miss it takes off the fair value Gap is even better when you have the sell side liquidity resting below short-term low and the drop down into it here you can use that low as your entry or minus one tick okay this short-term low forms at 2:34 p.m. now if you look at the low figure up here that value represents that candle right there so that's why you see it highlighter here when I took a screenshot I'm holding underneath this candle so that way the reference points up here are directly related to this candle so you can see the low is 14528 and a half so you could be a buyer on a limit at 14,520 and a quarter or maybe if you want to try to reach for the you the 28 even number either way that's a nice place to put a limit order in the short-term low down here after the fair value Gap forms that's where your stop loss is that's the rules so you have an entry point your stop and between the two of them it works out to be okay let's say you have 14 14 and a quarter in terms of risk okay so 14 and a quarter points or handles of total risk and let's assume that you were trading I don't know six contracts on the micro you're essentially looking at buying and risking $85 to make about $300 so it's about 3.5 to one reward the risk thereabouts I'm roughing I don't have calculator in front of me folks just you do the math now here this value is important because I want you to see in these conditions you can't expect it to be perfect you can't be you know expecting to be in there at the lowest point no draw down no heat on the position and then it just goes in your favor don't think like that you can see on this candle if you would have bought here you would have had nine points of heat okay or basically $54 if you were trading six micros now obviously it goes up more than that if you're trading One Mini because it's $20 per handle but overall this is a nice little setup with the afternoon using the logic over here even though it doesn't give us a fair value Gap the you know the setups that I'm teaching you to use using the fair value Gap afternoon taking the stops it provides the Baseline for bias for the afternoon now what did I teach you here I taught you that you can use these reference points with the underlying sentiment that's already in motion if you didn't trade overnight and take that big run I didn't get any of that run I didn't do anything with that if you miss that it doesn't matter because that is something that's going to give you more insight and it tells you when to avoid the morning session don't trade it everybody's going to be doing what think about it everybody woke up and saw these markets and they all wanted to do what they wanted to buy it because it's going up a lot and they want to chase it that idea leads many times to losing trades and then it's starts this cycle where you go into this chasing chasing chasing and then when the market does these sideways consolidations and sloppy choppy market conditions it it's literally like a blowtorch on your account if you don't know how to stop or if you don't know what you're doing you can literally talk yourself into millions of Trades and then draw your",
+      "timestamp": "9:23"
+    },
+    {
+      "start": 1511.48,
+      "text": "countdown last slide and just to hammer this down this is zoomed in on a one minute chart swing High broken fair value G right there and we have that shortterm low here I'm noted in here so that's where you would be basically entering one with that idea trading below that is where the sell stops are trading below that now it goes below that now some of you have mentioned in the comment section does this invalidate the fair value Gap no it does not the idea is the fair value gaps we look at the look at the body of this candle here isn't that respecting that yes so in my mind I'm thinking well I know prices sometimes especially the way it is right now it's very volatile so I'm permitting a greater level of imperfection in price delivery and then using the logic of the fair value Gap as the basis for my entry idea and then using the stop premise which it didn't get it didn't get here it didn't stop you out you had basically what five what was that five or so uh more handles before you would have been stopped now watching it live might make you look little nervous but at some point folks you're going to have to get used to if you're going to trade like this in these really little time frames and you're trying to be very Nimble you're going to have to learn to trust the setups and let the stops do their jobs and if it if it gets stopped out that's just one trade you got wrong it's not your career look for the next one now I'm going to throw this in here as a bonus but you know take it for what it is it r is here takes off and does not take out that the buy side liquidity resting above here did not get taken here yet and then we had this imbalance and it trades down into it and then hits what the order block that's a buy and you can if you miss this one you can pick up this one based on the logic I teach on the YouTube channel so this is actually something that's taught in the YouTube channel okay uh this whole pattern here is exactly right out of my high probability short-term trading or scalping series I can't remember exactly what the title was but uh this pattern has right in that and then it runs for that liquidity there so there's two setups there so I've took something from the free lessons that's already on the YouTube channel and also amplifying something I've been teaching in this mentorship series hopefully you found this one insightful and until talk to you next time be safe",
+      "timestamp": "25:11"
+    }
+  ],
+  "title": "2022 ICT Mentorship Episode 9",
+  "playlistName": "ICT 2022 Mentorship",
+  "extractedAt": "2026-01-11T15:44:09.071Z"
+}

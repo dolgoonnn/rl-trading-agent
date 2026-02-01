@@ -11,20 +11,59 @@ import type {
   Transition,
 } from '../types';
 import { Actions } from '../types';
-import { ReplayBuffer } from './replay-buffer';
+import { ReplayBuffer, PrioritizedReplayBuffer } from './replay-buffer';
+
+/**
+ * Custom layer for Dueling DQN: combines Value and Advantage streams
+ * Q(s,a) = V(s) + (A(s,a) - mean(A(s,:)))
+ */
+class DuelingCombineLayer extends tf.layers.Layer {
+  static className = 'DuelingCombineLayer';
+
+  constructor(config?: tf.serialization.ConfigDict) {
+    super(config ?? {});
+  }
+
+  call(inputs: tf.Tensor | tf.Tensor[]): tf.Tensor | tf.Tensor[] {
+    return tf.tidy(() => {
+      const inputArray = inputs as tf.Tensor[];
+      const value = inputArray[0]!;
+      const advantage = inputArray[1]!;
+      // value shape: [batch, 1]
+      // advantage shape: [batch, numActions]
+
+      // Q = V + (A - mean(A))
+      const advantageMean = tf.mean(advantage, -1, true);
+      const normalizedAdvantage = tf.sub(advantage, advantageMean);
+      return tf.add(value, normalizedAdvantage);
+    });
+  }
+
+  computeOutputShape(inputShape: tf.Shape[]): tf.Shape {
+    // Output shape matches advantage shape [batch, numActions]
+    return inputShape[1]!;
+  }
+
+  getConfig(): tf.serialization.ConfigDict {
+    return super.getConfig();
+  }
+}
+
+// Register the custom layer
+tf.serialization.registerClass(DuelingCombineLayer);
 
 const DEFAULT_CONFIG: DQNConfig = {
-  inputSize: 94,
-  hiddenLayers: [128, 64, 32], // Reduced to prevent overfitting
+  inputSize: 104, // Updated: was 94, now 104 with BOS/CHoCH features
+  hiddenLayers: [128, 64, 32], // Larger capacity for complex patterns
   outputSize: 4,
-  learningRate: 0.0003, // Reduced for stability
+  learningRate: 0.0003,
   gamma: 0.99,
   tau: 0.005,
   epsilonStart: 1.0,
   epsilonEnd: 0.01,
   epsilonDecay: 0.995,
-  dropout: 0.35, // Increased from 0.2 to reduce overfitting
-  l2Regularization: 0.02, // Increased from 0.01 for stronger regularization
+  dropout: 0.25, // Reduced dropout
+  l2Regularization: 0.01, // Reduced L2
   // Training stability
   useBatchNorm: true,
   gradientClipNorm: 1.0,
@@ -72,8 +111,21 @@ export class DQNAgent {
 
   /**
    * Build the Q-network with optional batch normalization
+   * Supports Dueling DQN architecture when config.useDueling is true
    */
   private buildNetwork(name: string): tf.LayersModel {
+    const useDueling = this.config.useDueling ?? false;
+
+    if (useDueling) {
+      return this.buildDuelingNetwork(name);
+    }
+    return this.buildSequentialNetwork(name);
+  }
+
+  /**
+   * Build standard sequential Q-network
+   */
+  private buildSequentialNetwork(name: string): tf.LayersModel {
     const model = tf.sequential({ name });
     const useBatchNorm = this.config.useBatchNorm ?? true;
 
@@ -82,7 +134,7 @@ export class DQNAgent {
       tf.layers.dense({
         inputShape: [this.config.inputSize],
         units: this.config.hiddenLayers[0]!,
-        activation: useBatchNorm ? 'linear' : 'relu', // Apply activation after BN
+        activation: useBatchNorm ? 'linear' : 'relu',
         kernelRegularizer: tf.regularizers.l2({ l2: this.config.l2Regularization }),
         name: `${name}_dense1`,
       })
@@ -122,6 +174,77 @@ export class DQNAgent {
     );
 
     return model;
+  }
+
+  /**
+   * Build Dueling DQN network with separate Value and Advantage streams
+   * Q(s,a) = V(s) + (A(s,a) - mean(A(s,:)))
+   */
+  private buildDuelingNetwork(name: string): tf.LayersModel {
+    const useBatchNorm = this.config.useBatchNorm ?? true;
+
+    // Input layer
+    const input = tf.input({ shape: [this.config.inputSize], name: `${name}_input` });
+
+    // Shared hidden layers
+    let shared: tf.SymbolicTensor = input;
+
+    for (let i = 0; i < this.config.hiddenLayers.length; i++) {
+      shared = tf.layers.dense({
+        units: this.config.hiddenLayers[i]!,
+        activation: useBatchNorm ? 'linear' : 'relu',
+        kernelRegularizer: tf.regularizers.l2({ l2: this.config.l2Regularization }),
+        name: `${name}_shared_dense${i + 1}`,
+      }).apply(shared) as tf.SymbolicTensor;
+
+      if (useBatchNorm) {
+        shared = tf.layers.batchNormalization({ momentum: 0.9, epsilon: 1e-5, name: `${name}_shared_bn${i + 1}` })
+          .apply(shared) as tf.SymbolicTensor;
+        shared = tf.layers.activation({ activation: 'relu', name: `${name}_shared_relu${i + 1}` })
+          .apply(shared) as tf.SymbolicTensor;
+      }
+      shared = tf.layers.dropout({ rate: this.config.dropout, name: `${name}_shared_dropout${i + 1}` })
+        .apply(shared) as tf.SymbolicTensor;
+    }
+
+    // Value stream: outputs V(s) (scalar)
+    let valueStream = tf.layers.dense({
+      units: Math.max(32, Math.floor(this.config.hiddenLayers[this.config.hiddenLayers.length - 1]! / 2)),
+      activation: 'relu',
+      kernelRegularizer: tf.regularizers.l2({ l2: this.config.l2Regularization }),
+      name: `${name}_value_hidden`,
+    }).apply(shared) as tf.SymbolicTensor;
+
+    const valueOutput = tf.layers.dense({
+      units: 1,
+      activation: 'linear',
+      name: `${name}_value_output`,
+    }).apply(valueStream) as tf.SymbolicTensor;
+
+    // Advantage stream: outputs A(s,a) for each action
+    let advantageStream = tf.layers.dense({
+      units: Math.max(32, Math.floor(this.config.hiddenLayers[this.config.hiddenLayers.length - 1]! / 2)),
+      activation: 'relu',
+      kernelRegularizer: tf.regularizers.l2({ l2: this.config.l2Regularization }),
+      name: `${name}_advantage_hidden`,
+    }).apply(shared) as tf.SymbolicTensor;
+
+    const advantageOutput = tf.layers.dense({
+      units: this.config.outputSize,
+      activation: 'linear',
+      name: `${name}_advantage_output`,
+    }).apply(advantageStream) as tf.SymbolicTensor;
+
+    // Combine: Q(s,a) = V(s) + (A(s,a) - mean(A(s,:)))
+    // Custom lambda layer to compute Q-values
+    const qValues = new DuelingCombineLayer({ name: `${name}_dueling_combine` })
+      .apply([valueOutput, advantageOutput]) as tf.SymbolicTensor;
+
+    return tf.model({
+      inputs: input,
+      outputs: qValues,
+      name,
+    });
   }
 
   /**
@@ -193,14 +316,30 @@ export class DQNAgent {
   /**
    * Train on a batch from replay buffer
    * Uses Double DQN for reduced overestimation
+   * Returns loss value
    */
   train(batchSize?: number): number {
     if (!this.buffer.isReady()) {
       return 0;
     }
 
+    // Check if using prioritized replay
+    if (this.buffer instanceof PrioritizedReplayBuffer) {
+      const { batch, indices, weights } = this.buffer.sampleWithIndices(batchSize);
+      const { loss, tdErrors } = this.trainOnBatchWithTDErrors(batch, weights);
+
+      // Update priorities based on TD errors
+      this.buffer.updatePriorities(indices, tdErrors);
+
+      // Soft update target network
+      this.updateTargetNetwork(this.config.tau);
+
+      return loss;
+    }
+
+    // Standard replay buffer
     const batch = this.buffer.sample(batchSize);
-    const loss = this.trainOnBatch(batch);
+    const { loss } = this.trainOnBatchWithTDErrors(batch);
 
     // Soft update target network
     this.updateTargetNetwork(this.config.tau);
@@ -212,21 +351,39 @@ export class DQNAgent {
   }
 
   /**
-   * Huber loss (smooth L1) - more robust to outliers than MSE
+   * Weighted Huber loss (smooth L1) for importance-weighted samples
+   * Used by Prioritized Experience Replay
    */
-  private huberLoss(yTrue: tf.Tensor, yPred: tf.Tensor, delta: number = 1.0): tf.Scalar {
+  private weightedHuberLoss(
+    yTrue: tf.Tensor,
+    yPred: tf.Tensor,
+    weights: number[],
+    delta: number = 1.0
+  ): tf.Scalar {
     const error = tf.sub(yTrue, yPred);
     const absError = tf.abs(error);
     const quadratic = tf.minimum(absError, delta);
     const linear = tf.sub(absError, quadratic);
-    return tf.mean(tf.add(tf.mul(0.5, tf.square(quadratic)), tf.mul(delta, linear))) as tf.Scalar;
+    const perSampleLoss = tf.add(tf.mul(0.5, tf.square(quadratic)), tf.mul(delta, linear));
+    // Mean over actions for each sample
+    const sampleLosses = tf.mean(perSampleLoss, 1);
+    // Apply importance sampling weights
+    const weightsTensor = tf.tensor1d(weights);
+    const weightedLosses = tf.mul(sampleLosses, weightsTensor);
+    return tf.mean(weightedLosses) as tf.Scalar;
   }
 
   /**
    * Train on a specific batch of transitions
    * Uses Huber loss and gradient clipping for stability
+   * Returns both loss and TD errors for prioritized replay
+   * @param batch - Batch of transitions to train on
+   * @param importanceWeights - Optional importance sampling weights for PER
    */
-  private trainOnBatch(batch: Transition[]): number {
+  private trainOnBatchWithTDErrors(
+    batch: Transition[],
+    importanceWeights?: number[]
+  ): { loss: number; tdErrors: number[] } {
     const states = batch.map((t) => t.state);
     const actions = batch.map((t) => t.action);
     const rewards = batch.map((t) => t.reward);
@@ -236,6 +393,11 @@ export class DQNAgent {
     const useHuber = this.config.useHuberLoss ?? true;
     const huberDelta = this.config.huberDelta ?? 1.0;
     const clipNorm = this.config.gradientClipNorm ?? 1.0;
+
+    // Use uniform weights if not provided
+    const weights = importanceWeights ?? new Array(batch.length).fill(1);
+
+    let tdErrors: number[] = [];
 
     const loss = tf.tidy(() => {
       const statesTensor = tf.tensor2d(states);
@@ -248,8 +410,13 @@ export class DQNAgent {
       const nextQTarget = this.targetNetwork.predict(nextStatesTensor) as tf.Tensor;
       const nextQValues = nextQTarget.dataSync();
 
-      // Compute target Q-values
+      // Get current Q-values for TD error calculation
+      const currentQPred = this.onlineNetwork.predict(statesTensor) as tf.Tensor;
+      const currentQ = currentQPred.dataSync();
+
+      // Compute target Q-values and TD errors
       const targetQValues: number[] = [];
+      tdErrors = [];
       for (let i = 0; i < batch.length; i++) {
         const nextAction = nextActions[i]!;
         const nextQ = nextQValues[i * 4 + nextAction]!;
@@ -257,6 +424,10 @@ export class DQNAgent {
           ? rewards[i]!
           : rewards[i]! + this.config.gamma * nextQ;
         targetQValues.push(target);
+
+        // TD error = |target - predicted|
+        const predictedQ = currentQ[i * 4 + actions[i]!]!;
+        tdErrors.push(Math.abs(target - predictedQ));
       }
 
       // Compute loss and gradients
@@ -278,11 +449,19 @@ export class DQNAgent {
 
         const targetTensor = tf.tensor2d(targets, [batch.length, 4]);
 
-        // Use Huber loss for robustness to outliers
+        // Calculate weighted loss
+        // Use Huber loss for robustness or MSE
         if (useHuber) {
-          return this.huberLoss(targetTensor, predictions, huberDelta);
+          // Weighted Huber loss with importance sampling
+          return this.weightedHuberLoss(targetTensor, predictions, weights, huberDelta);
+        } else {
+          // Weighted MSE
+          const perSampleLoss = tf.square(tf.sub(targetTensor, predictions));
+          const sampleLosses = tf.mean(perSampleLoss, 1);
+          const weightsTensor = tf.tensor1d(weights);
+          const weightedLosses = tf.mul(sampleLosses, weightsTensor);
+          return tf.mean(weightedLosses) as tf.Scalar;
         }
-        return tf.losses.meanSquaredError(targetTensor, predictions) as tf.Scalar;
       });
 
       // Clip gradients to prevent exploding gradients
@@ -315,7 +494,7 @@ export class DQNAgent {
     // Update learning rate based on warmup/decay schedule
     this.updateLearningRate();
 
-    return loss;
+    return { loss, tdErrors };
   }
 
   /**
@@ -360,6 +539,16 @@ export class DQNAgent {
       this.config.epsilonEnd,
       this.config.epsilonStart * Math.pow(this.config.epsilonDecay, this.episodeCount)
     );
+  }
+
+  /**
+   * Reset epsilon to a specified value (for walk-forward windows)
+   * Also resets episode count to allow proper decay schedule
+   */
+  resetEpsilon(epsilon?: number): void {
+    this.epsilon = epsilon ?? this.config.epsilonStart;
+    // Don't reset episode count - keep learning from experience
+    // But do allow more exploration in new window
   }
 
   /**

@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Large data files
+data/ml_dataset.json
+data/*.db
+data/*.db-shm
+data/*.db-wal
