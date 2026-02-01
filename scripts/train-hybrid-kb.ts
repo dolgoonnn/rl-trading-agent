@@ -484,7 +484,7 @@ async function main() {
   };
 
   // Determine input size based on KB features
-  // Base: 22 features (was 18, now +4 for drawdown/confluence/BOS/CHoCH)
+  // Base: 22 features (6 position + 8 market + 8 price action)
   // With KB: 26 features (22 base + 4 KB features)
   const inputSize = args.kbFeatures ? 26 : 22;
 

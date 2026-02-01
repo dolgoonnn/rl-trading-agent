@@ -66,7 +66,7 @@ export class KBExitStateBuilder extends ExitStateBuilder {
 
   /**
    * Build exit state with KB features
-   * Total: 22 features (18 base + 4 KB)
+   * Total: 26 features (22 base + 4 KB)
    */
   override build(
     candles: Candle[],
@@ -74,7 +74,7 @@ export class KBExitStateBuilder extends ExitStateBuilder {
     position: HybridPosition,
     training: boolean = false
   ): KBExtendedExitState {
-    // Build base state (18 features)
+    // Build base state (22 features)
     const baseState = super.build(candles, currentIndex, position, training);
 
     // Check if KB features are enabled
@@ -98,9 +98,10 @@ export class KBExitStateBuilder extends ExitStateBuilder {
     // Apply noise during training
     let allFeatures = [...baseState.features, ...kbFeatureArray];
     if (training && this.kbConfig.addKBFeatures) {
-      // Apply same noise level to KB features
+      // Apply same noise level to KB features (base is 22 features)
+      const baseFeatureCount = 22;
       allFeatures = allFeatures.map((f, i) => {
-        if (i >= 18) {
+        if (i >= baseFeatureCount) {
           // Only add noise to KB features if needed
           const noiseLevel = 0.02; // Match base noise
           const noise = (Math.random() * 2 - 1) * noiseLevel;

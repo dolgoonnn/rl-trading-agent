@@ -1,7 +1,7 @@
 /**
  * Exit State Builder
- * Builds 25-feature state for exit-only RL agent
- * Includes position info, market context, price action, and HTF analysis
+ * Builds 22-feature state for exit-only RL agent
+ * Includes position info, market context, and price action
  */
 
 import type { Candle, OrderBlock, FairValueGap } from '@/types';
@@ -11,14 +11,12 @@ import type {
   ExitMarketContext,
   ExitPriceAction,
   HybridPosition,
-  HTFFeatures,
 } from '../types';
 import {
   analyzeMarketStructure,
   detectOrderBlocks,
   detectFairValueGaps,
 } from '@/lib/ict';
-import { CandleAggregator, type AggregatedCandles } from './candle-aggregator';
 
 export interface ExitStateBuilderConfig {
   // Feature noise for anti-overfitting
@@ -31,11 +29,6 @@ const DEFAULT_CONFIG: ExitStateBuilderConfig = {
 
 export class ExitStateBuilder {
   private config: ExitStateBuilderConfig;
-  // Cache for 4H aggregation (recomputed when candles change)
-  private htfCache: {
-    ltfCandleCount: number;
-    aggregation: AggregatedCandles;
-  } | null = null;
 
   constructor(config: Partial<ExitStateBuilderConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -43,7 +36,7 @@ export class ExitStateBuilder {
 
   /**
    * Build exit state from current market data and position
-   * Total: 25 features (22 base + 3 HTF)
+   * Total: 22 features (6 position + 8 market + 8 price action)
    */
   build(
     candles: Candle[],
@@ -62,10 +55,9 @@ export class ExitStateBuilder {
     const positionInfo = this.buildPositionInfo(position, currentPrice, currentIndex);
     const marketContext = this.buildMarketContext(candles, currentIndex, position, currentPrice);
     const priceAction = this.buildPriceAction(candles, currentIndex, position);
-    const htfFeatures = this.buildHTFFeatures(candles, currentIndex, position, currentPrice);
 
-    // Flatten to feature array (25 features total)
-    let features = this.flattenFeatures(positionInfo, marketContext, priceAction, htfFeatures);
+    // Flatten to feature array (22 features total)
+    let features = this.flattenFeatures(positionInfo, marketContext, priceAction);
 
     // Add noise during training
     if (training && this.config.featureNoiseLevel > 0) {
@@ -262,13 +254,12 @@ export class ExitStateBuilder {
   }
 
   /**
-   * Flatten features into array (25 total: 6 + 8 + 8 + 3)
+   * Flatten features into array (22 total: 6 + 8 + 8)
    */
   private flattenFeatures(
     positionInfo: ExitPositionInfo,
     marketContext: ExitMarketContext,
-    priceAction: ExitPriceAction,
-    htfFeatures: HTFFeatures
+    priceAction: ExitPriceAction
   ): number[] {
     return [
       // Position info (6)
@@ -298,11 +289,6 @@ export class ExitStateBuilder {
       priceAction.lowestSinceEntry,
       priceAction.candlePatternScore,
       priceAction.volumeRatio,
-
-      // HTF features (3)
-      htfFeatures.htfBiasAlignment,
-      htfFeatures.htfTrendStrength,
-      htfFeatures.htfOBDistance,
     ];
   }
 
@@ -321,7 +307,7 @@ export class ExitStateBuilder {
    * Get feature vector size
    */
   getFeatureSize(): number {
-    return 25;
+    return 22;
   }
 
   // ============================================
