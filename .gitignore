@@ -45,3 +45,4 @@ data/ml_dataset.json
 data/*.db
 data/*.db-shm
 data/*.db-wal
+scripts/python/venv/
