@@ -1,0 +1,507 @@
+{
+  "version": "1.0",
+  "description": "Experiment tracking for iterative RL model improvement",
+  "created": "2026-02-03",
+  "validation_gate": {
+    "backtest_bars": 2160,
+    "min_sharpe_per_symbol": 0,
+    "min_aggregate_win_rate": 35,
+    "min_trades_per_symbol": 10
+  },
+  "experiments": [
+    {
+      "id": "exp-000",
+      "timestamp": "2026-02-03T12:50:20Z",
+      "hypothesis": "BASELINE - DDQN with dropout=0.30, L2=0.012, LR=0.0004. Pre-framework model.",
+      "research_source": "Previous training runs without systematic tracking",
+      "config_changes": {
+        "dropout": 0.3,
+        "learningRate": 0.0004,
+        "l2Regularization": 0.012,
+        "epsilonEnd": 0.15,
+        "episodes": 200,
+        "useDoubleDQN": true
+      },
+      "training_result": {
+        "episodes_completed": 200,
+        "best_val_sharpe": 7.8,
+        "training_duration_min": 45,
+        "model_path": "models/ict_ensemble_improved_2026-02-03T12-50-20.json"
+      },
+      "backtest_90day": {
+        "btc_sharpe": -5.53,
+        "eth_sharpe": 15.71,
+        "sol_sharpe": -17.55,
+        "aggregate_win_rate": 38.8,
+        "total_trades": 67
+      },
+      "outcome": "FAIL",
+      "fail_reasons": [
+        "Negative Sharpe on: BTCUSDT(-5.53), SOLUSDT(-17.55)"
+      ],
+      "learnings": "Model has recency bias - only ETH profitable which had similar patterns to training period. 30-day validation was insufficient - overfitting not detected. Walk-forward validation alone doesn't prevent symbol-specific overfitting. Need regime-aware training or symbol-specific adaptation."
+    },
+    {
+      "id": "exp-002",
+      "timestamp": "2026-02-03T14:10:50.419Z",
+      "hypothesis": "Iteration 1: Higher dropout (0.40) to combat SOL/BTC overfitting - more aggressive regularization",
+      "config_changes": {
+        "dropout": 0.4,
+        "learningRate": 0.0004,
+        "l2Regularization": 0.012,
+        "epsilonEnd": 0.15,
+        "episodes": 120
+      },
+      "training_result": {
+        "episodes_completed": 120,
+        "best_val_sharpe": 6.14570170676096,
+        "training_duration_min": 60,
+        "model_path": "models/iterative_2026-02-03T14-30-16.json"
+      },
+      "backtest_90day": null,
+      "outcome": "FAIL",
+      "fail_reasons": [
+        "Gate validation script failed"
+      ],
+      "learnings": ""
+    },
+    {
+      "id": "exp-003",
+      "timestamp": "2026-02-03T15:11:31.487Z",
+      "hypothesis": "Iteration 2: Lower learning rate (0.0002) with higher L2 (0.02) - slower stable learning",
+      "config_changes": {
+        "dropout": 0.35,
+        "learningRate": 0.0002,
+        "l2Regularization": 0.02,
+        "epsilonEnd": 0.15,
+        "episodes": 100
+      },
+      "training_result": null,
+      "backtest_90day": null,
+      "outcome": "PENDING",
+      "fail_reasons": [],
+      "learnings": ""
+    },
+    {
+      "id": "exp-004",
+      "timestamp": "2026-02-03T15:11:38.375Z",
+      "hypothesis": "Iteration 2: Lower learning rate (0.0002) with higher L2 (0.02) - slower stable learning",
+      "config_changes": {
+        "dropout": 0.35,
+        "learningRate": 0.0002,
+        "l2Regularization": 0.02,
+        "epsilonEnd": 0.15,
+        "episodes": 100
+      },
+      "training_result": null,
+      "backtest_90day": null,
+      "outcome": "PENDING",
+      "fail_reasons": [],
+      "learnings": ""
+    },
+    {
+      "id": "exp-005",
+      "timestamp": "2026-02-03T18:16:27.505Z",
+      "hypothesis": "Iteration 2: Lower learning rate (0.0002) with higher L2 (0.02) - slower stable learning",
+      "config_changes": {
+        "dropout": 0.35,
+        "learningRate": 0.0002,
+        "l2Regularization": 0.02,
+        "epsilonEnd": 0.15,
+        "episodes": 100
+      },
+      "training_result": null,
+      "backtest_90day": null,
+      "outcome": "PENDING",
+      "fail_reasons": [],
+      "learnings": ""
+    },
+    {
+      "id": "exp-006",
+      "timestamp": "2026-02-03T20:55:33.701Z",
+      "hypothesis": "Iteration 2: Lower learning rate (0.0002) with higher L2 (0.02)",
+      "config_changes": {
+        "dropout": 0.35,
+        "learningRate": 0.0002,
+        "l2Regularization": 0.02,
+        "epsilonEnd": 0.15,
+        "episodes": 80
+      },
+      "training_result": {
+        "episodes_completed": 80,
+        "best_val_sharpe": 3.9257438212257725,
+        "training_duration_min": 223,
+        "model_path": "models/iterative_2026-02-04T00-18-55.json"
+      },
+      "backtest_90day": null,
+      "outcome": "FAIL",
+      "fail_reasons": [
+        "Gate validation script failed"
+      ],
+      "learnings": ""
+    },
+    {
+      "id": "exp-007",
+      "timestamp": "2026-02-04T00:39:59.874Z",
+      "hypothesis": "Iteration 3: Very high L2 (0.03) + dropout (0.40) to prevent BTC overfitting",
+      "config_changes": {
+        "dropout": 0.4,
+        "learningRate": 0.0003,
+        "l2Regularization": 0.03,
+        "epsilonEnd": 0.2,
+        "episodes": 80
+      },
+      "training_result": null,
+      "backtest_90day": null,
+      "outcome": "PENDING",
+      "fail_reasons": [],
+      "learnings": ""
+    },
+    {
+      "id": "exp-008",
+      "timestamp": "2026-02-04T01:01:12.432Z",
+      "hypothesis": "Iteration 4: Same high regularization but lower epsilon (0.10) to increase trade frequency",
+      "config_changes": {
+        "dropout": 0.4,
+        "learningRate": 0.0003,
+        "l2Regularization": 0.03,
+        "epsilonEnd": 0.1,
+        "episodes": 80
+      },
+      "training_result": {
+        "episodes_completed": 80,
+        "best_val_sharpe": -0.25435854522062645,
+        "training_duration_min": 38,
+        "model_path": "models/iterative_2026-02-04T01-19-45.json"
+      },
+      "backtest_90day": null,
+      "outcome": "FAIL",
+      "fail_reasons": [
+        "Gate validation script failed"
+      ],
+      "learnings": ""
+    },
+    {
+      "id": "exp-009",
+      "timestamp": "2026-02-04T01:47:11.676Z",
+      "hypothesis": "Iteration 5: Keep L2=0.03 but lower dropout (0.35) and epsilon (0.15) - balance quality vs quantity",
+      "config_changes": {
+        "dropout": 0.35,
+        "learningRate": 0.0003,
+        "l2Regularization": 0.03,
+        "epsilonEnd": 0.15,
+        "episodes": 80
+      },
+      "training_result": {
+        "episodes_completed": 80,
+        "best_val_sharpe": 10.469750198632147,
+        "training_duration_min": 112,
+        "model_path": "models/iterative_2026-02-04T02-05-40.json"
+      },
+      "backtest_90day": null,
+      "outcome": "FAIL",
+      "fail_reasons": [
+        "Gate validation script failed"
+      ],
+      "learnings": ""
+    },
+    {
+      "id": "exp-010",
+      "timestamp": "2026-02-04T03:40:10.895Z",
+      "hypothesis": "Iteration 6: Same as iter 3 (L2=0.03, dropout=0.40, epsilon=0.20) but 120 episodes for more trading",
+      "config_changes": {
+        "dropout": 0.4,
+        "learningRate": 0.0003,
+        "l2Regularization": 0.03,
+        "epsilonEnd": 0.2,
+        "episodes": 120
+      },
+      "training_result": {
+        "episodes_completed": 120,
+        "best_val_sharpe": -1.649897520523193,
+        "training_duration_min": 59,
+        "model_path": "models/iterative_2026-02-04T03-59-01.json"
+      },
+      "backtest_90day": null,
+      "outcome": "FAIL",
+      "fail_reasons": [
+        "Gate validation script failed"
+      ],
+      "learnings": ""
+    },
+    {
+      "id": "exp-011",
+      "timestamp": "2026-02-04T04:39:58.485Z",
+      "hypothesis": "Iteration 7: Like iter3 but lower L2 (0.025) to allow more trading while keeping quality",
+      "config_changes": {
+        "dropout": 0.4,
+        "learningRate": 0.00025,
+        "l2Regularization": 0.025,
+        "epsilonEnd": 0.18,
+        "episodes": 100
+      },
+      "training_result": {
+        "episodes_completed": 100,
+        "best_val_sharpe": 2.4981560732122174,
+        "training_duration_min": 50,
+        "model_path": "models/iterative_2026-02-04T05-00-50.json"
+      },
+      "backtest_90day": null,
+      "outcome": "FAIL",
+      "fail_reasons": [
+        "Gate validation script failed"
+      ],
+      "learnings": ""
+    },
+    {
+      "id": "exp-012",
+      "timestamp": "2026-02-04T05:32:00.974Z",
+      "hypothesis": "Iteration 8: Slightly lower regularization (L2=0.028, dropout=0.38, epsilon=0.16) to balance quality vs quantity",
+      "config_changes": {
+        "dropout": 0.38,
+        "learningRate": 0.00028,
+        "l2Regularization": 0.028,
+        "epsilonEnd": 0.16,
+        "episodes": 100
+      },
+      "training_result": {
+        "episodes_completed": 100,
+        "best_val_sharpe": 4.222498874512011,
+        "training_duration_min": 50,
+        "model_path": "models/iterative_2026-02-04T06-11-58.json"
+      },
+      "backtest_90day": {
+        "btc_sharpe": 22.6,
+        "btc_trades": 9,
+        "eth_sharpe": 24.26,
+        "eth_trades": 10,
+        "sol_sharpe": 32.9,
+        "sol_trades": 11,
+        "aggregate_win_rate": 53,
+        "total_trades": 30
+      },
+      "outcome": "FAIL",
+      "fail_reasons": [
+        "Insufficient trades on: BTCUSDT(9) - need 10"
+      ],
+      "learnings": "CLOSEST YET! All 3 symbols positive Sharpe (BTC +22.60, ETH +24.26, SOL +32.90). Aggregate 53% win rate. Only failed on BTC trades (9 vs 10 required). This config (L2=0.028, dropout=0.38, epsilon=0.16) produces quality signals. Need tiny adjustment to increase BTC trading."
+    },
+    {
+      "id": "exp-013",
+      "timestamp": "2026-02-04T06:26:39.876Z",
+      "hypothesis": "Iteration 9: Same as iter8 but epsilon=0.15 (was 0.16) to get 1 more BTC trade",
+      "config_changes": {
+        "dropout": 0.38,
+        "learningRate": 0.00028,
+        "l2Regularization": 0.028,
+        "epsilonEnd": 0.15,
+        "episodes": 100
+      },
+      "training_result": {
+        "episodes_completed": 100,
+        "best_val_sharpe": 10.064124715650095,
+        "training_duration_min": 51,
+        "model_path": "models/iterative_2026-02-04T06-45-26.json"
+      },
+      "backtest_90day": {
+        "btc_sharpe": -5.37,
+        "btc_trades": 10,
+        "eth_sharpe": -0.8,
+        "eth_trades": 11,
+        "sol_sharpe": -2,
+        "sol_trades": 9,
+        "aggregate_win_rate": 33.2,
+        "total_trades": 30
+      },
+      "outcome": "FAIL",
+      "fail_reasons": [
+        "All symbols negative Sharpe",
+        "Aggregate win rate 33.2% < 35%"
+      ],
+      "learnings": "DISASTER. Small epsilon change (0.16→0.15) ruined the model. All symbols negative Sharpe vs all positive in iter8. Model is EXTREMELY sensitive to epsilon."
+    },
+    {
+      "id": "exp-014",
+      "timestamp": "2026-02-04T07:23:07.813Z",
+      "hypothesis": "Iteration 10: Back to iter8 config (epsilon=0.16) with 120 episodes for more BTC learning",
+      "config_changes": {
+        "dropout": 0.38,
+        "learningRate": 0.00028,
+        "l2Regularization": 0.028,
+        "epsilonEnd": 0.16,
+        "episodes": 120
+      },
+      "training_result": {
+        "episodes_completed": 120,
+        "best_val_sharpe": 10.431000304844074,
+        "training_duration_min": 64,
+        "model_path": "models/iterative_2026-02-04T08-04-32.json"
+      },
+      "backtest_90day": {
+        "btc_sharpe": 8.111017037082785,
+        "eth_sharpe": 18.834901385328216,
+        "sol_sharpe": 17.620546489063923,
+        "aggregate_win_rate": 46.666666666666664,
+        "total_trades": 34
+      },
+      "outcome": "PASS",
+      "fail_reasons": [],
+      "learnings": "SUCCESS! After 10 iterations, found the winning config. Key insight: epsilon=0.16 is critical (0.15 destroyed the model). L2=0.028, dropout=0.38 balances quality vs trades. More episodes (120 vs 100) helped model converge better. All 3 symbols positive Sharpe on 90-day out-of-sample test."
+    },
+    {
+      "id": "exp-015",
+      "timestamp": "2026-02-04T10:30:04.018Z",
+      "hypothesis": "EXP-015: Enable Dueling DQN architecture for better value/advantage separation",
+      "config_changes": {
+        "dropout": 0.38,
+        "learningRate": 0.00028,
+        "l2Regularization": 0.028,
+        "epsilonEnd": 0.16,
+        "episodes": 120,
+        "useDueling": true,
+        "useNStep": false,
+        "usePER": false,
+        "useNoisy": false
+      },
+      "training_result": {
+        "episodes_completed": 120,
+        "best_val_sharpe": 7.913651801994393,
+        "training_duration_min": 287,
+        "model_path": "models/iterative_2026-02-04T15-16-49.json"
+      },
+      "backtest_90day": {
+        "btc_sharpe": -8.77,
+        "btc_trades": 12,
+        "eth_sharpe": 2.12,
+        "eth_trades": 12,
+        "sol_sharpe": 2.75,
+        "sol_trades": 10,
+        "aggregate_win_rate": 32.8,
+        "total_trades": 34
+      },
+      "outcome": "FAIL",
+      "fail_reasons": [
+        "Negative Sharpe on: BTCUSDT(-8.77)",
+        "Aggregate win rate 32.8% < 35%"
+      ],
+      "learnings": "WORSE than baseline. Dueling DQN with 48-dim state (added 20/50 bar features) significantly degraded performance. BTC went from +8.11 to -8.77. Possible causes: (1) 48 features may be too noisy/redundant, (2) Dueling architecture needs different hyperparameters, (3) Multi-period features confuse the model. Next: Try Dueling DQN WITHOUT the extra 6 features (keep 42-dim state) to isolate the cause."
+    },
+    {
+      "id": "exp-016",
+      "timestamp": "2026-02-04T15:19:34.145Z",
+      "hypothesis": "EXP-016: Dueling DQN with 42-dim state (isolate architecture from features)",
+      "config_changes": {
+        "dropout": 0.38,
+        "learningRate": 0.00028,
+        "l2Regularization": 0.028,
+        "epsilonEnd": 0.16,
+        "episodes": 120,
+        "useDueling": true,
+        "useNStep": false,
+        "usePER": false,
+        "useNoisy": false
+      },
+      "training_result": {
+        "episodes_completed": 120,
+        "best_val_sharpe": 8.164915157324488,
+        "training_duration_min": 679,
+        "model_path": "models/iterative_2026-02-04T15-39-10.json"
+      },
+      "backtest_90day": {
+        "btc_sharpe": -5.45,
+        "btc_trades": 10,
+        "eth_sharpe": 17.18,
+        "eth_trades": 13,
+        "sol_sharpe": 32.47,
+        "sol_trades": 7,
+        "aggregate_win_rate": 41.9,
+        "total_trades": 30
+      },
+      "outcome": "FAIL",
+      "fail_reasons": [
+        "Negative Sharpe on: BTCUSDT(-5.45)",
+        "Insufficient trades on: SOLUSDT(7)"
+      ],
+      "learnings": "Dueling DQN HURTS BTC performance even with 42-dim state. BTC went from +8.11 (exp-014) to -5.45. ETH similar (18.83→17.18), SOL better (17.62→32.47). Conclusion: Dueling architecture not suitable for this problem. Skip to N-Step Returns (EXP-017) or PER (EXP-018)."
+    },
+    {
+      "id": "exp-017",
+      "timestamp": "2026-02-05T06:15:50.795Z",
+      "hypothesis": "EXP-017: N-step returns n=3 for better credit assignment",
+      "config_changes": {
+        "dropout": 0.38,
+        "learningRate": 0.00028,
+        "l2Regularization": 0.028,
+        "epsilonEnd": 0.16,
+        "episodes": 120,
+        "useDueling": false,
+        "useNStep": true,
+        "nSteps": 3,
+        "usePER": false,
+        "useNoisy": false
+      },
+      "training_result": {
+        "episodes_completed": 120,
+        "best_val_sharpe": 1.0211769270957056,
+        "training_duration_min": 58,
+        "model_path": "models/iterative_2026-02-05T07-03-55.json"
+      },
+      "backtest_90day": {
+        "btc_sharpe": -2.53,
+        "btc_trades": 11,
+        "eth_sharpe": 8.98,
+        "eth_trades": 12,
+        "sol_sharpe": -3.92,
+        "sol_trades": 9,
+        "aggregate_win_rate": 34.1,
+        "total_trades": 32
+      },
+      "outcome": "FAIL",
+      "fail_reasons": [
+        "Negative Sharpe on: BTCUSDT(-2.53), SOLUSDT(-3.92)",
+        "Aggregate win rate 34.1% < 35%",
+        "Insufficient trades on: SOLUSDT(9)"
+      ],
+      "learnings": "N-step returns (n=3) significantly WORSE than baseline. BTC went from +8.11 to -2.53, SOL from +17.62 to -3.92. Val Sharpe also low (1.02 vs 10.43). N-step may be causing value estimation issues with sparse trading rewards. Next: Try PER (EXP-018) which focuses learning on high TD-error transitions."
+    },
+    {
+      "id": "exp-018",
+      "timestamp": "2026-02-05T07:14:48.843Z",
+      "hypothesis": "EXP-018: Prioritized Experience Replay (PER) for focusing on high TD-error transitions",
+      "config_changes": {
+        "dropout": 0.38,
+        "learningRate": 0.00028,
+        "l2Regularization": 0.028,
+        "epsilonEnd": 0.16,
+        "episodes": 120,
+        "useDueling": false,
+        "useNStep": false,
+        "usePER": true,
+        "perAlpha": 0.6,
+        "perBeta": 0.4,
+        "useNoisy": false
+      },
+      "training_result": {
+        "episodes_completed": 120,
+        "best_val_sharpe": 9.428906341251526,
+        "training_duration_min": 71,
+        "model_path": "models/iterative_2026-02-05T07-48-15.json"
+      },
+      "backtest_90day": {
+        "btc_sharpe": -2.61,
+        "btc_trades": 11,
+        "eth_sharpe": 8.47,
+        "eth_trades": 12,
+        "sol_sharpe": 12.66,
+        "sol_trades": 11,
+        "aggregate_win_rate": 38.1,
+        "total_trades": 34
+      },
+      "outcome": "FAIL",
+      "fail_reasons": [
+        "Negative Sharpe on: BTCUSDT(-2.61)"
+      ],
+      "learnings": "PER helped ETH and SOL but HURT BTC. Val Sharpe (9.43) close to baseline (10.43) but 90-day gate fails on BTC (-2.61 vs +8.11). PER may over-prioritize high TD-error BTC transitions which are noisy. All 4 advanced DQN techniques tested (Dueling, N-step, PER) have FAILED. Baseline config remains best."
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+[15:11:38] Creating experiment entry...
+[15:11:38] Experiment ID: exp-004
+[15:11:38] 
+[15:11:38] ============================================================
+[15:11:38] ITERATIVE RL TRAINING
+[15:11:38] ============================================================
+[15:11:38] 
+[15:11:38] Hypothesis: Iteration 2: Lower learning rate (0.0002) with higher L2 (0.02) - slower stable learning
+[15:11:38] 
+[15:11:38] Configuration:
+[15:11:38]   Dropout: 0.35
+[15:11:38]   Learning Rate: 0.0002
+[15:11:38]   L2 Regularization: 0.02
+[15:11:38]   Epsilon End: 0.15
+[15:11:38]   Episodes: 100
+[15:11:38] 
+[15:11:38]   BTCUSDT: 4320 candles (train: 3456, val: 864)
+[15:11:38]   ETHUSDT: 4320 candles (train: 3456, val: 864)
+[15:11:38]   SOLUSDT: 4320 candles (train: 3456, val: 864)
+
+============================
+Hi, looks like you are running TensorFlow.js in Node.js. To speed things up dramatically, install our node backend, visit https://github.com/tensorflow/tfjs-node for more details. 
+============================
+[15:11:38] Created ensemble with 3 agents
+[15:11:41] KB initialized
+[15:11:41] 
+[15:11:41] Starting training...
+[15:11:41] 
+[18:04:25] Ep  10 [BTCUSDT]: R=  59.19 Tr= 15 WR= 33.3% PnL=   -15
