@@ -16,6 +16,7 @@ import type {
 import { Actions, actionToName } from '../types';
 import { StateBuilder, StateBuilderConfig } from './state-builder';
 import { RewardCalculator, RewardConfig } from './reward-calculator';
+import { FeatureReducer } from './feature-reducer';
 
 const DEFAULT_ENV_CONFIG: EnvironmentConfig = {
   initialCapital: 10000,
@@ -41,6 +42,9 @@ export class TradingEnvironment {
   private rewardCalculator: RewardCalculator;
   private training: boolean;
 
+  // Optional feature reducer for dimensionality reduction
+  private featureReducer: FeatureReducer | null = null;
+
   // Episode state
   private currentIndex: number = 0;
   private startIndex: number = 0;
@@ -54,7 +58,8 @@ export class TradingEnvironment {
     envConfig: Partial<EnvironmentConfig> = {},
     stateConfig: Partial<StateBuilderConfig> = {},
     rewardConfig: Partial<RewardConfig> = {},
-    training: boolean = true
+    training: boolean = true,
+    featureReducer?: FeatureReducer
   ) {
     this.candles = candles;
     this.config = { ...DEFAULT_ENV_CONFIG, ...envConfig };
@@ -62,6 +67,7 @@ export class TradingEnvironment {
     this.rewardCalculator = new RewardCalculator(rewardConfig);
     this.portfolio = this.createInitialPortfolio();
     this.training = training;
+    this.featureReducer = featureReducer ?? null;
   }
 
   private createInitialPortfolio(): Portfolio {
@@ -119,6 +125,7 @@ export class TradingEnvironment {
 
     const currentPrice = currentCandle.close;
     let trade: TradeRecord | undefined;
+    let isNewEntry = false; // Track if this action opens a new position
 
     // Check stop loss / take profit BEFORE executing new action
     const slTpTrade = this.checkStopLossTakeProfit(currentCandle);
@@ -126,14 +133,19 @@ export class TradingEnvironment {
       trade = slTpTrade;
     }
 
+    // Check if we're opening a new position (was flat, now entering)
+    const wasFlat = this.portfolio.position === null;
+
     // Execute action (only if we didn't just close via SL/TP)
     if (!trade) {
       switch (action) {
         case Actions.BUY:
           trade = this.executeBuy(currentPrice);
+          isNewEntry = wasFlat && this.portfolio.position !== null;
           break;
         case Actions.SELL:
           trade = this.executeSell(currentPrice);
+          isNewEntry = wasFlat && this.portfolio.position !== null;
           break;
         case Actions.CLOSE:
           trade = this.executeClose(currentPrice);
@@ -193,6 +205,7 @@ export class TradingEnvironment {
       holdingPeriod: this.portfolio.position
         ? this.currentIndex - this.portfolio.position.entryIndex
         : 0,
+      isNewEntry, // Flag to penalize new position entries
     });
 
     const info: StepInfo = {
@@ -214,6 +227,7 @@ export class TradingEnvironment {
 
   /**
    * Get current state
+   * If a feature reducer is configured, it will be applied to reduce dimensionality
    */
   getState(): TradingState {
     const lookbackCandles = this.candles.slice(
@@ -226,13 +240,20 @@ export class TradingEnvironment {
       throw new Error(`No candle at index ${this.currentIndex}`);
     }
 
-    return this.stateBuilder.build(
+    const state = this.stateBuilder.build(
       lookbackCandles,
       this.currentIndex,
       currentCandle.close,
       this.portfolio.position,
       this.training // Pass training flag for feature noise
     );
+
+    // Apply feature reduction if configured
+    if (this.featureReducer) {
+      return this.featureReducer.fitTransformState(state);
+    }
+
+    return state;
   }
 
   /**
@@ -486,12 +507,39 @@ export class TradingEnvironment {
   }
 
   getStateSize(): number {
+    // If feature reducer is ready, return reduced size
+    if (this.featureReducer && this.featureReducer.isReady()) {
+      return this.featureReducer.getOutputDimension();
+    }
     return this.stateBuilder.getFeatureSize();
+  }
+
+  /**
+   * Get the raw (unreduced) state size
+   */
+  getRawStateSize(): number {
+    return this.stateBuilder.getFeatureSize();
+  }
+
+  /**
+   * Get the feature reducer (if configured)
+   */
+  getFeatureReducer(): FeatureReducer | null {
+    return this.featureReducer;
+  }
+
+  /**
+   * Set or update the feature reducer
+   * Use this to share a fitted reducer across multiple environments
+   */
+  setFeatureReducer(reducer: FeatureReducer | null): void {
+    this.featureReducer = reducer;
   }
 
   /**
    * Get state at a specific index (for dataset export)
    * Does not modify the environment state
+   * Applies feature reduction if configured
    */
   getStateAt(index: number): TradingState | null {
     if (index < this.config.lookbackPeriod || index >= this.candles.length) {
@@ -508,11 +556,21 @@ export class TradingEnvironment {
       return null;
     }
 
-    return this.stateBuilder.build(
+    const state = this.stateBuilder.build(
       lookbackCandles,
       index,
       currentCandle.close,
       null // No position when exporting features
     );
+
+    // Apply feature reduction if configured and ready
+    if (this.featureReducer && this.featureReducer.isReady()) {
+      return {
+        ...state,
+        features: this.featureReducer.transform(state.features),
+      };
+    }
+
+    return state;
   }
 }

@@ -49,30 +49,31 @@ export interface KBIntegrationConfig {
 
 /**
  * Default configuration for KB integration
+ * NOTE: KB integration is now ENABLED by default to leverage the 7,431+ ICT concept chunks
  */
 export const DEFAULT_KB_CONFIG: KBIntegrationConfig = {
-  enabled: false,
+  enabled: true, // Enabled to leverage KB for ICT-based trading
 
   // Features
   addKBFeatures: true,
   kbFeatureCount: 4,
 
-  // Reward shaping
+  // Reward shaping - asymmetric loss with stronger alignment bonuses
   useKBRewardShaping: true,
-  maxKBRewardBonus: 0.2,
-  ruleAlignmentBonus: 0.03,
-  ruleConflictPenalty: 0.02,
-  highSimilarityThreshold: 0.7,
-  highSimilarityBonus: 0.05,
+  maxKBRewardBonus: 0.25, // Increased from 0.2 for stronger KB influence
+  ruleAlignmentBonus: 0.05, // Increased from 0.03 for ICT-aligned trades
+  ruleConflictPenalty: 0.03, // Increased from 0.02 for conflicting trades
+  highSimilarityThreshold: 0.65, // Lowered from 0.7 to match more concepts
+  highSimilarityBonus: 0.08, // Increased from 0.05 for high-confidence matches
 
   // Search
-  topK: 3,
-  minSimilarity: 0.4,
+  topK: 5, // Increased from 3 for better coverage
+  minSimilarity: 0.35, // Lowered from 0.4 for more matches
 
-  // Caching
-  cacheSize: 500,
-  warmCacheOnInit: false,
-  cacheTTL: 300000,
+  // Caching - warm cache for common patterns
+  cacheSize: 1000, // Increased from 500
+  warmCacheOnInit: true, // Enabled to pre-load common ICT queries
+  cacheTTL: 600000, // 10 minutes (increased from 5)
 };
 
 /**

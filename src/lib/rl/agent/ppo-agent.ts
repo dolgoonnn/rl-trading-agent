@@ -32,6 +32,14 @@ export interface PPOConfig {
   dropout: number;
   l2Regularization: number;
   gradientClipNorm: number;
+
+  // Value function clipping (optional, for stability)
+  clipValue?: boolean; // Enable value function clipping
+  vfClipRange?: number; // Range for value function clipping (default: 0.2)
+
+  // Action bias to prevent hold collapse
+  actionBias?: boolean;
+  actionBiasDecay?: number;
 }
 
 const DEFAULT_CONFIG: PPOConfig = {
@@ -43,7 +51,7 @@ const DEFAULT_CONFIG: PPOConfig = {
   gamma: 0.99,
   lambda: 0.95,
   clipRatio: 0.2,
-  entropyCoef: 0.01,
+  entropyCoef: 0.02, // Increased for more exploration
   valueCoef: 0.5,
 
   nSteps: 2048,
@@ -54,6 +62,14 @@ const DEFAULT_CONFIG: PPOConfig = {
   dropout: 0.25, // Increased from 0.1 to reduce overfitting
   l2Regularization: 0.02, // Increased from 0.01
   gradientClipNorm: 0.5,
+
+  // Value function clipping for stability
+  clipValue: true,
+  vfClipRange: 0.2,
+
+  // Action bias to prevent hold collapse
+  actionBias: true,
+  actionBiasDecay: 0.999,
 };
 
 interface RolloutStep {
@@ -80,6 +96,10 @@ export class PPOAgent implements RolloutAgent {
   private episodeCount: number = 0;
   private recentLosses: number[] = [];
   private recentRewards: number[] = [];
+
+  // Action tracking for diagnostics
+  private actionCounts: number[] = [0, 0, 0, 0];
+  private actionBiasValue: number = 0.1;
 
   constructor(config: Partial<PPOConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -109,38 +129,61 @@ export class PPOAgent implements RolloutAgent {
 
   /**
    * Select action using the policy network
+   * Includes action bias to prevent "hold" collapse
    */
   selectAction(state: number[], training: boolean = true): Action {
-    return tf.tidy(() => {
+    const useActionBias = this.config.actionBias ?? true;
+
+    const selectedAction = tf.tidy(() => {
       const stateTensor = tf.tensor2d([state]);
       const logits = this.actor.predict(stateTensor) as tf.Tensor;
-      const probs = tf.softmax(logits);
-      const probsData = probs.dataSync();
+      const logitsData = Array.from(logits.dataSync());
+
+      // Apply action bias during training to prevent "hold" collapse
+      const biasedLogits = [...logitsData];
+      if (training && useActionBias && this.actionBiasValue > 0.01) {
+        // Bias trading actions (BUY, SELL, CLOSE) over HOLD
+        if (biasedLogits[1] !== undefined) biasedLogits[1] += this.actionBiasValue; // BUY
+        if (biasedLogits[2] !== undefined) biasedLogits[2] += this.actionBiasValue; // SELL
+        if (biasedLogits[3] !== undefined) biasedLogits[3] += this.actionBiasValue * 0.5; // CLOSE
+      }
+
+      // Compute probabilities from biased logits
+      const maxLogit = Math.max(...biasedLogits);
+      const expLogits = biasedLogits.map(l => Math.exp(l - maxLogit));
+      const sumExp = expLogits.reduce((a, b) => a + b, 0);
+      const probs = expLogits.map(e => e / sumExp);
 
       if (training) {
         // Sample from distribution
         const rand = Math.random();
         let cumProb = 0;
         for (let i = 0; i < 4; i++) {
-          cumProb += probsData[i]!;
+          cumProb += probs[i]!;
           if (rand < cumProb) {
             return i as Action;
           }
         }
         return Actions.HOLD;
       } else {
-        // Greedy action
+        // Greedy action (no bias during evaluation)
+        const origProbs = tf.softmax(logits).dataSync();
         let maxProb = -Infinity;
         let bestAction: Action = Actions.HOLD;
         for (let i = 0; i < 4; i++) {
-          if (probsData[i]! > maxProb) {
-            maxProb = probsData[i]!;
+          if (origProbs[i]! > maxProb) {
+            maxProb = origProbs[i]!;
             bestAction = i as Action;
           }
         }
         return bestAction;
       }
     });
+
+    // Track action distribution
+    this.actionCounts[selectedAction] = (this.actionCounts[selectedAction] ?? 0) + 1;
+
+    return selectedAction;
   }
 
   /**
@@ -307,6 +350,7 @@ export class PPOAgent implements RolloutAgent {
 
   /**
    * Train on a mini-batch
+   * Includes value function clipping for stability (PPO2 style)
    */
   private trainMiniBatch(
     indices: number[],
@@ -316,8 +360,12 @@ export class PPOAgent implements RolloutAgent {
     const batchStates = indices.map((i) => this.rolloutBuffer[i]!.state);
     const batchActions = indices.map((i) => this.rolloutBuffer[i]!.action);
     const batchOldLogProbs = indices.map((i) => this.rolloutBuffer[i]!.logProb);
+    const batchOldValues = indices.map((i) => this.rolloutBuffer[i]!.value);
     const batchAdvantages = indices.map((i) => advantages[i]!);
     const batchReturns = indices.map((i) => returns[i]!);
+
+    const useVfClip = this.config.clipValue ?? true;
+    const vfClipRange = this.config.vfClipRange ?? 0.2;
 
     const loss = tf.tidy(() => {
       const statesTensor = tf.tensor2d(batchStates);
@@ -346,7 +394,7 @@ export class PPOAgent implements RolloutAgent {
         );
         const policyLoss = -surr1.map((s1, i) => Math.min(s1, surr2[i]!)).reduce((a, b) => a + b, 0) / indices.length;
 
-        // Entropy bonus
+        // Entropy bonus (higher entropy = more exploration)
         let entropy = 0;
         for (let i = 0; i < indices.length; i++) {
           for (let a = 0; a < 4; a++) {
@@ -364,15 +412,33 @@ export class PPOAgent implements RolloutAgent {
       // Apply actor gradients with clipping
       this.applyClippedGradients(actorGrads, this.actorOptimizer);
 
-      // Critic loss
+      // Critic loss with optional value function clipping
       const { grads: criticGrads, value: criticLoss } = tf.variableGrads(() => {
         const values = this.critic.predict(statesTensor) as tf.Tensor;
         const valuesData = values.dataSync();
 
-        // MSE loss
         let valueLoss = 0;
         for (let i = 0; i < indices.length; i++) {
-          valueLoss += Math.pow(valuesData[i]! - batchReturns[i]!, 2);
+          const vpred = valuesData[i]!;
+          const vtarg = batchReturns[i]!;
+
+          if (useVfClip) {
+            // Clipped value function loss (PPO2 style)
+            // Prevents large value updates that can destabilize training
+            const vpredClipped = batchOldValues[i]! + Math.max(
+              -vfClipRange,
+              Math.min(vfClipRange, vpred - batchOldValues[i]!)
+            );
+
+            const vf_losses1 = Math.pow(vpred - vtarg, 2);
+            const vf_losses2 = Math.pow(vpredClipped - vtarg, 2);
+
+            // Take the maximum (conservative estimate)
+            valueLoss += Math.max(vf_losses1, vf_losses2);
+          } else {
+            // Simple MSE loss
+            valueLoss += Math.pow(vpred - vtarg, 2);
+          }
         }
         valueLoss /= indices.length;
 
@@ -426,6 +492,31 @@ export class PPOAgent implements RolloutAgent {
    */
   endEpisode(): void {
     this.episodeCount++;
+
+    // Decay action bias over time
+    const actionBiasDecay = this.config.actionBiasDecay ?? 0.999;
+    this.actionBiasValue *= actionBiasDecay;
+  }
+
+  /**
+   * Get action distribution diagnostics
+   */
+  getActionDistribution(): { hold: number; buy: number; sell: number; close: number } {
+    const total = this.actionCounts.reduce((a, b) => a + b, 0);
+    if (total === 0) return { hold: 0.25, buy: 0.25, sell: 0.25, close: 0.25 };
+    return {
+      hold: this.actionCounts[0]! / total,
+      buy: this.actionCounts[1]! / total,
+      sell: this.actionCounts[2]! / total,
+      close: this.actionCounts[3]! / total,
+    };
+  }
+
+  /**
+   * Reset action tracking
+   */
+  resetDiagnostics(): void {
+    this.actionCounts = [0, 0, 0, 0];
   }
 
   /**
