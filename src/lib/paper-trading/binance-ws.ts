@@ -52,6 +52,7 @@ export class BinanceWebSocket extends EventEmitter {
   private lastPongTime: number = 0;
   private shouldReconnect: boolean = true;
   private currentCandle: LiveCandle | null = null;
+  private lastClosedTimestamp: number = 0;
 
   constructor(config: BinanceWsConfig) {
     super();
@@ -174,8 +175,9 @@ export class BinanceWebSocket extends EventEmitter {
       // Emit candle update
       this.emit('candle', candle);
 
-      // Emit candleClosed if this candle just closed
-      if (candle.closed && (!this.currentCandle || !this.currentCandle.closed)) {
+      // Emit candleClosed if this candle just closed (and we haven't already emitted for this timestamp)
+      if (candle.closed && candle.timestamp > this.lastClosedTimestamp) {
+        this.lastClosedTimestamp = candle.timestamp;
         this.emit('candleClosed', candle);
       }
 
