@@ -3,15 +3,19 @@
 ## In 60 Seconds
 
 ### 1. Start the server
+
 ```bash
 pnpm dev
 ```
 
 ### 2. Open search UI
+
 Visit: **http://localhost:3000/kb-search**
 
 ### 3. Search for concepts
-Type any ICT trading term:
+
+Type any ICT trading term:c
+
 - "fair value gap"
 - "kill zone"
 - "order blocks"
@@ -33,6 +37,7 @@ Type any ICT trading term:
 ## Using the API
 
 ### From Frontend (React)
+
 ```typescript
 import { trpc } from '@/lib/trpc/client';
 
@@ -47,17 +52,17 @@ export function SearchComponent() {
 ```
 
 ### From Server (Node.js)
+
 ```typescript
-import { keywordSearch, getRelatedChunks } from '@/lib/kb/search/semantic';
+import { keywordSearch, getRelatedChunks } from "@/lib/kb/search/semantic";
 
-
-const results = await keywordSearch('fair value gap', { topK: 10 });
+const results = await keywordSearch("fair value gap", { topK: 10 });
 
 // Get all chunks for a concept
-const fvgChunks = await getRelatedChunks('fair-value-gap');
+const fvgChunks = await getRelatedChunks("fair-value-gap");
 
 // Build RAG context for LLM
-const { buildRAGContext } = await import('@/lib/kb/search/semantic');
+const { buildRAGContext } = await import("@/lib/kb/search/semantic");
 const context = buildRAGContext(results, 4000);
 ```
 
@@ -68,6 +73,7 @@ const context = buildRAGContext(results, 4000);
 Want semantic search instead of just keywords?
 
 ### 1. Install Ollama
+
 ```bash
 # macOS
 brew install ollama
@@ -76,6 +82,7 @@ brew install ollama
 ```
 
 ### 2. Start Ollama
+
 ```bash
 # Terminal 1
 ollama serve
@@ -85,6 +92,7 @@ ollama pull nomic-embed-text
 ```
 
 ### 3. Generate embeddings
+
 ```bash
 pnpm tsx scripts/ingest-concepts.ts --with-embeddings
 ```
@@ -98,11 +106,13 @@ pnpm tsx scripts/ingest-concepts.ts --with-embeddings
 SQLite at: `/data/ict-trading.db`
 
 View with:
+
 ```bash
 pnpm db:studio
 ```
 
 ### Tables
+
 - `knowledge_chunks` (275 rows) - Main content
 - `flashcards` - For spaced repetition (future)
 - `videoSources` - Source tracking
@@ -128,36 +138,39 @@ pnpm db:studio
 
 ## Key Files
 
-| File | Purpose |
-|------|---------|
+| File                            | Purpose          |
+| ------------------------------- | ---------------- |
 | `src/lib/kb/search/semantic.ts` | Search functions |
-| `src/lib/trpc/routers/kb.ts` | API endpoints |
-| `src/app/kb-search/page.tsx` | Search UI |
-| `scripts/ingest-concepts.ts` | Data ingestion |
-| `knowledge-base/concepts/` | Content files |
+| `src/lib/trpc/routers/kb.ts`    | API endpoints    |
+| `src/app/kb-search/page.tsx`    | Search UI        |
+| `scripts/ingest-concepts.ts`    | Data ingestion   |
+| `knowledge-base/concepts/`      | Content files    |
 
 ---
 
 ## Common Queries
 
 **Search for a concept:**
+
 ```typescript
 const results = await trpc.kb.search.query({
-  query: 'market structure break',
+  query: "market structure break",
 });
 ```
 
 **Get all chunks for a concept:**
+
 ```typescript
 const chunks = await trpc.kb.concept.query({
-  concept: 'order-blocks',
+  concept: "order-blocks",
 });
 ```
 
 **Build context for Claude:**
+
 ```typescript
 const { context } = await trpc.kb.ragContext.query({
-  query: 'what is a fair value gap',
+  query: "what is a fair value gap",
   maxTokens: 2000,
 });
 ```
@@ -167,11 +180,13 @@ const { context } = await trpc.kb.ragContext.query({
 ## Troubleshooting
 
 ### No results found?
+
 - Try more general terms ("order blocks" not "order block positioning")
 - Check search is at least 3 characters
 - Use concept filter if you know the slug
 
 ### Want embeddings but Ollama won't start?
+
 ```bash
 # Verify Ollama is running
 curl http://localhost:11434/api/tags
@@ -181,6 +196,7 @@ ollama serve
 ```
 
 ### Database locked?
+
 ```bash
 # Remove stale WAL files
 rm data/ict-trading.db-wal data/ict-trading.db-shm
