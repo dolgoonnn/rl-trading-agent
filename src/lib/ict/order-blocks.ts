@@ -13,14 +13,19 @@ export interface OrderBlockConfig {
 }
 
 const DEFAULT_CONFIG: OrderBlockConfig = {
-  minMovePercent: 0.5,
-  maxAgeCandles: 100,
-  bodyToRangeRatio: 0.5,
+  minMovePercent: 1.2,   // Raised from 1.0% — reduce noise, but 1.5% killed OB count
+  maxAgeCandles: 75,
+  bodyToRangeRatio: 0.5, // Enforced below: reject doji/indecision candles as OBs
 };
 
 /**
  * Detect bullish order blocks
- * Bullish OB = Last bearish candle before a significant bullish move
+ * Bullish OB = Last bearish candle immediately before a significant bullish move
+ *
+ * Quality filters:
+ * - Must be the LAST bearish candle before the impulse (not any candle in a range)
+ * - Body-to-range ratio must exceed threshold (reject doji/indecision candles)
+ * - Impulse move must exceed minMovePercent
  */
 export function detectBullishOrderBlocks(
   candles: Candle[],
@@ -35,16 +40,31 @@ export function detectBullishOrderBlocks(
     // Must be a bearish candle
     if (!isBearish(current)) continue;
 
+    // Body-to-range filter: reject doji/indecision candles
+    const candleRange = range(current);
+    if (candleRange <= 0) continue;
+    if (bodySize(current) / candleRange < config.bodyToRangeRatio) continue;
+
+    // "Last candle" requirement: one of the next 2 candles must be bullish (start of impulse)
+    // This ensures this is the last bearish candle before the move, not one in the middle of a range
+    const next1 = candles[i + 1];
+    const next2 = candles[i + 2];
+    const impulseStarts = (next1 && isBullish(next1)) || (next2 && isBullish(next2));
+    if (!impulseStarts) continue;
+
+    // Also reject if next candle is another bearish candle with bigger body (not the "last" bearish)
+    if (next1 && isBearish(next1) && bodySize(next1) > bodySize(current)) continue;
+
     // Check for significant bullish move after
     let totalMove = 0;
     let validMove = false;
 
     for (let j = i + 1; j < Math.min(i + 5, candles.length); j++) {
-      const nextCandle = candles[j];
-      if (!nextCandle) continue;
+      const moveCandle = candles[j];
+      if (!moveCandle) continue;
 
-      if (isBullish(nextCandle)) {
-        totalMove += bodySize(nextCandle);
+      if (isBullish(moveCandle)) {
+        totalMove += bodySize(moveCandle);
       }
 
       const movePercent = (totalMove / current.close) * 100;
@@ -74,7 +94,12 @@ export function detectBullishOrderBlocks(
 
 /**
  * Detect bearish order blocks
- * Bearish OB = Last bullish candle before a significant bearish move
+ * Bearish OB = Last bullish candle immediately before a significant bearish move
+ *
+ * Quality filters:
+ * - Must be the LAST bullish candle before the impulse (not any candle in a range)
+ * - Body-to-range ratio must exceed threshold (reject doji/indecision candles)
+ * - Impulse move must exceed minMovePercent
  */
 export function detectBearishOrderBlocks(
   candles: Candle[],
@@ -89,16 +114,30 @@ export function detectBearishOrderBlocks(
     // Must be a bullish candle
     if (!isBullish(current)) continue;
 
+    // Body-to-range filter: reject doji/indecision candles
+    const candleRange = range(current);
+    if (candleRange <= 0) continue;
+    if (bodySize(current) / candleRange < config.bodyToRangeRatio) continue;
+
+    // "Last candle" requirement: one of the next 2 candles must be bearish (start of impulse)
+    const next1 = candles[i + 1];
+    const next2 = candles[i + 2];
+    const impulseStarts = (next1 && isBearish(next1)) || (next2 && isBearish(next2));
+    if (!impulseStarts) continue;
+
+    // Also reject if next candle is another bullish candle with bigger body (not the "last" bullish)
+    if (next1 && isBullish(next1) && bodySize(next1) > bodySize(current)) continue;
+
     // Check for significant bearish move after
     let totalMove = 0;
     let validMove = false;
 
     for (let j = i + 1; j < Math.min(i + 5, candles.length); j++) {
-      const nextCandle = candles[j];
-      if (!nextCandle) continue;
+      const moveCandle = candles[j];
+      if (!moveCandle) continue;
 
-      if (isBearish(nextCandle)) {
-        totalMove += bodySize(nextCandle);
+      if (isBearish(moveCandle)) {
+        totalMove += bodySize(moveCandle);
       }
 
       const movePercent = (totalMove / current.close) * 100;
@@ -186,7 +225,12 @@ export function checkMitigation(
 }
 
 /**
- * Detect all order blocks in candle data
+ * Detect all order blocks in candle data.
+ *
+ * Note: Mitigation is NOT checked here because detection runs on a lookback window
+ * where most OBs will already have been mitigated. Mitigation should be checked
+ * at the strategy level relative to the current bar (or not at all — the strategy
+ * already filters for price touching the OB zone).
  */
 export function detectOrderBlocks(
   candles: Candle[],

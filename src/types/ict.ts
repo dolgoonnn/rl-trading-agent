@@ -68,6 +68,10 @@ export interface FairValueGap {
   index: number;
   timestamp: number;
   fillPercent: number;
+  /** Consequent Encroachment - 50% midpoint of FVG (proper ICT entry level) */
+  consequentEncroachment: number;
+  /** Whether FVG formed from displacement (strong impulsive move) - required for valid FVG */
+  displacement: boolean;
 }
 
 // Liquidity
@@ -91,6 +95,33 @@ export interface LiquiditySweep {
   sweepIndex: number;
   timestamp: number;
   priceExceeded: number; // How far past the level
+}
+
+// Breaker Blocks
+export type BreakerType = 'bullish' | 'bearish';
+export type BreakerStatus = 'active' | 'tested' | 'broken';
+
+export interface BreakerBlock {
+  type: BreakerType;
+  status: BreakerStatus;
+  /** Original order block that was broken */
+  originalOB: OrderBlock;
+  /** High of the breaker zone */
+  high: number;
+  /** Low of the breaker zone */
+  low: number;
+  /** Index where the OB was broken */
+  breakIndex: number;
+  /** Timestamp of break */
+  breakTimestamp: number;
+  /** How far price exceeded the OB (as % of price) */
+  breakExceedance: number;
+  /** Number of times breaker has been tested */
+  testCount: number;
+  /** Index of first test (if tested) */
+  firstTestIndex?: number;
+  /** Strength based on original OB and break characteristics */
+  strength: number;
 }
 
 // Premium/Discount & OTE
