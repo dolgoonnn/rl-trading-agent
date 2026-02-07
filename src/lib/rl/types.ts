@@ -330,9 +330,9 @@ export interface RewardComponents {
 }
 
 export interface RewardConfig {
-  pnlWeight: number; // Default: 0.4
-  sharpeWeight: number; // Default: 0.3
-  drawdownWeight: number; // Default: 0.2
+  pnlWeight: number; // Default: 0.6
+  sharpeWeight: number; // Default: 0.2
+  drawdownWeight: number; // Default: 0.1
   ictAlignmentWeight: number; // Default: 0.1
 
   // ICT alignment bonuses
@@ -345,6 +345,28 @@ export interface RewardConfig {
   // Penalties
   overTradingPenalty: number; // Too frequent trades
   holdingTooLongPenalty: number; // Positions held too long
+
+  // Dense signal settings (to prevent exploration collapse)
+  useDenseReward?: boolean; // Enable dense reward signals
+  unrealizedPnLWeight?: number; // Weight for unrealized PnL changes
+  holdingCostPerBar?: number; // Small cost per bar of holding
+  inactivityPenalty?: number; // Penalty for excessive inactivity
+  inactivityThreshold?: number; // Bars before inactivity penalty kicks in
+  entryBonus?: number; // Bonus for taking decisive action (entering trades)
+  progressiveInactivityMultiplier?: number; // Exponential growth rate for inactivity penalty
+
+  // Structure-based exit rewards (M4.2)
+  structureExitBonus?: number; // Bonus for exiting at structure levels
+  profitProtectionBonus?: number; // Bonus for moving stop to BE when profitable
+  trailingStopBonus?: number; // Bonus for using trailing stop
+  optimalExitBonus?: number; // Bonus for exiting at OB/FVG/liquidity
+
+  // Strategy diversity and frequency rewards (Model Improvement)
+  // Research: "Strategy imbalance causes model to ignore FVG/CHoCH signals"
+  useStrategyDiversity?: boolean; // Enable strategy diversity bonus
+  strategyDiversityWeight?: number; // Weight for strategy entropy bonus (default: 0.1)
+  tradeFrequencyPenaltyWeight?: number; // Penalty for overtrading (default: 0.001)
+  targetTradesPerEpisode?: number; // Expected trades per episode (default: 15)
 }
 
 // ============================================
@@ -401,6 +423,31 @@ export interface DQNConfig {
 
   // Dueling DQN architecture (optional)
   useDueling?: boolean; // Use Dueling DQN architecture (separate V and A streams)
+
+  // Noisy Networks for exploration (optional)
+  useNoisyNetworks?: boolean; // Replace epsilon-greedy with parametric noise
+  noisySigmaInit?: number; // Initial noise scale (default: 0.5)
+
+  // Action bias settings (to prevent "hold" collapse)
+  actionBias?: boolean; // Enable action exploration bonus
+  actionBiasDecay?: number; // Decay rate for action bias
+
+  // Epsilon decay settings (Phase 2 research-backed improvements)
+  useLinearEpsilonDecay?: boolean; // Use linear instead of exponential decay
+  totalExpectedEpisodes?: number; // For linear decay calculation
+  rewardBasedEpsilonAdjustment?: boolean; // Increase epsilon if win rate is low
+  lowWinRateThreshold?: number; // Win rate below this triggers epsilon boost
+  epsilonBoostAmount?: number; // How much to boost epsilon when win rate is low
+
+  // Double DQN (reduces Q-value overestimation)
+  useDoubleDQN?: boolean; // Use Double DQN target calculation (default: true)
+
+  // Symbol-specific epsilon scaling (EXP-019)
+  // Different symbols may need more/less exploration based on signal quality
+  // BTC: typically needs more exploration (Sharpe lower)
+  // SOL: may need less exploration (Sharpe higher)
+  symbolEpsilonScaling?: Record<string, number>; // e.g., { 'BTCUSDT': 1.15, 'ETHUSDT': 1.0, 'SOLUSDT': 0.95 }
+  currentSymbol?: string; // Set by environment to indicate current trading symbol
 }
 
 export interface AgentState {
