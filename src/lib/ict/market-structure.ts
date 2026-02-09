@@ -11,8 +11,8 @@ export interface SwingDetectionConfig {
 }
 
 const DEFAULT_CONFIG: SwingDetectionConfig = {
-  lookback: 5,
-  minStrength: 2,
+  lookback: 7,       // Balanced: 5 too loose (noisy swings), 10 too strict (few swings)
+  minStrength: 3,    // Balanced: 2 too loose, 4 too strict
 };
 
 /**
@@ -126,6 +126,10 @@ export function detectSwingLows(
  * BOS occurs when price breaks a swing point IN THE DIRECTION of the prevailing trend:
  * - Uptrend: price breaks above swing high → bullish BOS (continuation)
  * - Downtrend: price breaks below swing low → bearish BOS (continuation)
+ *
+ * ICT Methodology:
+ * - Valid BOS requires CANDLE BODY CLOSE beyond the level, not just a wick
+ * - "A valid BOS happens only when price closes beyond a key level, not just touches it" - XS
  */
 export function detectBOS(
   candles: Candle[],
@@ -156,11 +160,12 @@ export function detectBOS(
         // Don't double-count breaks
         if (brokenHighs.has(swing.index)) continue;
 
-        // Check if candle broke above the swing high
-        if (candle.high > swing.price) {
+        // ICT FIX: Require CANDLE BODY CLOSE above the swing high (not just wick)
+        // This filters out false breaks where only the wick touched the level
+        if (candle.close > swing.price) {
           brokenHighs.add(swing.index);
 
-          // Calculate confidence
+          // Calculate confidence (now with body close requirement already met)
           const confidence = calculateBreakConfidence(candle, swing, 'high', candles);
 
           breaks.push({
@@ -182,7 +187,9 @@ export function detectBOS(
         if (swing.index >= i) continue;
         if (brokenLows.has(swing.index)) continue;
 
-        if (candle.low < swing.price) {
+        // ICT FIX: Require CANDLE BODY CLOSE below the swing low (not just wick)
+        // This filters out false breaks where only the wick touched the level
+        if (candle.close < swing.price) {
           brokenLows.add(swing.index);
 
           const confidence = calculateBreakConfidence(candle, swing, 'low', candles);
@@ -209,6 +216,10 @@ export function detectBOS(
  * CHoCH occurs when price breaks a swing point AGAINST the prevailing trend:
  * - Uptrend: price breaks below swing low → bearish CHoCH (reversal signal)
  * - Downtrend: price breaks above swing high → bullish CHoCH (reversal signal)
+ *
+ * ICT Methodology:
+ * - Valid CHoCH requires CANDLE BODY CLOSE beyond the level, not just a wick
+ * - This is even more important for reversals as false breaks are common
  */
 export function detectCHoCH(
   candles: Candle[],
@@ -237,7 +248,8 @@ export function detectCHoCH(
         if (swing.index >= i) continue;
         if (brokenLows.has(swing.index)) continue;
 
-        if (candle.low < swing.price) {
+        // ICT FIX: Require CANDLE BODY CLOSE below the swing low (not just wick)
+        if (candle.close < swing.price) {
           brokenLows.add(swing.index);
 
           const confidence = calculateBreakConfidence(candle, swing, 'low', candles);
@@ -261,7 +273,8 @@ export function detectCHoCH(
         if (swing.index >= i) continue;
         if (brokenHighs.has(swing.index)) continue;
 
-        if (candle.high > swing.price) {
+        // ICT FIX: Require CANDLE BODY CLOSE above the swing high (not just wick)
+        if (candle.close > swing.price) {
           brokenHighs.add(swing.index);
 
           const confidence = calculateBreakConfidence(candle, swing, 'high', candles);
@@ -315,7 +328,9 @@ function determineTrendFromSwings(
  * Confidence based on:
  * - Swing strength (higher = more significant level)
  * - Break distance (how far past the level)
- * - Close confirmation (candle closed past level vs just wick)
+ * - Close quality (how far the CLOSE is past the level, since body close is now required)
+ *
+ * NOTE: Since we now require body close for valid BOS/CHoCH, confidence starts higher (0.6)
  */
 function calculateBreakConfidence(
   breakCandle: Candle,
@@ -323,40 +338,32 @@ function calculateBreakConfidence(
   type: 'high' | 'low',
   candles: Candle[]
 ): number {
-  let confidence = 0.5; // Base confidence
+  // Higher base confidence since body close is already required
+  let confidence = 0.6;
 
   // 1. Swing strength bonus (+0.15 max)
   // Normalize swing strength (typically 2-10)
   const normalizedStrength = Math.min(swing.strength / 10, 1);
   confidence += normalizedStrength * 0.15;
 
-  // 2. Break distance bonus (+0.20 max)
-  // How far price exceeded the level
+  // 2. Break distance bonus (+0.15 max)
+  // How far the CLOSE exceeded the level (not just the wick)
   const atr = calculateLocalATR(candles, Math.max(0, swing.index - 14), swing.index);
-  let breakDistance: number;
+  let closeDistance: number;
   if (type === 'high') {
-    breakDistance = (breakCandle.high - swing.price) / atr;
+    closeDistance = (breakCandle.close - swing.price) / atr;
   } else {
-    breakDistance = (swing.price - breakCandle.low) / atr;
+    closeDistance = (swing.price - breakCandle.close) / atr;
   }
-  // Cap at 2 ATR for max bonus
-  confidence += Math.min(breakDistance / 2, 1) * 0.20;
+  // Cap at 1.5 ATR for max bonus (strong close beyond level)
+  confidence += Math.min(closeDistance / 1.5, 1) * 0.15;
 
-  // 3. Close confirmation bonus (+0.15)
-  // Did the candle CLOSE past the level (stronger) or just wick through?
-  if (type === 'high') {
-    if (breakCandle.close > swing.price) {
-      confidence += 0.15; // Full bonus for close confirmation
-    } else if (breakCandle.high > swing.price) {
-      confidence += 0.05; // Partial for wick only
-    }
-  } else {
-    if (breakCandle.close < swing.price) {
-      confidence += 0.15;
-    } else if (breakCandle.low < swing.price) {
-      confidence += 0.05;
-    }
-  }
+  // 3. Candle body strength bonus (+0.10 max)
+  // Larger body relative to range = more conviction
+  const bodySize = Math.abs(breakCandle.close - breakCandle.open);
+  const candleRange = breakCandle.high - breakCandle.low;
+  const bodyRatio = candleRange > 0 ? bodySize / candleRange : 0;
+  confidence += bodyRatio * 0.10;
 
   return Math.min(confidence, 1);
 }

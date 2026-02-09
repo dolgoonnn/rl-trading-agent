@@ -16,6 +16,12 @@ import {
   detectOrderBlocks,
   detectFairValueGaps,
 } from '@/lib/ict';
+import type { FuturesSnapshot } from '@/lib/data/binance-futures-api';
+import {
+  buildOrderFlowFeatures,
+  flattenOrderFlowFeatures,
+  ORDER_FLOW_FEATURE_COUNT,
+} from './order-flow-features';
 
 export interface StateBuilderConfig {
   lookbackPeriod: number; // Number of candles for returns
@@ -55,7 +61,8 @@ export class StateBuilder {
     currentIndex: number,
     currentPrice: number,
     position: Position | null,
-    training: boolean = false
+    training: boolean = false,
+    futuresSnapshots?: FuturesSnapshot[],
   ): TradingState {
     // Calculate ATR for asset-agnostic normalization
     const atr = this.config.useATRNormalization ? this.calculateATR(candles) : 1;
@@ -66,6 +73,12 @@ export class StateBuilder {
 
     // Flatten all features into a single array
     let features = this.flattenFeatures(price, ict, positionFeatures);
+
+    // Append order flow features if futures data is available
+    if (futuresSnapshots && futuresSnapshots.length > 0) {
+      const orderFlow = buildOrderFlowFeatures(futuresSnapshots, candles, currentIndex);
+      features.push(...flattenOrderFlowFeatures(orderFlow));
+    }
 
     // Add noise during training to prevent overfitting
     if (training && this.config.featureNoiseLevel > 0) {
@@ -457,12 +470,14 @@ export class StateBuilder {
   /**
    * Get feature vector size
    */
-  getFeatureSize(): number {
+  getFeatureSize(includeOrderFlow: boolean = false): number {
     // Price: 60 returns + 6 indicators = 66
     // ICT: 6 structure + 8 BOS/CHoCH + 6 OB + 6 FVG + 3 liquidity + 5 session = 34
     // Position: 4
-    // Total: 104
-    return this.config.lookbackPeriod + 6 + 34 + 4;
+    // Base: 104
+    const base = this.config.lookbackPeriod + 6 + 34 + 4;
+    // Order flow: 10 (optional)
+    return includeOrderFlow ? base + ORDER_FLOW_FEATURE_COUNT : base;
   }
 
   // ============================================

@@ -306,3 +306,148 @@ export class PrioritizedReplayBuffer extends ReplayBuffer {
     }
   }
 }
+
+/**
+ * N-Step Replay Buffer
+ *
+ * Computes N-step returns for better credit assignment.
+ * Instead of storing single-step transitions, stores multi-step transitions
+ * with accumulated rewards and the state N steps ahead.
+ *
+ * N-step return: G_t = r_t + γr_{t+1} + γ²r_{t+2} + ... + γ^{n-1}r_{t+n-1} + γ^n V(s_{t+n})
+ *
+ * Benefits:
+ * - Better bias-variance tradeoff than 1-step TD
+ * - Faster propagation of rewards
+ * - Reduces overestimation in Q-learning
+ */
+export class NStepReplayBuffer extends ReplayBuffer {
+  private nSteps: number;
+  private gamma: number;
+  private pendingTransitions: Array<{
+    state: number[];
+    action: Action;
+    reward: number;
+    nextState: number[];
+    done: boolean;
+  }> = [];
+
+  constructor(
+    config: Partial<ReplayBufferConfig> = {},
+    nSteps: number = 3,
+    gamma: number = 0.99
+  ) {
+    super(config);
+    this.nSteps = nSteps;
+    this.gamma = gamma;
+  }
+
+  /**
+   * Store a transition with N-step return computation
+   * Transitions are accumulated and stored with multi-step returns
+   */
+  override store(
+    state: number[],
+    action: Action,
+    reward: number,
+    nextState: number[],
+    done: boolean
+  ): void {
+    // Add to pending transitions
+    this.pendingTransitions.push({
+      state: [...state],
+      action,
+      reward,
+      nextState: [...nextState],
+      done,
+    });
+
+    // If episode ended, flush all pending transitions
+    if (done) {
+      this.flushPendingTransitions();
+      return;
+    }
+
+    // If we have N steps, compute and store the N-step transition
+    if (this.pendingTransitions.length >= this.nSteps) {
+      this.storeNStepTransition();
+    }
+  }
+
+  /**
+   * Compute and store a single N-step transition
+   */
+  private storeNStepTransition(): void {
+    const oldest = this.pendingTransitions.shift();
+    if (!oldest) return;
+
+    // Compute N-step return: sum of discounted rewards
+    let nStepReward = oldest.reward;
+    let gammaFactor = this.gamma;
+    let finalDone = oldest.done;
+    let finalNextState = oldest.nextState;
+
+    for (let i = 0; i < this.pendingTransitions.length && i < this.nSteps - 1; i++) {
+      const t = this.pendingTransitions[i]!;
+      nStepReward += gammaFactor * t.reward;
+      gammaFactor *= this.gamma;
+      finalNextState = t.nextState;
+      if (t.done) {
+        finalDone = true;
+        break;
+      }
+    }
+
+    // Store the N-step transition
+    super.store(oldest.state, oldest.action, nStepReward, finalNextState, finalDone);
+  }
+
+  /**
+   * Flush remaining transitions at episode end
+   */
+  private flushPendingTransitions(): void {
+    while (this.pendingTransitions.length > 0) {
+      const oldest = this.pendingTransitions.shift()!;
+
+      // Compute return for remaining transitions
+      let nStepReward = oldest.reward;
+      let gammaFactor = this.gamma;
+      let finalNextState = oldest.nextState;
+      let finalDone = oldest.done;
+
+      for (const t of this.pendingTransitions) {
+        nStepReward += gammaFactor * t.reward;
+        gammaFactor *= this.gamma;
+        finalNextState = t.nextState;
+        if (t.done) {
+          finalDone = true;
+          break;
+        }
+      }
+
+      super.store(oldest.state, oldest.action, nStepReward, finalNextState, finalDone);
+    }
+  }
+
+  /**
+   * Reset pending transitions (call at episode start)
+   */
+  resetPending(): void {
+    this.pendingTransitions = [];
+  }
+
+  /**
+   * Get the N-step discount factor for gamma correction in TD target
+   * TD target: r + γ^n * max Q(s')
+   */
+  getGammaN(): number {
+    return Math.pow(this.gamma, this.nSteps);
+  }
+
+  /**
+   * Get the number of steps
+   */
+  getNSteps(): number {
+    return this.nSteps;
+  }
+}

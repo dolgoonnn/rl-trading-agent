@@ -1,10 +1,9 @@
 /**
  * Trade Logger
- * Persists paper trades and sessions to SQLite database
+ * Persists paper trades and sessions via a PaperTradingRepository.
+ * Works with both SQLite (local) and PostgreSQL (Railway).
  */
 
-import { db, schema } from '@/lib/data/db';
-import { eq } from 'drizzle-orm';
 import type {
   PaperTrade,
   PaperSession,
@@ -12,6 +11,7 @@ import type {
   PaperTraderConfig,
 } from './types';
 import type { ExitAction } from '../rl/types';
+import type { PaperTradingRepository, SessionRow } from './repository';
 
 export class TradeLogger {
   private sessionId: string;
@@ -24,7 +24,8 @@ export class TradeLogger {
     private readonly symbol: string,
     private readonly timeframe: string,
     private readonly modelPath: string,
-    private readonly config: PaperTraderConfig
+    private readonly config: PaperTraderConfig,
+    private readonly repo: PaperTradingRepository,
   ) {
     this.sessionId = sessionId;
   }
@@ -52,8 +53,7 @@ export class TradeLogger {
       isActive: true,
     };
 
-    // Insert into database
-    await db.insert(schema.paperSessions).values({
+    await this.repo.insertSession({
       id: session.id,
       symbol: session.symbol,
       timeframe: session.timeframe,
@@ -79,7 +79,7 @@ export class TradeLogger {
    * Log trade entry
    */
   async logEntry(trade: PaperTrade, signal: { confluence: number; factors: string[] }): Promise<void> {
-    await db.insert(schema.paperTrades).values({
+    await this.repo.insertTrade({
       tradeId: trade.id,
       sessionId: this.sessionId,
       symbol: trade.symbol,
@@ -109,20 +109,17 @@ export class TradeLogger {
    * Log trade exit
    */
   async logExit(trade: PaperTrade): Promise<void> {
-    await db
-      .update(schema.paperTrades)
-      .set({
-        status: 'closed',
-        exitPrice: trade.exitPrice,
-        exitTime: trade.exitTime,
-        exitIndex: trade.exitIndex,
-        barsHeld: trade.barsHeld,
-        exitAction: trade.exitAction !== undefined ? this.actionToString(trade.exitAction) : undefined,
-        exitReason: trade.exitReason,
-        pnl: trade.pnl,
-        pnlPercent: trade.pnlPercent,
-      })
-      .where(eq(schema.paperTrades.tradeId, trade.id));
+    await this.repo.updateTradeByTradeId(trade.id, {
+      status: 'closed',
+      exitPrice: trade.exitPrice,
+      exitTime: trade.exitTime,
+      exitIndex: trade.exitIndex,
+      barsHeld: trade.barsHeld,
+      exitAction: trade.exitAction !== undefined ? this.actionToString(trade.exitAction) : undefined,
+      exitReason: trade.exitReason,
+      pnl: trade.pnl,
+      pnlPercent: trade.pnlPercent,
+    });
 
     // Update session stats
     const isWin = trade.pnl > 0;
@@ -140,13 +137,7 @@ export class TradeLogger {
    * Update session statistics
    */
   private async updateSessionStats(pnl: number, pnlPercent: number, isWin: boolean): Promise<void> {
-    // Fetch current session
-    const sessions = await db
-      .select()
-      .from(schema.paperSessions)
-      .where(eq(schema.paperSessions.id, this.sessionId));
-
-    const session = sessions[0];
+    const session = await this.repo.getSessionById(this.sessionId);
     if (!session) return;
 
     const newTotalTrades = (session.totalTrades ?? 0) + 1;
@@ -155,29 +146,23 @@ export class TradeLogger {
     const newTotalPnl = (session.totalPnl ?? 0) + pnl;
     const newTotalPnlPercent = (session.totalPnlPercent ?? 0) + pnlPercent;
 
-    await db
-      .update(schema.paperSessions)
-      .set({
-        totalTrades: newTotalTrades,
-        wins: newWins,
-        losses: newLosses,
-        totalPnl: newTotalPnl,
-        totalPnlPercent: newTotalPnlPercent,
-      })
-      .where(eq(schema.paperSessions.id, this.sessionId));
+    await this.repo.updateSession(this.sessionId, {
+      totalTrades: newTotalTrades,
+      wins: newWins,
+      losses: newLosses,
+      totalPnl: newTotalPnl,
+      totalPnlPercent: newTotalPnlPercent,
+    });
   }
 
   /**
    * Update session drawdown and sharpe
    */
   async updateSessionMetrics(maxDrawdown: number, sharpe: number): Promise<void> {
-    await db
-      .update(schema.paperSessions)
-      .set({
-        maxDrawdown,
-        sharpe,
-      })
-      .where(eq(schema.paperSessions.id, this.sessionId));
+    await this.repo.updateSession(this.sessionId, {
+      maxDrawdown,
+      sharpe,
+    });
   }
 
   /**
@@ -186,35 +171,31 @@ export class TradeLogger {
   async endSession(metrics: { totalPnl: number; maxDrawdown: number; sharpe: number }): Promise<void> {
     const now = new Date();
 
-    // Fetch session start time
-    const sessions = await db
-      .select()
-      .from(schema.paperSessions)
-      .where(eq(schema.paperSessions.id, this.sessionId));
+    const session = await this.repo.getSessionById(this.sessionId);
+    const startedAt = session?.startedAt;
+    const startMs = startedAt instanceof Date
+      ? startedAt.getTime()
+      : typeof startedAt === 'string'
+        ? new Date(startedAt).getTime()
+        : typeof startedAt === 'number'
+          ? startedAt
+          : 0;
+    const uptimeSeconds = startMs > 0 ? Math.floor((now.getTime() - startMs) / 1000) : 0;
 
-    const session = sessions[0];
-    const uptimeSeconds = session?.startedAt
-      ? Math.floor((now.getTime() - new Date(session.startedAt).getTime()) / 1000)
-      : 0;
-
-    await db
-      .update(schema.paperSessions)
-      .set({
-        endedAt: now,
-        uptimeSeconds,
-        isActive: false,
-        totalPnl: metrics.totalPnl,
-        maxDrawdown: metrics.maxDrawdown,
-        sharpe: metrics.sharpe,
-      })
-      .where(eq(schema.paperSessions.id, this.sessionId));
+    await this.repo.updateSession(this.sessionId, {
+      endedAt: now,
+      uptimeSeconds,
+      isActive: false,
+      totalPnl: metrics.totalPnl,
+      maxDrawdown: metrics.maxDrawdown,
+      sharpe: metrics.sharpe,
+    });
 
     this.log('update', 'Session ended', {
       uptime: uptimeSeconds,
       ...metrics,
     });
 
-    // Flush any remaining logs
     await this.flush();
   }
 
@@ -222,69 +203,17 @@ export class TradeLogger {
    * Get session by ID
    */
   async getSession(): Promise<PaperSession | null> {
-    const sessions = await db
-      .select()
-      .from(schema.paperSessions)
-      .where(eq(schema.paperSessions.id, this.sessionId));
-
-    const row = sessions[0];
+    const row = await this.repo.getSessionById(this.sessionId);
     if (!row) return null;
-
-    return {
-      id: row.id,
-      symbol: row.symbol,
-      timeframe: row.timeframe,
-      modelPath: row.modelPath,
-      config: JSON.parse(row.config) as PaperTraderConfig,
-      totalTrades: row.totalTrades ?? 0,
-      wins: row.wins ?? 0,
-      losses: row.losses ?? 0,
-      totalPnl: row.totalPnl ?? 0,
-      totalPnlPercent: row.totalPnlPercent ?? 0,
-      maxDrawdown: row.maxDrawdown ?? 0,
-      sharpe: row.sharpe ?? 0,
-      startedAt: new Date(row.startedAt),
-      endedAt: row.endedAt ? new Date(row.endedAt) : undefined,
-      uptime: row.uptimeSeconds ?? 0,
-      isActive: row.isActive ?? false,
-    };
+    return sessionRowToModel(row);
   }
 
   /**
    * Get trades for current session
    */
   async getTrades(): Promise<PaperTrade[]> {
-    const rows = await db
-      .select()
-      .from(schema.paperTrades)
-      .where(eq(schema.paperTrades.sessionId, this.sessionId));
-
-    return rows.map((row) => ({
-      id: row.tradeId,
-      sessionId: row.sessionId,
-      symbol: row.symbol,
-      timeframe: row.timeframe,
-      side: row.side as 'long' | 'short',
-      status: row.status as 'open' | 'closed',
-      entryPrice: row.entryPrice,
-      exitPrice: row.exitPrice ?? undefined,
-      stopLoss: row.stopLoss,
-      takeProfit: row.takeProfit,
-      entryTime: new Date(row.entryTime),
-      exitTime: row.exitTime ? new Date(row.exitTime) : undefined,
-      entryIndex: row.entryIndex,
-      exitIndex: row.exitIndex ?? 0,
-      barsHeld: row.barsHeld ?? 0,
-      holdingPeriod: row.barsHeld ?? 0,
-      entryConfluence: row.entryConfluence ?? 0,
-      exitAction: row.exitAction ? this.stringToAction(row.exitAction) : undefined,
-      exitReason: row.exitReason as PaperTrade['exitReason'],
-      pnl: row.pnl ?? 0,
-      pnlPercent: row.pnlPercent ?? 0,
-      kbPrimaryConcept: row.kbPrimaryConcept ?? undefined,
-      kbAlignmentScore: row.kbAlignmentScore ?? undefined,
-      createdAt: new Date(row.createdAt),
-    }));
+    const rows = await this.repo.getTradesBySessionId(this.sessionId);
+    return rows.map((row) => tradeRowToModel(row, this));
   }
 
   /**
@@ -308,17 +237,14 @@ export class TradeLogger {
   }
 
   /**
-   * Flush log buffer (for now just clears, could persist to file)
+   * Flush log buffer
    */
   async flush(): Promise<void> {
-    // Could write to log file here
     this.logBuffer = [];
   }
 
-  /**
-   * Convert ExitAction to string
-   */
-  private actionToString(action: ExitAction): string {
+  /** Convert ExitAction enum to string */
+  actionToString(action: ExitAction): string {
     switch (action) {
       case 0: return 'hold';
       case 1: return 'exit_market';
@@ -328,10 +254,8 @@ export class TradeLogger {
     }
   }
 
-  /**
-   * Convert string to ExitAction
-   */
-  private stringToAction(str: string): ExitAction {
+  /** Convert string to ExitAction enum */
+  stringToAction(str: string): ExitAction {
     switch (str) {
       case 'hold': return 0;
       case 'exit_market': return 1;
@@ -360,52 +284,17 @@ export class TradeLogger {
   }
 }
 
-/**
- * Get all paper trading sessions
- */
-export async function getAllSessions(): Promise<PaperSession[]> {
-  const rows = await db.select().from(schema.paperSessions);
+// ============================================
+// Row → Model Helpers
+// ============================================
 
-  return rows.map((row) => ({
-    id: row.id,
-    symbol: row.symbol,
-    timeframe: row.timeframe,
-    modelPath: row.modelPath,
-    config: JSON.parse(row.config) as PaperTraderConfig,
-    totalTrades: row.totalTrades ?? 0,
-    wins: row.wins ?? 0,
-    losses: row.losses ?? 0,
-    totalPnl: row.totalPnl ?? 0,
-    totalPnlPercent: row.totalPnlPercent ?? 0,
-    maxDrawdown: row.maxDrawdown ?? 0,
-    sharpe: row.sharpe ?? 0,
-    startedAt: new Date(row.startedAt),
-    endedAt: row.endedAt ? new Date(row.endedAt) : undefined,
-    uptime: row.uptimeSeconds ?? 0,
-    isActive: row.isActive ?? false,
-  }));
+function toDate(val: Date | string | number | null | undefined): Date | undefined {
+  if (val == null) return undefined;
+  if (val instanceof Date) return val;
+  return new Date(val);
 }
 
-/**
- * Get active sessions
- */
-export async function getActiveSessions(): Promise<PaperSession[]> {
-  const sessions = await getAllSessions();
-  return sessions.filter((s) => s.isActive);
-}
-
-/**
- * Get session by ID
- */
-export async function getSessionById(id: string): Promise<PaperSession | null> {
-  const sessions = await db
-    .select()
-    .from(schema.paperSessions)
-    .where(eq(schema.paperSessions.id, id));
-
-  const row = sessions[0];
-  if (!row) return null;
-
+function sessionRowToModel(row: SessionRow): PaperSession {
   return {
     id: row.id,
     symbol: row.symbol,
@@ -419,17 +308,67 @@ export async function getSessionById(id: string): Promise<PaperSession | null> {
     totalPnlPercent: row.totalPnlPercent ?? 0,
     maxDrawdown: row.maxDrawdown ?? 0,
     sharpe: row.sharpe ?? 0,
-    startedAt: new Date(row.startedAt),
-    endedAt: row.endedAt ? new Date(row.endedAt) : undefined,
+    startedAt: toDate(row.startedAt) ?? new Date(),
+    endedAt: toDate(row.endedAt),
     uptime: row.uptimeSeconds ?? 0,
-    isActive: row.isActive ?? false,
+    isActive: row.isActive === true || row.isActive === 1,
   };
 }
 
+function tradeRowToModel(row: import('./repository').TradeRow, logger: TradeLogger): PaperTrade {
+  return {
+    id: row.tradeId,
+    sessionId: row.sessionId,
+    symbol: row.symbol,
+    timeframe: row.timeframe,
+    side: row.side as 'long' | 'short',
+    status: row.status as 'open' | 'closed',
+    entryPrice: row.entryPrice,
+    exitPrice: row.exitPrice ?? undefined,
+    stopLoss: row.stopLoss,
+    takeProfit: row.takeProfit,
+    entryTime: toDate(row.entryTime) ?? new Date(),
+    exitTime: toDate(row.exitTime),
+    entryIndex: row.entryIndex,
+    exitIndex: row.exitIndex ?? 0,
+    barsHeld: row.barsHeld ?? 0,
+    holdingPeriod: row.barsHeld ?? 0,
+    entryConfluence: row.entryConfluence ?? 0,
+    exitAction: row.exitAction ? logger.stringToAction(row.exitAction) : undefined,
+    exitReason: row.exitReason as PaperTrade['exitReason'],
+    pnl: row.pnl ?? 0,
+    pnlPercent: row.pnlPercent ?? 0,
+    kbPrimaryConcept: row.kbPrimaryConcept ?? undefined,
+    kbAlignmentScore: row.kbAlignmentScore ?? undefined,
+    createdAt: toDate(row.createdAt) ?? new Date(),
+  };
+}
+
+// ============================================
+// Free-standing Functions (accept repo param)
+// ============================================
+
 /**
- * Get trades for a session
+ * Get all paper trading sessions
  */
-export async function getTradesForSession(sessionId: string): Promise<PaperTrade[]> {
-  const logger = new TradeLogger(sessionId, '', '', '', {} as PaperTraderConfig);
-  return logger.getTrades();
+export async function getAllSessions(repo: PaperTradingRepository): Promise<PaperSession[]> {
+  const rows = await repo.getAllSessions();
+  return rows.map(sessionRowToModel);
+}
+
+/**
+ * Get active sessions
+ */
+export async function getActiveSessions(repo: PaperTradingRepository): Promise<PaperSession[]> {
+  const sessions = await getAllSessions(repo);
+  return sessions.filter((s) => s.isActive);
+}
+
+/**
+ * Get session by ID
+ */
+export async function getSessionById(id: string, repo: PaperTradingRepository): Promise<PaperSession | null> {
+  const row = await repo.getSessionById(id);
+  if (!row) return null;
+  return sessionRowToModel(row);
 }

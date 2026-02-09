@@ -13,11 +13,41 @@ import { DEFAULT_KB_CONFIG } from './types';
 import type { ExitAction } from '../types';
 import { ExitActions } from '../types';
 
+/**
+ * Asymmetric loss configuration for reward shaping
+ * Research suggests penalizing losses 1.5-2x more than rewarding wins
+ */
+export interface AsymmetricLossConfig {
+  /** Enable asymmetric loss (default: true) */
+  enabled: boolean;
+  /** Multiplier for loss penalties (default: 2.0) */
+  lossMultiplier: number;
+  /** Multiplier for win bonuses (default: 1.0) */
+  winMultiplier: number;
+  /** Additional penalty for early exits on losing trades (default: 0.5) */
+  earlyLossExitPenalty: number;
+  /** Bonus for letting winners run (default: 0.3) */
+  winnerHoldBonus: number;
+}
+
+const DEFAULT_ASYMMETRIC_CONFIG: AsymmetricLossConfig = {
+  enabled: true,
+  lossMultiplier: 2.0,
+  winMultiplier: 1.0,
+  earlyLossExitPenalty: 0.5,
+  winnerHoldBonus: 0.3,
+};
+
 export class KBRewardShaper {
   private config: KBIntegrationConfig;
+  private asymmetricConfig: AsymmetricLossConfig;
 
-  constructor(config: Partial<KBIntegrationConfig> = {}) {
+  constructor(
+    config: Partial<KBIntegrationConfig> = {},
+    asymmetricConfig: Partial<AsymmetricLossConfig> = {}
+  ) {
     this.config = { ...DEFAULT_KB_CONFIG, ...config };
+    this.asymmetricConfig = { ...DEFAULT_ASYMMETRIC_CONFIG, ...asymmetricConfig };
   }
 
   /**
@@ -221,28 +251,100 @@ export class KBRewardShaper {
   }
 
   /**
-   * Apply KB bonus to base reward
+   * Apply KB bonus to base reward with asymmetric loss
+   * Losses are penalized 2x more than wins are rewarded (academic consensus 2025-2026)
+   *
+   * @param baseReward - The original reward from environment
+   * @param kbContext - KB context for current situation
+   * @param action - Action taken by agent
+   * @param positionSide - Current position direction
+   * @param isClosingTrade - Whether this action closes a position
+   * @param tradePnL - PnL of the trade if closing (optional)
    */
   shapeReward(
     baseReward: number,
     kbContext: KBContext | null,
     action: ExitAction,
-    positionSide: 'long' | 'short'
+    positionSide: 'long' | 'short',
+    isClosingTrade: boolean = false,
+    tradePnL?: number
   ): { reward: number; result: KBRewardResult } {
     const result = this.calculateKBBonus(baseReward, kbContext, action, positionSide);
 
-    // Apply bonus as percentage of |baseReward| or absolute if base is zero
+    // Apply KB bonus as percentage of |baseReward| or absolute if base is zero
     let shapedReward = baseReward;
     if (Math.abs(baseReward) > 0.01) {
       shapedReward = baseReward * (1 + result.bonus);
     } else {
-      shapedReward = baseReward + result.bonus * 0.1; // Small absolute bonus
+      shapedReward = baseReward + result.bonus * 0.1;
+    }
+
+    // Apply asymmetric loss if enabled
+    if (this.asymmetricConfig.enabled) {
+      shapedReward = this.applyAsymmetricLoss(
+        shapedReward,
+        action,
+        isClosingTrade,
+        tradePnL,
+        kbContext
+      );
     }
 
     return {
       reward: shapedReward,
       result,
     };
+  }
+
+  /**
+   * Apply asymmetric loss function
+   * Penalizes losses more heavily than rewarding wins to improve risk:reward ratio
+   */
+  private applyAsymmetricLoss(
+    reward: number,
+    action: ExitAction,
+    isClosingTrade: boolean,
+    tradePnL?: number,
+    kbContext?: KBContext | null
+  ): number {
+    let adjustedReward = reward;
+
+    // If closing a trade, apply asymmetric multipliers based on PnL
+    if (isClosingTrade && tradePnL !== undefined) {
+      if (tradePnL < 0) {
+        // Loss: Apply heavier penalty (2x default)
+        adjustedReward = reward * this.asymmetricConfig.lossMultiplier;
+
+        // Additional penalty for exiting early on losers (cutting losses too late)
+        // Only if KB suggests we should have held or had conflicting signals
+        if (kbContext && kbContext.alignmentScore < -0.2) {
+          adjustedReward -= this.asymmetricConfig.earlyLossExitPenalty * Math.abs(tradePnL);
+        }
+      } else if (tradePnL > 0) {
+        // Win: Standard multiplier
+        adjustedReward = reward * this.asymmetricConfig.winMultiplier;
+
+        // Bonus for KB-aligned winning exits
+        if (kbContext && kbContext.alignmentScore > 0.3) {
+          adjustedReward += this.asymmetricConfig.winnerHoldBonus * tradePnL;
+        }
+      }
+    }
+
+    // Encourage holding winners, discourage holding losers
+    if (action === ExitActions.HOLD && !isClosingTrade) {
+      // If KB strongly suggests exit but agent holds, slight penalty
+      if (kbContext) {
+        const exitSuggestions = kbContext.alignedRules.filter(
+          (r) => r.suggestedAction === 'exit'
+        );
+        if (exitSuggestions.length >= 2) {
+          adjustedReward -= 0.02; // Small penalty for ignoring exit signals
+        }
+      }
+    }
+
+    return adjustedReward;
   }
 
   /**
@@ -299,5 +401,26 @@ export class KBRewardShaper {
    */
   isEnabled(): boolean {
     return this.config.enabled && this.config.useKBRewardShaping;
+  }
+
+  /**
+   * Update asymmetric loss configuration
+   */
+  updateAsymmetricConfig(config: Partial<AsymmetricLossConfig>): void {
+    this.asymmetricConfig = { ...this.asymmetricConfig, ...config };
+  }
+
+  /**
+   * Get asymmetric loss configuration
+   */
+  getAsymmetricConfig(): AsymmetricLossConfig {
+    return { ...this.asymmetricConfig };
+  }
+
+  /**
+   * Check if asymmetric loss is enabled
+   */
+  isAsymmetricEnabled(): boolean {
+    return this.asymmetricConfig.enabled;
   }
 }

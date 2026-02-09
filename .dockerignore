@@ -1,0 +1,13 @@
+node_modules
+.next
+.git
+*.db
+*.db-wal
+*.db-shm
+drizzle/
+knowledge-base/
+experiments/
+docs/
+models/
+.env
+.env.local

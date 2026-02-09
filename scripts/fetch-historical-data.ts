@@ -80,6 +80,7 @@ async function fetchBinanceKlines(
     low: parseFloat(k[3] as string),
     close: parseFloat(k[4] as string),
     volume: parseFloat(k[5] as string),
+    takerBuyVolume: parseFloat(k[9] as string) || 0,
   }));
 }
 
@@ -368,7 +369,7 @@ async function fetchAndSaveSymbol(
 // CLI
 // ============================================
 
-function parseArgs(): { symbol?: string; all: boolean; timeframe: string; days: number; output: string } {
+function parseArgs(): { symbol?: string; all: boolean; timeframe: string; days: number; output: string; includeMinute: boolean } {
   const args = process.argv.slice(2);
   const options: Record<string, string> = {};
 
@@ -376,6 +377,8 @@ function parseArgs(): { symbol?: string; all: boolean; timeframe: string; days: 
     const arg = args[i];
     if (arg === '--all') {
       options['all'] = 'true';
+    } else if (arg === '--include-minute') {
+      options['includeMinute'] = 'true';
     } else if (arg?.startsWith('--')) {
       const key = arg.replace(/^--/, '');
       const value = args[i + 1];
@@ -390,13 +393,14 @@ function parseArgs(): { symbol?: string; all: boolean; timeframe: string; days: 
     symbol: options['symbol'],
     all: options['all'] === 'true',
     timeframe: options['timeframe'] || '1h',
-    days: parseInt(options['days'] || '365', 10),
+    days: parseInt(options['days'] || '1095', 10), // Default to 3 years
     output: options['output'] || 'data',
+    includeMinute: options['includeMinute'] === 'true',
   };
 }
 
 async function main() {
-  const { symbol, all, timeframe, days, output } = parseArgs();
+  const { symbol, all, timeframe, days, output, includeMinute } = parseArgs();
 
   console.log('='.repeat(60));
   console.log('ICT Trading - Historical Data Fetcher');
@@ -404,8 +408,12 @@ async function main() {
 
   if (!symbol && !all) {
     console.log('\nUsage:');
-    console.log('  npx tsx scripts/fetch-historical-data.ts --symbol BTCUSDT --timeframe 1h --days 365');
-    console.log('  npx tsx scripts/fetch-historical-data.ts --all --timeframe 1h --days 365');
+    console.log('  npx tsx scripts/fetch-historical-data.ts --symbol BTCUSDT --timeframe 1h --days 1095');
+    console.log('  npx tsx scripts/fetch-historical-data.ts --all --timeframe 1h --days 1095');
+    console.log('  npx tsx scripts/fetch-historical-data.ts --symbol BTCUSDT --include-minute --days 30');
+    console.log('\nOptions:');
+    console.log('  --days N          Number of days to fetch (default: 1095 = 3 years)');
+    console.log('  --include-minute  Also fetch 1m data for DARL augmentation (Binance only, max 30 days)');
     console.log('\nSupported symbols:');
     for (const [sym, cfg] of Object.entries(SYMBOLS)) {
       console.log(`  ${sym.padEnd(12)} (${cfg.provider}) - ${cfg.name ?? sym}`);
@@ -416,16 +424,39 @@ async function main() {
   console.log(`\nTimeframe: ${timeframe}`);
   console.log(`Days: ${days}`);
   console.log(`Output: ${output}/`);
+  if (includeMinute) {
+    console.log('Include minute data: Yes (for DARL augmentation)');
+  }
 
   if (all) {
     // Fetch all supported symbols
     console.log(`\nFetching all ${Object.keys(SYMBOLS).length} supported symbols...`);
     for (const sym of Object.keys(SYMBOLS)) {
       await fetchAndSaveSymbol(sym, timeframe, days, output);
+
+      // Fetch minute data for Binance symbols if requested
+      if (includeMinute && SYMBOLS[sym]?.provider === 'binance') {
+        const minuteDays = Math.min(30, days); // Binance limits minute data
+        console.log(`  Also fetching 1m data (${minuteDays} days) for DARL...`);
+        await fetchAndSaveSymbol(sym, '1m', minuteDays, output);
+      }
+
       await sleep(1000); // Pause between symbols
     }
   } else if (symbol) {
     await fetchAndSaveSymbol(symbol, timeframe, days, output);
+
+    // Fetch minute data if requested
+    if (includeMinute) {
+      const config = SYMBOLS[symbol];
+      if (config?.provider === 'binance') {
+        const minuteDays = Math.min(30, days);
+        console.log(`\nAlso fetching 1m data (${minuteDays} days) for DARL...`);
+        await fetchAndSaveSymbol(symbol, '1m', minuteDays, output);
+      } else {
+        console.log('\nNote: Minute data only available for Binance symbols');
+      }
+    }
   }
 
   console.log('\nDone!');

@@ -1,6 +1,11 @@
 /**
  * Fair Value Gap (FVG) Detection
  * Identifies price imbalances where price moved too fast
+ *
+ * ICT Methodology:
+ * - FVG must form from DISPLACEMENT (strong impulsive move after liquidity sweep)
+ * - Entry should be at Consequent Encroachment (CE) - the 50% midpoint of FVG
+ * - "CE is respected far more often than the entire FVG" - TheSimpleICT
  */
 
 import type { Candle, FairValueGap } from '@/types';
@@ -8,16 +13,57 @@ import type { Candle, FairValueGap } from '@/types';
 export interface FVGConfig {
   minSizePercent: number; // Minimum gap size as % of price
   maxAgeCandles: number; // Maximum age before FVG expires
+  displacementMultiple: number; // Candle 2 body must be > this * avg body size
+  avgBodyLookback: number; // Bars to calculate average body size
 }
 
 const DEFAULT_CONFIG: FVGConfig = {
-  minSizePercent: 0.1,
-  maxAgeCandles: 50,
+  minSizePercent: 0.4,       // Raised from 0.2% — filter micro-gaps from normal volatility
+  maxAgeCandles: 30,         // Reduced from 50 — FVGs older than 30 bars are stale
+  displacementMultiple: 1.5, // 1.5x average body = displacement
+  avgBodyLookback: 14,
 };
+
+/**
+ * Calculate average candle body size over a lookback period
+ */
+function calculateAvgBodySize(candles: Candle[], endIndex: number, lookback: number): number {
+  const startIdx = Math.max(0, endIndex - lookback);
+  const relevantCandles = candles.slice(startIdx, endIndex);
+
+  if (relevantCandles.length === 0) return 0;
+
+  const totalBodySize = relevantCandles.reduce((sum, c) => {
+    return sum + Math.abs(c.close - c.open);
+  }, 0);
+
+  return totalBodySize / relevantCandles.length;
+}
+
+/**
+ * Check if candle 2 (middle candle) represents displacement
+ * Displacement = strong impulsive move, indicated by body size > 1.5x average
+ */
+function isDisplacementCandle(
+  candle: Candle,
+  candles: Candle[],
+  index: number,
+  config: FVGConfig
+): boolean {
+  const avgBodySize = calculateAvgBodySize(candles, index, config.avgBodyLookback);
+  if (avgBodySize === 0) return true; // Default to true if can't calculate
+
+  const candleBodySize = Math.abs(candle.close - candle.open);
+  return candleBodySize > avgBodySize * config.displacementMultiple;
+}
 
 /**
  * Detect bullish FVGs
  * Bullish FVG = Gap between candle 1 high and candle 3 low (price moved up fast)
+ *
+ * ICT Methodology:
+ * - Must be from displacement (candle 2 body > 1.5x average body size)
+ * - CE (Consequent Encroachment) = 50% midpoint of gap
  */
 export function detectBullishFVGs(
   candles: Candle[],
@@ -38,16 +84,27 @@ export function detectBullishFVGs(
       const gapPercent = (gapSize / candle2.close) * 100;
 
       if (gapPercent >= config.minSizePercent) {
+        // Hard-require displacement — non-displacement FVGs are noise
+        const hasDisplacement = isDisplacementCandle(candle2, candles, i + 1, config);
+        if (!hasDisplacement) continue;
+
+        // Calculate Consequent Encroachment (CE) - 50% midpoint
+        const fvgHigh = candle3.low;
+        const fvgLow = candle1.high;
+        const ce = (fvgHigh + fvgLow) / 2;
+
         fvgs.push({
           type: 'bullish',
           status: 'unfilled',
-          high: candle3.low, // Top of gap
-          low: candle1.high, // Bottom of gap
+          high: fvgHigh, // Top of gap
+          low: fvgLow, // Bottom of gap
           size: gapSize,
           sizePercent: gapPercent,
           index: i + 1, // Index of middle candle
           timestamp: candle2.timestamp,
           fillPercent: 0,
+          consequentEncroachment: ce,
+          displacement: hasDisplacement,
         });
       }
     }
@@ -59,6 +116,10 @@ export function detectBullishFVGs(
 /**
  * Detect bearish FVGs
  * Bearish FVG = Gap between candle 1 low and candle 3 high (price moved down fast)
+ *
+ * ICT Methodology:
+ * - Must be from displacement (candle 2 body > 1.5x average body size)
+ * - CE (Consequent Encroachment) = 50% midpoint of gap
  */
 export function detectBearishFVGs(
   candles: Candle[],
@@ -79,16 +140,27 @@ export function detectBearishFVGs(
       const gapPercent = (gapSize / candle2.close) * 100;
 
       if (gapPercent >= config.minSizePercent) {
+        // Hard-require displacement — non-displacement FVGs are noise
+        const hasDisplacement = isDisplacementCandle(candle2, candles, i + 1, config);
+        if (!hasDisplacement) continue;
+
+        // Calculate Consequent Encroachment (CE) - 50% midpoint
+        const fvgHigh = candle1.low;
+        const fvgLow = candle3.high;
+        const ce = (fvgHigh + fvgLow) / 2;
+
         fvgs.push({
           type: 'bearish',
           status: 'unfilled',
-          high: candle1.low, // Top of gap
-          low: candle3.high, // Bottom of gap
+          high: fvgHigh, // Top of gap
+          low: fvgLow, // Bottom of gap
           size: gapSize,
           sizePercent: gapPercent,
           index: i + 1, // Index of middle candle
           timestamp: candle2.timestamp,
           fillPercent: 0,
+          consequentEncroachment: ce,
+          displacement: hasDisplacement,
         });
       }
     }
@@ -160,7 +232,7 @@ export function detectFairValueGaps(
 export function getActiveFVGs(
   fvgs: FairValueGap[],
   currentIndex: number,
-  maxAge: number = 50
+  maxAge: number = 30
 ): FairValueGap[] {
   return fvgs.filter(
     (fvg) =>

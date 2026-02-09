@@ -40,8 +40,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Large data files
+# Large data/model files
 data/ml_dataset.json
+models/report_dqn_*.json
 data/*.db
 data/*.db-shm
 data/*.db-wal

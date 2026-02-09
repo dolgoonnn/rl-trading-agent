@@ -1,0 +1,35 @@
+{
+  "model": {
+    "weights": [
+      -0.05976531678349962,
+      -0.05123761719920304,
+      -0.016485739513656693,
+      0,
+      -0.0640470214990038,
+      0,
+      0,
+      -0.0640470214990038,
+      -0.0774166619645782,
+      -0.004301747608950369,
+      -0.03994243374601595,
+      -0.13190609549056365
+    ],
+    "bias": -0.12871176327788142,
+    "threshold": 0.45
+  },
+  "featureNames": [
+    "confluenceScore",
+    "riskReward",
+    "direction",
+    "regimeTrend",
+    "regimeVol",
+    "trendStrength",
+    "efficiency",
+    "atrPercentile",
+    "structAlign",
+    "liqSweep",
+    "obFreshness",
+    "rrScore"
+  ],
+  "datasetSize": 584
+}

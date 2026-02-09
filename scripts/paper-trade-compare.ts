@@ -15,7 +15,7 @@ import '@tensorflow/tfjs-node';
 
 import {
   getSessionById,
-  getTradesForSession,
+  createRepository,
   type PaperSession,
   type PaperTrade,
   type PaperBacktestComparison,
@@ -335,9 +335,11 @@ async function main(): Promise<void> {
   console.log();
 
   // Load session
-  const session = await getSessionById(args.session);
+  const repo = await createRepository();
+  const session = await getSessionById(args.session, repo);
   if (!session) {
     console.error(`Session not found: ${args.session}`);
+    await repo.close();
     process.exit(1);
   }
 
@@ -352,7 +354,32 @@ async function main(): Promise<void> {
   console.log();
 
   // Load paper trades
-  const paperTrades = await getTradesForSession(args.session);
+  const tradeRows = await repo.getTradesBySessionId(args.session);
+  const paperTrades: PaperTrade[] = tradeRows.map((row) => ({
+    id: row.tradeId,
+    sessionId: row.sessionId,
+    symbol: row.symbol,
+    timeframe: row.timeframe,
+    side: row.side as 'long' | 'short',
+    status: row.status as 'open' | 'closed',
+    entryPrice: row.entryPrice,
+    exitPrice: row.exitPrice ?? undefined,
+    stopLoss: row.stopLoss,
+    takeProfit: row.takeProfit,
+    entryTime: new Date(row.entryTime),
+    exitTime: row.exitTime ? new Date(row.exitTime) : undefined,
+    entryIndex: row.entryIndex,
+    exitIndex: row.exitIndex ?? 0,
+    barsHeld: row.barsHeld ?? 0,
+    holdingPeriod: row.barsHeld ?? 0,
+    entryConfluence: row.entryConfluence ?? 0,
+    exitReason: row.exitReason as PaperTrade['exitReason'],
+    pnl: row.pnl ?? 0,
+    pnlPercent: row.pnlPercent ?? 0,
+    kbPrimaryConcept: row.kbPrimaryConcept ?? undefined,
+    kbAlignmentScore: row.kbAlignmentScore ?? undefined,
+    createdAt: new Date(row.createdAt),
+  }));
   console.log(`Loaded ${paperTrades.length} paper trades`);
 
   // Load backtest data
