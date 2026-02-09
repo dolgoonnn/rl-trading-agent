@@ -34,6 +34,11 @@ import { DQNAgent, type SerializedWeights } from '../src/lib/rl/agent/dqn-agent'
 import { ReplayBuffer } from '../src/lib/rl/agent/replay-buffer';
 import { ICTMetaStrategyEnvironment } from '../src/lib/rl/environment/ict-meta-env';
 import { type StrategyAction, STRATEGY_COUNT } from '../src/lib/rl/strategies';
+import {
+  estimatePBO,
+  type WindowResult as PBOWindowResult,
+  type PBOResult,
+} from '../src/lib/rl/utils/pbo';
 
 // ============================================
 // Public Types
@@ -51,7 +56,7 @@ export interface WalkForwardStrategyRunner {
    * Training candles are provided for calibration, warm-up, or context.
    * Must return all trades executed during the validation window only.
    */
-  run(trainCandles: Candle[], valCandles: Candle[]): Promise<TradeResult[]>;
+  run(trainCandles: Candle[], valCandles: Candle[], meta?: { symbol?: string }): Promise<TradeResult[]>;
 }
 
 /** A single trade result from a strategy runner */
@@ -103,6 +108,8 @@ export interface WalkForwardResult {
   overallPassed: boolean;
   /** Fraction of windows that passed across all symbols (0..1) */
   passRate: number;
+  /** Probability of Backtest Overfitting (CSCV method). Only populated if --pbo flag is used. */
+  pbo?: PBOResult;
 }
 
 /** Configuration for the walk-forward validation */
@@ -159,7 +166,11 @@ export const DEFAULT_WF_CONFIG: WalkForwardConfig = {
  * Returns 0 if fewer than 2 trades.
  */
 export function calculateSharpe(returns: number[]): number {
-  if (returns.length < 2) return 0;
+  if (returns.length < 2) {
+    // 1 trade: can't compute std, but if the return is positive, treat as marginally positive Sharpe
+    if (returns.length === 1 && returns[0]! > 0) return 0.01;
+    return 0;
+  }
 
   const mean = returns.reduce((sum, r) => sum + r, 0) / returns.length;
   const variance =
@@ -219,6 +230,8 @@ interface DataWindow {
   trainCandles: Candle[];
   /** Validation candles (pure validation period, no overlap) */
   valCandles: Candle[];
+  /** Symbol name for metadata */
+  symbol: string;
   /** Metadata for reporting */
   trainStartTs: number;
   trainEndTs: number;
@@ -228,7 +241,8 @@ interface DataWindow {
 
 function generateWindows(
   allCandles: Candle[],
-  config: WalkForwardConfig
+  config: WalkForwardConfig,
+  symbol = '',
 ): DataWindow[] {
   const windows: DataWindow[] = [];
   const totalRequired = config.trainWindowBars + config.valWindowBars;
@@ -262,6 +276,7 @@ function generateWindows(
       windowIndex,
       trainCandles: trainSlice,
       valCandles: valSlice,
+      symbol,
       trainStartTs: trainStartCandle.timestamp,
       trainEndTs: trainEndCandle.timestamp,
       valStartTs: valStartCandle.timestamp,
@@ -283,7 +298,7 @@ async function evaluateWindow(
   runner: WalkForwardStrategyRunner,
   window: DataWindow
 ): Promise<WindowResult> {
-  const trades = await runner.run(window.trainCandles, window.valCandles);
+  const trades = await runner.run(window.trainCandles, window.valCandles, { symbol: window.symbol });
   const returns = trades.map((t) => t.pnlPercent);
 
   const winningTrades = trades.filter((t) => t.pnlPercent > 0);
@@ -323,7 +338,7 @@ async function evaluateSymbol(
   config: WalkForwardConfig,
   quiet: boolean
 ): Promise<SymbolWFResult> {
-  const dataPath = path.join(config.dataDir, `${symbol}_1h.json`);
+  const dataPath = path.join(config.dataDir, `${symbol}_${config.timeframe}.json`);
 
   if (!fs.existsSync(dataPath)) {
     return {
@@ -339,7 +354,7 @@ async function evaluateSymbol(
   }
 
   const allCandles = JSON.parse(fs.readFileSync(dataPath, 'utf-8')) as Candle[];
-  const windows = generateWindows(allCandles, config);
+  const windows = generateWindows(allCandles, config, symbol);
 
   if (windows.length === 0) {
     return {
@@ -606,6 +621,28 @@ function printSummary(result: WalkForwardResult): void {
   const totalEligible = result.symbols.reduce((sum, s) => sum + s.totalWindows, 0);
   const totalSkipped = totalAllWindows - totalEligible;
   log(`Overall pass rate: ${(result.passRate * 100).toFixed(1)}% of eligible windows passed (${totalSkipped} zero-trade windows skipped)`);
+
+  // PBO report (if calculated)
+  if (result.pbo) {
+    const p = result.pbo;
+    log('');
+    log('─'.repeat(60));
+    log('Probability of Backtest Overfitting (PBO)');
+    log('─'.repeat(60));
+    log(`  PBO:           ${(p.pbo * 100).toFixed(1)}% (${p.numOverfit}/${p.numCombinations} splits)`);
+    log(`  Avg Logit OOS: ${p.avgLogitOOS.toFixed(3)}`);
+    log(`  Threshold:     < ${(p.threshold * 100).toFixed(0)}%`);
+    log(`  Status:        ${p.passes ? '\x1b[32mPASS\x1b[0m' : '\x1b[31mFAIL (likely overfitted)\x1b[0m'}`);
+    log('');
+    if (p.pbo > 0.50) {
+      log('  ⚠ PBO > 50%: IS winner is worse than random OOS.');
+      log('    The selected model/config is likely overfitted.');
+    } else if (p.pbo > 0.25) {
+      log('  ⚠ PBO 25-50%: moderate overfitting risk. Use with caution.');
+    } else {
+      log('  ✓ PBO < 25%: strong evidence of genuine edge.');
+    }
+  }
 }
 
 // ============================================
@@ -825,6 +862,30 @@ async function main(): Promise<void> {
 
   const runner = createRLModelRunner(modelPath);
   const result = await runWalkForward(runner, configOverrides);
+
+  // Calculate PBO if --pbo flag is present
+  if (hasFlag('pbo') && result.symbols.length > 0) {
+    log('\n[PBO] Calculating Probability of Backtest Overfitting...');
+
+    // Build window metrics from walk-forward results
+    // Use per-symbol Sharpe arrays as different "configs" for CSCV
+    const pboInputs: PBOWindowResult[] = result.symbols.map((s) => ({
+      configId: s.symbol,
+      windowMetrics: s.windows.map((w) => w.sharpe),
+    }));
+
+    // Need at least 2 configs and 6 windows
+    if (pboInputs.length >= 2 && (pboInputs[0]?.windowMetrics.length ?? 0) >= 6) {
+      try {
+        result.pbo = estimatePBO(pboInputs, 1000, { threshold: 0.50 });
+        log(`[PBO] Done: ${(result.pbo.pbo * 100).toFixed(1)}% overfitting probability`);
+      } catch (err) {
+        log(`[PBO] Skipped: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    } else {
+      log('[PBO] Skipped: insufficient data (need >= 2 symbols, >= 6 windows each)');
+    }
+  }
 
   printSummary(result);
 

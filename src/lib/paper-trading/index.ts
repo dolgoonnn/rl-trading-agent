@@ -10,7 +10,11 @@ export * from './types';
 export { BinanceWebSocket } from './binance-ws';
 export { CandleManager } from './candle-manager';
 export { PaperTrader } from './paper-trader';
-export { TradeLogger, getAllSessions, getActiveSessions, getSessionById, getTradesForSession } from './trade-logger';
+export { TradeLogger, getAllSessions, getActiveSessions, getSessionById } from './trade-logger';
+
+// Repository
+export { type PaperTradingRepository } from './repository';
+export { createRepository } from './create-repository';
 export { PerformanceMonitor } from './performance-monitor';
 export {
   PositionManager,

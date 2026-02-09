@@ -250,6 +250,68 @@ function checkKillZoneFilter(
 }
 
 // ============================================
+// SL/TP Placement Helpers
+// ============================================
+
+function calculateLongSLTP(
+  entryPrice: number,
+  obBoundary: number,
+  atr: number,
+  slMultiple: number,
+  tpMultiple: number,
+  mode: SLPlacementMode,
+): { stopLoss: number; takeProfit: number } {
+  switch (mode) {
+    case 'entry_based':
+      return {
+        stopLoss: entryPrice - atr * slMultiple,
+        takeProfit: entryPrice + atr * tpMultiple,
+      };
+    case 'dynamic_rr': {
+      const stopLoss = obBoundary - atr * slMultiple;
+      const risk = entryPrice - stopLoss;
+      const targetRR = tpMultiple / slMultiple;
+      return { stopLoss, takeProfit: entryPrice + risk * targetRR };
+    }
+    case 'ob_based':
+    default:
+      return {
+        stopLoss: obBoundary - atr * slMultiple,
+        takeProfit: entryPrice + atr * tpMultiple,
+      };
+  }
+}
+
+function calculateShortSLTP(
+  entryPrice: number,
+  obBoundary: number,
+  atr: number,
+  slMultiple: number,
+  tpMultiple: number,
+  mode: SLPlacementMode,
+): { stopLoss: number; takeProfit: number } {
+  switch (mode) {
+    case 'entry_based':
+      return {
+        stopLoss: entryPrice + atr * slMultiple,
+        takeProfit: entryPrice - atr * tpMultiple,
+      };
+    case 'dynamic_rr': {
+      const stopLoss = obBoundary + atr * slMultiple;
+      const risk = stopLoss - entryPrice;
+      const targetRR = tpMultiple / slMultiple;
+      return { stopLoss, takeProfit: entryPrice - risk * targetRR };
+    }
+    case 'ob_based':
+    default:
+      return {
+        stopLoss: obBoundary + atr * slMultiple,
+        takeProfit: entryPrice - atr * tpMultiple,
+      };
+  }
+}
+
+// ============================================
 // Order Block Strategy
 // ============================================
 

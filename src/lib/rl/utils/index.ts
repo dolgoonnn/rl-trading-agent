@@ -31,3 +31,12 @@ export {
   type GTScoreConfig,
   type GTScoreResult,
 } from './gt-score';
+
+// Probability of Backtest Overfitting - CSCV method for detecting overfitted models
+export {
+  calculatePBO,
+  estimatePBO,
+  type WindowResult,
+  type PBOResult,
+  type PBOConfig,
+} from './pbo';

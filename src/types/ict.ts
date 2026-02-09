@@ -51,6 +51,7 @@ export interface OrderBlock {
   index: number;
   timestamp: number;
   strength: number; // Based on move after OB
+  volume?: number;  // Volume of the OB formation candle (for volume-quality scoring)
   mitigationIndex?: number;
 }
 

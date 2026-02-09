@@ -36,6 +36,7 @@ import { BinanceWebSocket } from './binance-ws';
 import { CandleManager } from './candle-manager';
 import { TradeLogger } from './trade-logger';
 import { PerformanceMonitor } from './performance-monitor';
+import { SqliteRepository } from './repository-sqlite';
 
 export class PaperTrader extends EventEmitter {
   private config: PaperTraderConfig;
@@ -100,7 +101,8 @@ export class PaperTrader extends EventEmitter {
         this.config.symbol,
         this.config.timeframe,
         this.config.modelPath,
-        this.config
+        this.config,
+        new SqliteRepository(),
       );
       this.session = await this.logger.initSession();
 

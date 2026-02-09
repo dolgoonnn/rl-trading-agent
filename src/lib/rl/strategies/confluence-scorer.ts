@@ -69,6 +69,12 @@ export interface ConfluenceWeights {
   breakerConfluence: number;
   /** Both OB and FVG present near price */
   obFvgConfluence: number;
+  /** OB formed with above-average volume (institutional quality) */
+  obVolumeQuality: number;
+  /** Recent candle close momentum confirms trade direction */
+  momentumConfirmation: number;
+  /** Funding rate alignment with signal direction (requires futures data) */
+  fundingAlignment: number;
 }
 
 /**
@@ -97,6 +103,9 @@ export const DEFAULT_WEIGHTS: ConfluenceWeights = {
   oteZone: 0.5,
   breakerConfluence: 0,      // Disabled: negatively correlated with wins
   obFvgConfluence: 1.0,
+  obVolumeQuality: 0,       // Disabled by default; enable with --ob-volume-weight
+  momentumConfirmation: 0,  // Disabled by default; enable with --weights "momentumConfirmation:0.5"
+  fundingAlignment: 0,     // Disabled by default; enable with --weights "fundingAlignment:0.5" + --with-orderflow
 };
 
 /** Regime filter configuration for suppressing trades in unfavorable market conditions */
@@ -149,6 +158,8 @@ export interface ConfluenceConfig {
   maxStructureAge: number;
   /** Bars to look back for recent BOS (default: 30) */
   bosLookback: number;
+  /** Half-life for OB freshness exponential decay in bars (0 = use 3-tier legacy, default: 0) */
+  obFreshnessHalfLife: number;
   /** R:R threshold for the rrRatio bonus (default: 2.0) */
   minRR: number;
   /** Proximity (as fraction of price) for OB+FVG confluence check (default: 0.02) */
@@ -175,6 +186,18 @@ export interface ConfluenceConfig {
   suppressedRegimes: string[];
   /** Multi-timeframe bias filter configuration */
   mtfBias: MTFBiasConfig;
+  /** ATR extension filter: skip signals where price is > N ATR bands from SMA(20). 0 = disabled. */
+  atrExtensionBands: number;
+  /** Per-regime threshold overrides: e.g., { 'uptrend+high': 3.5, 'uptrend+normal': 5.0 } */
+  regimeThresholdOverrides: Record<string, number>;
+  /** Minimum regime classification confidence to allow trades (0-1, 0 = disabled, default: 0) */
+  regimeConfidenceGate: number;
+  /** Maximum funding rate to allow LONG signals. Contrarian: reject when crowd is long. Set to Infinity to disable. Default: Infinity (disabled) */
+  fundingMaxForLong: number;
+  /** Minimum funding rate to allow SHORT signals. Contrarian: reject when funding is too low. Set to -Infinity to disable. Default: -Infinity (disabled) */
+  fundingMinForShort: number;
+  /** Funding rate alignment scoring mode: 'off', 'contrarian' (low funding = good for longs), 'aligned' (high funding = good for longs). Default: 'off' */
+  fundingScoringMode: 'off' | 'contrarian' | 'aligned';
 }
 
 export const DEFAULT_CONFLUENCE_CONFIG: ConfluenceConfig = {
@@ -182,6 +205,7 @@ export const DEFAULT_CONFLUENCE_CONFIG: ConfluenceConfig = {
   minThreshold: 4.0,
   maxStructureAge: 100,
   bosLookback: 30,
+  obFreshnessHalfLife: 0,  // 0 = 3-tier legacy; >0 = exponential decay
   minRR: 2.0,
   obFvgProximity: 0.02,
   minSignalRR: 1.5,
@@ -195,6 +219,12 @@ export const DEFAULT_CONFLUENCE_CONFIG: ConfluenceConfig = {
   activeStrategies: ['order_block', 'fvg'],
   suppressedRegimes: [],
   mtfBias: { ...DEFAULT_MTF_BIAS },
+  atrExtensionBands: 0,  // 0 = disabled
+  regimeThresholdOverrides: {},  // empty = use minThreshold for all regimes
+  regimeConfidenceGate: 0,  // 0 = disabled
+  fundingMaxForLong: Infinity,     // Disabled by default
+  fundingMinForShort: -Infinity,   // Disabled by default
+  fundingScoringMode: 'off' as const,       // Disabled by default
 };
 
 /**
@@ -225,6 +255,25 @@ export const PRODUCTION_STRATEGY_CONFIG: Partial<StrategyConfig> = {
   },
   requireLiquiditySweep: false,
   liquiditySweepBonus: 0.15,
+};
+
+/**
+ * 15-minute timeframe production config.
+ * Bar-based params scaled 4× from 1H values to maintain equivalent time windows.
+ */
+export const FIFTEEN_MIN_STRATEGY_CONFIG: Partial<StrategyConfig> = {
+  ...PRODUCTION_STRATEGY_CONFIG,
+  maxStructureAge: 200,        // 50 bars × 4 = 200 bars (still ~50 hours)
+};
+
+/**
+ * 15-minute confluence config overrides.
+ * Bar-based params in ConfluenceConfig scaled 4× from 1H.
+ */
+export const FIFTEEN_MIN_CONFLUENCE_OVERRIDES: Partial<ConfluenceConfig> = {
+  maxStructureAge: 400,        // 100 × 4
+  bosLookback: 120,            // 30 × 4
+  cooldownBars: 24,            // 6 × 4
 };
 
 /** A signal with its computed score and factor breakdown */
@@ -262,6 +311,8 @@ export class ConfluenceScorer {
   private lastTradeBar: Map<string, number> = new Map();
   /** Last detected regime (available after evaluate() when regime filter is enabled) */
   private lastRegime: MarketRegime | null = null;
+  /** Funding rate data indexed by candle timestamp for O(1) lookup */
+  private fundingRateMap: Map<number, number> = new Map();
 
   constructor(config?: Partial<ConfluenceConfig>) {
     this.config = {
@@ -292,6 +343,14 @@ export class ConfluenceScorer {
   /** Reset cooldown tracking (e.g., between walk-forward windows) */
   resetCooldowns(): void {
     this.lastTradeBar.clear();
+  }
+
+  /** Load futures data for funding rate filtering. Snapshots must be aligned to candle timestamps. */
+  setFuturesData(snapshots: { timestamp: number; fundingRate: number }[]): void {
+    this.fundingRateMap.clear();
+    for (const snap of snapshots) {
+      this.fundingRateMap.set(snap.timestamp, snap.fundingRate);
+    }
   }
 
   // ------------------------------------------
@@ -389,19 +448,38 @@ export class ConfluenceScorer {
       }
     }
 
+    // Detect regime for label-based suppression or per-regime threshold overrides
+    const needsRegime = this.config.suppressedRegimes.length > 0
+      || Object.keys(this.config.regimeThresholdOverrides).length > 0;
+    if (needsRegime && !this.lastRegime) {
+      const regimeConfig = this.config.regimeFilter.regimeConfig
+        ? { ...DEFAULT_REGIME_CONFIG, ...this.config.regimeFilter.regimeConfig }
+        : undefined;
+      this.lastRegime = detectRegime(candles, currentIndex, regimeConfig);
+    }
+
     // Regime label suppression (simple label-based, independent of parametric regime filter)
     if (this.config.suppressedRegimes.length > 0) {
-      // Detect regime if not already detected above
-      if (!this.lastRegime) {
-        const regimeConfig = this.config.regimeFilter.regimeConfig
-          ? { ...DEFAULT_REGIME_CONFIG, ...this.config.regimeFilter.regimeConfig }
-          : undefined;
-        this.lastRegime = detectRegime(candles, currentIndex, regimeConfig);
-      }
-      const label = regimeLabel(this.lastRegime);
+      const label = regimeLabel(this.lastRegime!);
       if (this.config.suppressedRegimes.includes(label)) {
         reasoning.push(
           `Regime suppressed by label: ${label} is in suppressedRegimes list`,
+        );
+        return {
+          selectedSignal: null,
+          allScored: [],
+          action: 'wait',
+          reasoning,
+          regime: this.lastRegime ?? undefined,
+        };
+      }
+    }
+
+    // Regime confidence gate: suppress signals when regime classification is uncertain
+    if (this.config.regimeConfidenceGate > 0 && this.lastRegime) {
+      if (this.lastRegime.confidence < this.config.regimeConfidenceGate) {
+        reasoning.push(
+          `Regime confidence gate: ${this.lastRegime.confidence.toFixed(3)} < ${this.config.regimeConfidenceGate} (${regimeLabel(this.lastRegime)})`,
         );
         return {
           selectedSignal: null,
@@ -429,6 +507,32 @@ export class ConfluenceScorer {
         reasoning.push(
           `MTF bias: insufficient HTF candles (${htfCandles.length} < ${this.config.mtfBias.minHigherTFCandles})`,
         );
+      }
+    }
+
+    // ATR extension filter: skip if price is extended too far from SMA(20)
+    if (this.config.atrExtensionBands > 0) {
+      const smaLen = 20;
+      if (localIndex >= smaLen) {
+        let smaSum = 0;
+        for (let i = localIndex - smaLen + 1; i <= localIndex; i++) {
+          smaSum += lookbackCandles[i]!.close;
+        }
+        const sma = smaSum / smaLen;
+        const deviation = Math.abs(ctx.currentPrice - sma);
+        if (deviation > ctx.atr * this.config.atrExtensionBands) {
+          reasoning.push(
+            `ATR extension filter: price ${ctx.currentPrice.toFixed(2)} is ` +
+            `${(deviation / ctx.atr).toFixed(1)} ATR from SMA(20) ${sma.toFixed(2)} ` +
+            `(limit: ${this.config.atrExtensionBands})`,
+          );
+          return {
+            selectedSignal: null,
+            allScored: [],
+            action: 'wait',
+            reasoning,
+          };
+        }
       }
     }
 
@@ -499,6 +603,33 @@ export class ConfluenceScorer {
       }
     }
 
+    // Funding rate hard filter: reject signals where funding contradicts trade direction
+    if (this.fundingRateMap.size > 0 && signals.length > 0) {
+      const fundingRate = this.fundingRateMap.get(candles[currentIndex]?.timestamp ?? 0);
+      if (fundingRate !== undefined && fundingRate !== 0) {
+        const maxLong = this.config.fundingMaxForLong;
+        const minShort = this.config.fundingMinForShort;
+        const filtered: StrategySignal[] = [];
+        for (const signal of signals) {
+          if (signal.direction === 'long' && isFinite(maxLong) && fundingRate > maxLong) {
+            reasoning.push(
+              `${signal.strategy} rejected by funding filter: rate=${(fundingRate * 10000).toFixed(2)}bp > maxLong=${(maxLong * 10000).toFixed(2)}bp`,
+            );
+            continue;
+          }
+          if (signal.direction === 'short' && isFinite(minShort) && fundingRate < minShort) {
+            reasoning.push(
+              `${signal.strategy} rejected by funding filter: rate=${(fundingRate * 10000).toFixed(2)}bp < minShort=${(minShort * 10000).toFixed(2)}bp`,
+            );
+            continue;
+          }
+          filtered.push(signal);
+        }
+        signals.length = 0;
+        signals.push(...filtered);
+      }
+    }
+
     if (signals.length === 0) {
       reasoning.push('No strategy produced a qualifying signal at this bar');
       return {
@@ -524,14 +655,25 @@ export class ConfluenceScorer {
       );
     }
 
-    // 7. Select the best signal if it exceeds threshold
+    // 7. Determine effective threshold (regime-specific override or global)
+    let effectiveThreshold = this.config.minThreshold;
+    if (this.lastRegime && Object.keys(this.config.regimeThresholdOverrides).length > 0) {
+      const label = regimeLabel(this.lastRegime);
+      const override = this.config.regimeThresholdOverrides[label];
+      if (override !== undefined) {
+        effectiveThreshold = override;
+        reasoning.push(`Regime threshold override: ${label} → ${override}`);
+      }
+    }
+
+    // 8. Select the best signal if it exceeds threshold
     const best = allScored[0];
-    if (best && best.totalScore >= this.config.minThreshold) {
+    if (best && best.totalScore >= effectiveThreshold) {
       // Record cooldown for this strategy
       this.lastTradeBar.set(best.signal.strategy, currentIndex);
 
       reasoning.push(
-        `Selected ${best.signal.strategy} with score ${best.totalScore.toFixed(2)} >= threshold ${this.config.minThreshold}`,
+        `Selected ${best.signal.strategy} with score ${best.totalScore.toFixed(2)} >= threshold ${effectiveThreshold}`,
       );
       return {
         selectedSignal: best,
@@ -541,10 +683,10 @@ export class ConfluenceScorer {
       };
     }
 
-    // 8. Nothing passed threshold
+    // 9. Nothing passed threshold
     const topScore = best ? best.totalScore.toFixed(2) : '0';
     reasoning.push(
-      `Best score ${topScore} < threshold ${this.config.minThreshold} -- waiting`,
+      `Best score ${topScore} < threshold ${effectiveThreshold} -- waiting`,
     );
     return {
       selectedSignal: null,
@@ -610,6 +752,18 @@ export class ConfluenceScorer {
     const obFvgRaw = this.scoreOBFVGConfluence(signal, ctx);
     breakdown['obFvgConfluence'] = obFvgRaw * w.obFvgConfluence;
 
+    // Factor 11: OB volume quality (institutional OB = higher volume)
+    const obVolRaw = this.scoreOBVolumeQuality(signal, candles, currentIndex);
+    breakdown['obVolumeQuality'] = obVolRaw * w.obVolumeQuality;
+
+    // Factor 12: Momentum confirmation (recent candle closes in trade direction)
+    const momRaw = this.scoreMomentumConfirmation(signal, candles, currentIndex);
+    breakdown['momentumConfirmation'] = momRaw * w.momentumConfirmation;
+
+    // Factor 13: Funding rate alignment (requires futures data via setFuturesData)
+    const fundingRaw = this.scoreFundingAlignment(signal, candles, currentIndex);
+    breakdown['fundingAlignment'] = fundingRaw * w.fundingAlignment;
+
     const totalScore = Object.values(breakdown).reduce(
       (sum, val) => sum + val,
       0,
@@ -651,6 +805,37 @@ export class ConfluenceScorer {
   /** Update threshold at runtime (for calibration scripts) */
   setThreshold(threshold: number): void {
     this.config.minThreshold = threshold;
+  }
+
+  /**
+   * Evaluate with temporary weight multipliers.
+   * Used by PPO weight optimizer — multipliers adjust base weights per regime.
+   * Multipliers map each weight name to a factor in [0.5, 2.0].
+   * Does NOT mutate the scorer's internal weights.
+   */
+  evaluateWithWeightMultipliers(
+    candles: Candle[],
+    currentIndex: number,
+    weightMultipliers: Partial<Record<keyof ConfluenceWeights, number>>,
+  ): ConfluenceScorerResult {
+    // Save original weights
+    const originalWeights = { ...this.config.weights };
+
+    // Apply multipliers temporarily
+    for (const [key, multiplier] of Object.entries(weightMultipliers)) {
+      const weightKey = key as keyof ConfluenceWeights;
+      if (weightKey in this.config.weights) {
+        this.config.weights[weightKey] = originalWeights[weightKey] * multiplier;
+      }
+    }
+
+    // Run evaluation with adjusted weights
+    const result = this.evaluate(candles, currentIndex);
+
+    // Restore original weights
+    this.config.weights = originalWeights;
+
+    return result;
   }
 
   /** Get last detected regime (null if regime filter disabled or not yet evaluated) */
@@ -797,7 +982,9 @@ export class ConfluenceScorer {
    * Factor 4: OB Proximity + Freshness (0 to 1, continuous)
    *
    * Only applies if the signal references an order block.
-   * Freshness scoring:
+   *
+   * When obFreshnessHalfLife > 0: exponential decay score = exp(-age / halfLife)
+   * When obFreshnessHalfLife = 0 (default): 3-tier legacy scoring:
    * - Age < 20 bars: 1.0
    * - Age < 50 bars: 0.7
    * - Age < maxStructureAge: 0.3
@@ -813,12 +1000,17 @@ export class ConfluenceScorer {
 
     const age = currentIndex - ob.index;
     if (age < 0) return 0;
+    if (age >= this.config.maxStructureAge) return 0;
 
+    // Exponential decay mode
+    if (this.config.obFreshnessHalfLife > 0) {
+      return Math.exp(-age / this.config.obFreshnessHalfLife);
+    }
+
+    // 3-tier legacy mode
     if (age < 20) return 1.0;
     if (age < 50) return 0.7;
-    if (age < this.config.maxStructureAge) return 0.3;
-
-    return 0;
+    return 0.3;
   }
 
   /**
@@ -1005,6 +1197,138 @@ export class ConfluenceScorer {
       );
 
       return hasBearishOB && hasBearishFVG ? 1 : 0;
+    }
+  }
+  /**
+   * Factor 11: OB Volume Quality (0 to 1, continuous)
+   *
+   * Scores OBs formed with above-average volume as more institutional.
+   * score = min(1.0, obVolume / avgVolume(20))
+   * Returns 0 if signal has no OB or OB has no volume data.
+   */
+  private scoreOBVolumeQuality(
+    signal: StrategySignal,
+    candles: Candle[],
+    currentIndex: number,
+  ): number {
+    const ob = signal.orderBlock;
+    if (!ob || ob.volume === undefined || ob.volume <= 0) return 0;
+
+    // Calculate average volume over last 20 candles
+    const lookback = 20;
+    const start = Math.max(0, currentIndex - lookback);
+    let volSum = 0;
+    let count = 0;
+    for (let i = start; i <= currentIndex; i++) {
+      const c = candles[i];
+      if (c && c.volume > 0) {
+        volSum += c.volume;
+        count++;
+      }
+    }
+    if (count === 0) return 0;
+
+    const avgVolume = volSum / count;
+    return Math.min(1.0, ob.volume / avgVolume);
+  }
+
+  /**
+   * Factor 12: Momentum Confirmation (pullback mode)
+   *
+   * For OB entries (mean-reverting), we WANT a pullback into the OB zone.
+   * Score higher when recent candles are AGAINST signal direction = confirming retracement.
+   *
+   * For longs: count candles where close < open (bearish = pullback to bullish OB).
+   * For shorts: count candles where close > open (bullish = rally to bearish OB).
+   *
+   * Scoring: 4-5/5 AGAINST → 1.0 (deep pullback), 3/5 → 0.5, <3 → 0 (no pullback)
+   */
+  private scoreMomentumConfirmation(
+    signal: StrategySignal,
+    candles: Candle[],
+    currentIndex: number,
+  ): number {
+    const lookback = 5;
+    const start = Math.max(0, currentIndex - lookback + 1);
+    let pullbackCount = 0;
+    let total = 0;
+
+    for (let i = start; i <= currentIndex; i++) {
+      const c = candles[i];
+      if (!c) continue;
+      total++;
+      // Count candles AGAINST signal direction (pullback)
+      if (signal.direction === 'long') {
+        if (c.close < c.open) pullbackCount++;  // bearish = pullback for long
+      } else {
+        if (c.close > c.open) pullbackCount++;  // bullish = pullback for short
+      }
+    }
+
+    if (total === 0) return 0;
+    const ratio = pullbackCount / total;
+    if (ratio >= 0.8) return 1.0;   // 4-5 out of 5 candles pulling back
+    if (ratio >= 0.6) return 0.5;   // 3 out of 5
+    return 0;                        // weak or no pullback
+  }
+
+  /**
+   * Factor 13: Funding Rate Alignment (0 to 1, continuous)
+   *
+   * Requires futures data loaded via setFuturesData().
+   * Two modes:
+   * - contrarian: Low/negative funding = good for longs (not crowded), high funding = good for shorts
+   * - aligned: High funding = good for longs (momentum), low funding = good for shorts
+   *
+   * Scoring based on z-score relative to funding distribution:
+   * - funding ≤ 0:        1.0 for longs (contrarian) / 0 for longs (aligned)
+   * - funding < median:   0.5 for longs (contrarian)
+   * - funding > median:   0 for longs (contrarian) / 0.5 for longs (aligned)
+   * - funding ≥ 2×median: 0 for longs / 1.0 for shorts
+   */
+  private scoreFundingAlignment(
+    signal: StrategySignal,
+    candles: Candle[],
+    currentIndex: number,
+  ): number {
+    if (this.config.fundingScoringMode === 'off') return 0;
+    if (this.fundingRateMap.size === 0) return 0;
+
+    const timestamp = candles[currentIndex]?.timestamp;
+    if (!timestamp) return 0;
+    const fundingRate = this.fundingRateMap.get(timestamp);
+    if (fundingRate === undefined || fundingRate === 0) return 0;
+
+    // BTC funding rate distribution: avg ~0.00007, range -0.00012 to 0.00088
+    // Using fixed thresholds based on known distribution
+    const median = 0.00007;
+    const high = 0.00015;
+
+    if (this.config.fundingScoringMode === 'contrarian') {
+      if (signal.direction === 'long') {
+        // Low funding = better for longs (less crowded)
+        if (fundingRate <= 0) return 1.0;
+        if (fundingRate <= median) return 0.5;
+        return 0;
+      } else {
+        // High funding = better for shorts (crowded longs to fade)
+        if (fundingRate >= high) return 1.0;
+        if (fundingRate >= median) return 0.5;
+        return 0;
+      }
+    } else {
+      // aligned mode
+      if (signal.direction === 'long') {
+        // High funding = bullish momentum
+        if (fundingRate >= high) return 1.0;
+        if (fundingRate >= median) return 0.5;
+        return 0;
+      } else {
+        // Low funding = bearish momentum
+        if (fundingRate <= 0) return 1.0;
+        if (fundingRate <= median) return 0.5;
+        return 0;
+      }
     }
   }
 }

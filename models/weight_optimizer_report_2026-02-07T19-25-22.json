@@ -1,0 +1,163 @@
+{
+  "config": {
+    "episodes": 10,
+    "symbols": [
+      "BTCUSDT"
+    ],
+    "dataDir": "/Users/apple/projects/ict-trading/data",
+    "timeframe": "1h",
+    "modelDir": "/Users/apple/projects/ict-trading/models",
+    "saveInterval": 50,
+    "logInterval": 10,
+    "loadModel": null,
+    "decisionInterval": 24,
+    "episodeLength": 720,
+    "commission": 0.001,
+    "slippage": 0.0005,
+    "maxHoldBars": 72,
+    "learningRate": 0.0003,
+    "nSteps": 128,
+    "nEpochs": 4,
+    "miniBatchSize": 32,
+    "gamma": 0.99,
+    "lambda": 0.95,
+    "clipRatio": 0.2,
+    "entropyCoef": 0.01,
+    "windowSlide": 360
+  },
+  "paramCount": {
+    "actor": 1348,
+    "critic": 1025,
+    "total": 2373
+  },
+  "history": [
+    {
+      "episode": 0,
+      "symbol": "BTCUSDT",
+      "totalReward": -0.9738785137724675,
+      "trades": 4,
+      "wins": 1,
+      "pnl": -0.027693925688623357,
+      "winRate": 0.25,
+      "avgMultiplier": 0.13191228091354573,
+      "loss": 0
+    },
+    {
+      "episode": 1,
+      "symbol": "BTCUSDT",
+      "totalReward": -1.7100059375429102,
+      "trades": 3,
+      "wins": 0,
+      "pnl": -0.0585002968771455,
+      "winRate": 0,
+      "avgMultiplier": 0.20176748458088598,
+      "loss": 0
+    },
+    {
+      "episode": 2,
+      "symbol": "BTCUSDT",
+      "totalReward": -0.6000000000000002,
+      "trades": 0,
+      "wins": 0,
+      "pnl": 0,
+      "winRate": 0,
+      "avgMultiplier": 0.30495659651643775,
+      "loss": 0
+    },
+    {
+      "episode": 3,
+      "symbol": "BTCUSDT",
+      "totalReward": -0.6000000000000002,
+      "trades": 0,
+      "wins": 0,
+      "pnl": 0,
+      "winRate": 0,
+      "avgMultiplier": 0.10057836205646072,
+      "loss": 0
+    },
+    {
+      "episode": 4,
+      "symbol": "BTCUSDT",
+      "totalReward": -1.0283749484622446,
+      "trades": 1,
+      "wins": 0,
+      "pnl": -0.02241874742311222,
+      "winRate": 0,
+      "avgMultiplier": 0.4291298904739828,
+      "loss": 0.04906466230750084
+    },
+    {
+      "episode": 5,
+      "symbol": "BTCUSDT",
+      "totalReward": -0.6000000000000002,
+      "trades": 0,
+      "wins": 0,
+      "pnl": 0,
+      "winRate": 0,
+      "avgMultiplier": 0.08663397774100987,
+      "loss": 0
+    },
+    {
+      "episode": 6,
+      "symbol": "BTCUSDT",
+      "totalReward": -0.6000000000000002,
+      "trades": 0,
+      "wins": 0,
+      "pnl": 0,
+      "winRate": 0,
+      "avgMultiplier": 0.05255650469468582,
+      "loss": 0
+    },
+    {
+      "episode": 7,
+      "symbol": "BTCUSDT",
+      "totalReward": -0.6000000000000002,
+      "trades": 0,
+      "wins": 0,
+      "pnl": 0,
+      "winRate": 0,
+      "avgMultiplier": 0.18021253231513884,
+      "loss": 0
+    },
+    {
+      "episode": 8,
+      "symbol": "BTCUSDT",
+      "totalReward": -0.6000000000000002,
+      "trades": 0,
+      "wins": 0,
+      "pnl": 0,
+      "winRate": 0,
+      "avgMultiplier": 0.12589667283106246,
+      "loss": -0.11181693023536354
+    },
+    {
+      "episode": 9,
+      "symbol": "BTCUSDT",
+      "totalReward": -0.6000000000000002,
+      "trades": 0,
+      "wins": 0,
+      "pnl": 0,
+      "winRate": 0,
+      "avgMultiplier": 0.035640100429989566,
+      "loss": 0
+    }
+  ],
+  "summary": {
+    "totalEpisodes": 10,
+    "avgReward": -0.7912259399777626,
+    "avgTrades": 0.8,
+    "avgWinRate": 0.025,
+    "avgPnL": -0.010861296998888109,
+    "bestEpisodeReward": -0.6000000000000002,
+    "worstEpisodeReward": -1.7100059375429102,
+    "rewardTrend": "improving",
+    "perSymbol": {
+      "BTCUSDT": {
+        "avgReward": -0.7912259399777626,
+        "avgWR": 0.025,
+        "avgPnL": -0.010861296998888109,
+        "episodes": 10
+      }
+    }
+  }
+}

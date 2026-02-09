@@ -37,7 +37,7 @@ import {
   type RegimeFilterConfig,
   type MTFBiasConfig,
 } from '../src/lib/rl/strategies/confluence-scorer';
-import { ICTStrategyManager, type StrategyName } from '../src/lib/rl/strategies/ict-strategies';
+import { ICTStrategyManager, type StrategyName, type SLPlacementMode } from '../src/lib/rl/strategies/ict-strategies';
 import {
   runWalkForward,
   calculateSharpe,
@@ -55,9 +55,10 @@ import {
 const THRESHOLD_GRID = [3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0];
 const WEIGHT_DELTA = 0.5;
 const SENSITIVITY_ALERT_THRESHOLD = 0.20; // 20% change in min_sharpe is "fragile"
-const DEFAULT_COMMISSION = 0.001; // 0.1% per side
-const DEFAULT_SLIPPAGE = 0.0005; // 0.05% slippage
 const MAX_BARS_IN_POSITION = 72; // 3 days max hold on hourly bars
+
+/** Combined friction per side: commission + slippage (overridable via --friction) */
+let FRICTION_PER_SIDE = 0.0015; // 0.15% per side default (0.1% commission + 0.05% slippage)
 
 /** All 10 weight factor keys in the ConfluenceWeights interface */
 const WEIGHT_KEYS: (keyof ConfluenceWeights)[] = [
@@ -128,6 +129,21 @@ interface SimulatedPosition {
 }
 
 /**
+ * Apply friction (commission + slippage) to entry/exit prices.
+ */
+function applyEntryFriction(price: number, direction: 'long' | 'short'): number {
+  return direction === 'long'
+    ? price * (1 + FRICTION_PER_SIDE)
+    : price * (1 - FRICTION_PER_SIDE);
+}
+
+function applyExitFriction(price: number, direction: 'long' | 'short'): number {
+  return direction === 'long'
+    ? price * (1 - FRICTION_PER_SIDE)
+    : price * (1 + FRICTION_PER_SIDE);
+}
+
+/**
  * Simulate a position through subsequent candles.
  * Returns a TradeResult when the position exits via SL, TP, or max bars.
  * Returns null if the position is still open at the end of the candle array.
@@ -137,9 +153,9 @@ function simulatePosition(
   candles: Candle[],
   startIndex: number,
   maxBars: number,
-  commission: number,
-  slippage: number,
 ): TradeResult | null {
+  const adjustedEntry = applyEntryFriction(position.entryPrice, position.direction);
+
   for (let i = startIndex; i < candles.length; i++) {
     const candle = candles[i];
     if (!candle) continue;
@@ -175,30 +191,19 @@ function simulatePosition(
         exitPrice = candle.close;
       }
 
-      // Apply slippage (always adverse)
-      if (position.direction === 'long') {
-        exitPrice *= (1 - slippage);
-      } else {
-        exitPrice *= (1 + slippage);
-      }
+      const adjustedExit = applyExitFriction(exitPrice, position.direction);
 
-      // Calculate PnL
-      let rawPnl: number;
-      if (position.direction === 'long') {
-        rawPnl = (exitPrice - position.entryPrice) / position.entryPrice;
-      } else {
-        rawPnl = (position.entryPrice - exitPrice) / position.entryPrice;
-      }
-
-      // Apply commission (entry + exit)
-      const pnlPercent = rawPnl - 2 * commission;
+      // Calculate PnL from friction-adjusted prices
+      const pnlPercent = position.direction === 'long'
+        ? (adjustedExit - adjustedEntry) / adjustedEntry
+        : (adjustedEntry - adjustedExit) / adjustedEntry;
 
       return {
         entryTimestamp: position.entryTimestamp,
         exitTimestamp: candle.timestamp,
         direction: position.direction,
-        entryPrice: position.entryPrice,
-        exitPrice,
+        entryPrice: adjustedEntry,
+        exitPrice: adjustedExit,
         pnlPercent,
         strategy: position.strategy,
       };
@@ -218,8 +223,6 @@ function simulatePosition(
  */
 function createConfluenceRunner(
   scorer: ConfluenceScorer,
-  commission: number,
-  slippage: number,
   maxBarsInPosition: number,
   label: string,
 ): WalkForwardStrategyRunner {
@@ -249,15 +252,12 @@ function createConfluenceRunner(
             allCandles,
             i,
             maxBarsInPosition,
-            commission,
-            slippage,
           );
 
           if (result) {
             trades.push(result);
             currentPosition = null;
             // Skip to the exit bar to avoid re-entering immediately
-            // Find the exit bar index
             const exitBarIndex = allCandles.findIndex(
               (c) => c.timestamp === result.exitTimestamp,
             );
@@ -274,17 +274,9 @@ function createConfluenceRunner(
         if (evaluation.action === 'trade' && evaluation.selectedSignal) {
           const signal = evaluation.selectedSignal.signal;
 
-          // Apply entry slippage
-          let entryPrice = signal.entryPrice;
-          if (signal.direction === 'long') {
-            entryPrice *= (1 + slippage);
-          } else {
-            entryPrice *= (1 - slippage);
-          }
-
           currentPosition = {
             direction: signal.direction,
-            entryPrice,
+            entryPrice: signal.entryPrice,
             stopLoss: signal.stopLoss,
             takeProfit: signal.takeProfit,
             entryIndex: i,
@@ -310,6 +302,7 @@ async function runThresholdSearch(
   activeStrategies?: StrategyName[],
   suppressedRegimes?: string[],
   mtfBias?: MTFBiasConfig,
+  slPlacementMode?: SLPlacementMode,
 ): Promise<ThresholdSearchResult[]> {
   const results: ThresholdSearchResult[] = [];
 
@@ -318,11 +311,16 @@ async function runThresholdSearch(
       log(`\n--- Testing threshold: ${threshold.toFixed(1)} ---`);
     }
 
+    const strategyConfig = {
+      ...PRODUCTION_STRATEGY_CONFIG,
+      ...(slPlacementMode ? { slPlacementMode } : {}),
+    };
+
     const scorer = new ConfluenceScorer({
       ...DEFAULT_CONFLUENCE_CONFIG,
       minThreshold: threshold,
       weights: { ...DEFAULT_WEIGHTS },
-      strategyConfig: PRODUCTION_STRATEGY_CONFIG,
+      strategyConfig,
       ...(regimeFilter ? { regimeFilter } : {}),
       ...(activeStrategies ? { activeStrategies } : {}),
       ...(suppressedRegimes && suppressedRegimes.length > 0 ? { suppressedRegimes } : {}),
@@ -331,8 +329,6 @@ async function runThresholdSearch(
 
     const runner = createConfluenceRunner(
       scorer,
-      DEFAULT_COMMISSION,
-      DEFAULT_SLIPPAGE,
       MAX_BARS_IN_POSITION,
       `Confluence(threshold=${threshold})`,
     );
@@ -477,6 +473,7 @@ async function runWeightSensitivity(
   activeStrategies?: StrategyName[],
   suppressedRegimes?: string[],
   mtfBias?: MTFBiasConfig,
+  slPlacementMode?: SLPlacementMode,
 ): Promise<WeightSensitivityResult[]> {
   const results: WeightSensitivityResult[] = [];
 
@@ -493,6 +490,7 @@ async function runWeightSensitivity(
     activeStrategies,
     suppressedRegimes,
     mtfBias,
+    slPlacementMode,
   );
 
   if (!quiet) {
@@ -517,6 +515,7 @@ async function runWeightSensitivity(
       activeStrategies,
       suppressedRegimes,
       mtfBias,
+      slPlacementMode,
     );
 
     // Test -delta
@@ -530,6 +529,7 @@ async function runWeightSensitivity(
       activeStrategies,
       suppressedRegimes,
       mtfBias,
+      slPlacementMode,
     );
 
     // Sensitivity = max absolute change relative to baseline
@@ -582,12 +582,18 @@ async function getMinSharpeForConfig(
   activeStrategies?: StrategyName[],
   suppressedRegimes?: string[],
   mtfBias?: MTFBiasConfig,
+  slPlacementMode?: SLPlacementMode,
 ): Promise<number> {
+  const strategyConfig = {
+    ...PRODUCTION_STRATEGY_CONFIG,
+    ...(slPlacementMode ? { slPlacementMode } : {}),
+  };
+
   const scorer = new ConfluenceScorer({
     ...DEFAULT_CONFLUENCE_CONFIG,
     minThreshold: threshold,
     weights,
-    strategyConfig: PRODUCTION_STRATEGY_CONFIG,
+    strategyConfig,
     ...(regimeFilter ? { regimeFilter } : {}),
     ...(activeStrategies ? { activeStrategies } : {}),
     ...(suppressedRegimes && suppressedRegimes.length > 0 ? { suppressedRegimes } : {}),
@@ -596,8 +602,6 @@ async function getMinSharpeForConfig(
 
   const runner = createConfluenceRunner(
     scorer,
-    DEFAULT_COMMISSION,
-    DEFAULT_SLIPPAGE,
     MAX_BARS_IN_POSITION,
     `Confluence(t=${threshold},custom_weights)`,
   );
@@ -930,7 +934,24 @@ async function main(): Promise<void> {
   const strategyArg = getArg('strategy');
   const suppressRegimeArg = getArg('suppress-regime');
   const useMTF = hasFlag('mtf');
+  const frictionArg = getArg('friction');
+  const slModeArg = getArg('sl-mode');
   jsonOutputMode = hasFlag('json');
+
+  // Apply friction override
+  if (frictionArg) {
+    FRICTION_PER_SIDE = parseFloat(frictionArg);
+    if (Number.isNaN(FRICTION_PER_SIDE) || FRICTION_PER_SIDE < 0) {
+      console.error('Error: --friction must be a non-negative number (per-side fraction, e.g., 0.0007)');
+      process.exit(1);
+    }
+  }
+
+  // Parse SL placement mode
+  const slPlacementMode: SLPlacementMode | undefined =
+    (['ob_based', 'entry_based', 'dynamic_rr'] as const).includes(slModeArg as SLPlacementMode)
+      ? (slModeArg as SLPlacementMode)
+      : undefined;
 
   const symbols = symbolsArg
     ? symbolsArg.split(',').map((s) => s.trim())
@@ -971,8 +992,8 @@ async function main(): Promise<void> {
     log(`Active strategies:  ${activeStrategies ? activeStrategies.join(', ') : 'default (order_block, fvg)'}`);
     log(`Threshold grid:     ${THRESHOLD_GRID.join(', ')}`);
     log(`Objective:          max(min(window_sharpe)) -- maximin`);
-    log(`Commission:         ${(DEFAULT_COMMISSION * 100).toFixed(2)}%`);
-    log(`Slippage:           ${(DEFAULT_SLIPPAGE * 100).toFixed(2)}%`);
+    log(`Friction:           ${(FRICTION_PER_SIDE * 100).toFixed(3)}% per side (${(FRICTION_PER_SIDE * 2 * 100).toFixed(3)}% RT)`);
+    log(`SL mode:            ${slPlacementMode ?? 'default (ob_based)'}`);
     log(`Max bars in pos:    ${MAX_BARS_IN_POSITION}`);
     log(`Skip sensitivity:   ${skipSensitivity}`);
     log(`Suppress regimes:   ${suppressedRegimes.length > 0 ? suppressedRegimes.join(', ') : 'none'}`);
@@ -996,7 +1017,7 @@ async function main(): Promise<void> {
     log('============================================================');
   }
 
-  const phase1Results = await runThresholdSearch(symbols, jsonOutputMode, regimeFilter, activeStrategies, suppressedRegimes, mtfBias);
+  const phase1Results = await runThresholdSearch(symbols, jsonOutputMode, regimeFilter, activeStrategies, suppressedRegimes, mtfBias, slPlacementMode);
 
   if (!jsonOutputMode) {
     printPhase1Table(phase1Results);
@@ -1035,6 +1056,7 @@ async function main(): Promise<void> {
       activeStrategies,
       suppressedRegimes,
       mtfBias,
+      slPlacementMode,
     );
 
     if (!jsonOutputMode) {
@@ -1102,7 +1124,9 @@ async function main(): Promise<void> {
   const strategySuffix = activeStrategies ? `-${strategyArg}` : '';
   const suppressSuffix = suppressedRegimes.length > 0 ? '-suppress' : '';
   const mtfSuffix = useMTF ? '-mtf' : '';
-  const suffix = `${strategySuffix}${regimeSuffix}${suppressSuffix}${mtfSuffix}`;
+  const slSuffix = slPlacementMode ? `-${slPlacementMode}` : '';
+  const frictionSuffix = frictionArg ? '-maker' : '';
+  const suffix = `${strategySuffix}${regimeSuffix}${suppressSuffix}${mtfSuffix}${slSuffix}${frictionSuffix}`;
   const docPath = path.join(experimentsDir, `iteration-7-calibration${suffix}.md`);
   fs.writeFileSync(docPath, experimentDoc);
 

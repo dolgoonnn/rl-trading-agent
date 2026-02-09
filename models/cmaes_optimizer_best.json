@@ -1,0 +1,47 @@
+{
+  "action": [
+    1,
+    -1,
+    -1
+  ],
+  "multipliers": {
+    "global": 2.0137527074704766,
+    "structure": 0.7046880897187134,
+    "proximity": 0.7046880897187134
+  },
+  "perWeight": {
+    "structureAlignment": 1.4190675485932573,
+    "killZoneActive": 1.4190675485932573,
+    "liquiditySweep": 2.0137527074704766,
+    "obProximity": 1.4190675485932573,
+    "fvgAtCE": 1.4190675485932573,
+    "recentBOS": 1.4190675485932573,
+    "rrRatio": 2.0137527074704766,
+    "oteZone": 1.4190675485932573,
+    "breakerConfluence": 1.4190675485932573,
+    "obFvgConfluence": 1.4190675485932573
+  },
+  "evaluation": {
+    "avgReward": -0.4047469974393355,
+    "avgTrades": 9.125,
+    "avgWinRate": 0.40821917808219177,
+    "avgPnL": -0.04435693196345818
+  },
+  "baseline": {
+    "avgReward": 0.5706895721156003,
+    "avgTrades": 9.525,
+    "avgWinRate": 0.4356955380577428,
+    "avgPnL": 0.005270066044457006
+  },
+  "config": {
+    "generations": 50,
+    "populationSize": 15,
+    "episodesPerEval": 8,
+    "symbols": [
+      "BTCUSDT",
+      "ETHUSDT",
+      "SOLUSDT"
+    ]
+  },
+  "timestamp": "2026-02-07T20:01:33.365Z"
+}

@@ -12,11 +12,13 @@ export interface OrderBlockConfig {
   bodyToRangeRatio: number; // Minimum body/range ratio for OB candle
 }
 
-const DEFAULT_CONFIG: OrderBlockConfig = {
+export const DEFAULT_OB_CONFIG: OrderBlockConfig = {
   minMovePercent: 1.2,   // Raised from 1.0% — reduce noise, but 1.5% killed OB count
   maxAgeCandles: 75,
   bodyToRangeRatio: 0.5, // Enforced below: reject doji/indecision candles as OBs
 };
+
+const DEFAULT_CONFIG = DEFAULT_OB_CONFIG;
 
 /**
  * Detect bullish order blocks
@@ -85,6 +87,7 @@ export function detectBullishOrderBlocks(
         index: i,
         timestamp: current.timestamp,
         strength: calculateStrength(candles, i, 'bullish'),
+        volume: current.volume,
       });
     }
   }
@@ -158,6 +161,7 @@ export function detectBearishOrderBlocks(
         index: i,
         timestamp: current.timestamp,
         strength: calculateStrength(candles, i, 'bearish'),
+        volume: current.volume,
       });
     }
   }

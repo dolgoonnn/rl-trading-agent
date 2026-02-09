@@ -1,0 +1,61 @@
+{
+  "description": "CMA-ES Run 1 (18-dim, sigma=0.15, pop=16, 30 gens) - Best production-matched result",
+  "specs": [
+    "w_structureAlignment", "w_killZoneActive", "w_liquiditySweep",
+    "w_obProximity", "w_fvgAtCE", "w_recentBOS", "w_rrRatio",
+    "w_oteZone", "w_obFvgConfluence", "w_momentumConfirmation",
+    "t_uptrend+high", "t_uptrend+normal", "t_uptrend+low",
+    "t_downtrend+normal", "t_downtrend+low",
+    "baseThreshold", "obFreshnessHalfLife", "atrExtensionBands"
+  ],
+  "bestParams": [
+    0.99615, 0.8942, 0.84165, 0.6816, 1.2051,
+    1.2067, 0.90787, 1.1328, 1.1667, 1.0,
+    3.14, 5.27, 3.74, 4.43, 4.71,
+    4.329, 15.0, 3.10
+  ],
+  "decoded": {
+    "weightMultipliers": {
+      "structureAlignment": 1.9923,
+      "killZoneActive": 0.4471,
+      "liquiditySweep": 1.6833,
+      "obProximity": 0.6816,
+      "fvgAtCE": 1.2051,
+      "recentBOS": 1.2067,
+      "rrRatio": 1.3618,
+      "oteZone": 0.5664,
+      "obFvgConfluence": 1.1667,
+      "momentumConfirmation": 0
+    },
+    "regimeThresholds": {
+      "uptrend+high": 3.14,
+      "uptrend+normal": 5.27,
+      "uptrend+low": 3.74,
+      "downtrend+normal": 4.43,
+      "downtrend+low": 4.71
+    },
+    "baseThreshold": 4.329,
+    "obFreshnessHalfLife": 15,
+    "atrExtensionBands": 3.10
+  },
+  "result": {
+    "passRate": 0.723,
+    "totalTrades": 742,
+    "winRate": 54.4,
+    "pnl": 4.638
+  },
+  "fitness": 994.4,
+  "baselineResult": {
+    "passRate": 0.713,
+    "totalTrades": 748,
+    "winRate": 54.5,
+    "pnl": 5.33
+  },
+  "config": {
+    "generations": 30,
+    "populationSize": 16,
+    "sigma": 0.15,
+    "dimensions": 18
+  },
+  "cliCommand": "npx tsx scripts/backtest-confluence.ts --strategy ob --sl-mode dynamic_rr --friction 0.0007 --suppress-regime \"ranging+normal,ranging+high,downtrend+high\" --threshold 4.329 --exit-mode simple --partial-tp \"0.45,0.85\" --atr-extension 3.10 --ob-half-life 15 --regime-threshold \"uptrend+high:3.14,uptrend+normal:5.27,uptrend+low:3.74,downtrend+normal:4.43,downtrend+low:4.71\" --weights \"structureAlignment:1.9923,killZoneActive:0.4471,liquiditySweep:1.6833,obProximity:0.6816,fvgAtCE:1.2051,recentBOS:1.2067,rrRatio:1.3618,oteZone:0.5664,obFvgConfluence:1.1667\""
+}

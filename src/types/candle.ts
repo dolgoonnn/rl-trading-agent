@@ -9,6 +9,8 @@ export interface Candle {
   low: number;
   close: number;
   volume: number;
+  /** Taker buy base asset volume (from Binance klines index 9). Optional for backwards compat. */
+  takerBuyVolume?: number;
 }
 
 export interface CandleWithIndex extends Candle {

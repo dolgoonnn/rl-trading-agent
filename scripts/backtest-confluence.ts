@@ -27,6 +27,8 @@ import {
   DEFAULT_WEIGHTS,
   DEFAULT_CONFLUENCE_CONFIG,
   PRODUCTION_STRATEGY_CONFIG,
+  FIFTEEN_MIN_STRATEGY_CONFIG,
+  FIFTEEN_MIN_CONFLUENCE_OVERRIDES,
   DEFAULT_REGIME_FILTER,
   DEFAULT_MTF_BIAS,
   type RegimeFilterConfig,
@@ -36,6 +38,7 @@ import {
   detectRegime,
   regimeLabel,
 } from '../src/lib/ict/regime-detector';
+import { DEFAULT_OB_CONFIG } from '../src/lib/ict/order-blocks';
 import type { StrategyName, StrategyExitSignal, SLPlacementMode } from '../src/lib/rl/strategies/ict-strategies';
 import type { HybridPosition } from '../src/lib/rl/types';
 import {
@@ -49,8 +52,41 @@ import {
 // Constants
 // ============================================
 
-/** Maximum bars to hold a position before force-closing */
-const MAX_POSITION_BARS = 100;
+/** Maximum bars to hold a position before force-closing (overridable via --max-bars) */
+let MAX_POSITION_BARS = 100;
+
+/** Exit mode: simple (SL/TP only), breakeven (move SL to entry at 1R), trailing, enhanced */
+type ExitMode = 'simple' | 'breakeven' | 'trailing' | 'enhanced';
+
+/** Partial take-profit config: close fraction of position at triggerR */
+interface PartialTPConfig {
+  /** Fraction to close (0-1, e.g. 0.5 = 50%) */
+  fraction: number;
+  /** R-multiple trigger (e.g. 1.0 = at 1R profit) */
+  triggerR: number;
+  /** Breakeven buffer as fraction of risk distance (0 = exact breakeven, -1 = no BE move, default: 0.1) */
+  beBuffer: number;
+}
+
+/** A single level in a multi-level partial TP plan */
+interface TPLevel {
+  /** Fraction of ORIGINAL position to close at this level (sum of all fractions must be <= 1) */
+  fraction: number;
+  /** R-multiple trigger */
+  triggerR: number;
+  /** Where to move SL after this level triggers (in R-multiples from entry, e.g. 0.1 = BE+10%) */
+  slMoveR: number;
+}
+
+/** Multi-level TP config with optional trailing stop */
+interface MultiTPConfig {
+  /** Ordered TP levels (lowest triggerR first) */
+  levels: TPLevel[];
+  /** Trailing stop config (activates after all partials taken). Distance in R-multiples. */
+  trailDistanceR?: number;
+  /** Min R-multiple before trailing activates (default: same as last partial triggerR) */
+  trailActivationR?: number;
+}
 
 /** Default commission per side as a fraction (0.1% = 0.001) */
 const DEFAULT_COMMISSION = 0.001;
@@ -70,6 +106,34 @@ const EXP_014_RESULTS_PATH = 'experiments/walk-forward-results.json';
 // ============================================
 // Types
 // ============================================
+
+/** Circuit breaker config: pauses trading after consecutive losses */
+interface CircuitBreakerConfig {
+  /** Max consecutive losses before triggering pause */
+  maxConsecutiveLosses: number;
+  /** Number of bars to pause after triggering */
+  cooldownBars: number;
+}
+
+/** Streak-aware sizing config: anti-Martingale position scaling */
+interface StreakSizingConfig {
+  /** Number of consecutive wins/losses to trigger multiplier */
+  streakLength: number;
+  /** Multiplier after consecutive wins (e.g., 1.5) */
+  winMultiplier: number;
+  /** Multiplier after consecutive losses (e.g., 0.5) */
+  lossMultiplier: number;
+}
+
+/** Risk management config applied to trade PnL post-hoc */
+interface RiskConfig {
+  /** Scale PnL by inverse ATR percentile (vol-sizing proxy) */
+  volSizing: boolean;
+  /** Stop trading in window when cumulative PnL drops below this (e.g., -0.05 = -5%) */
+  maxWindowDD?: number;
+  /** Streak-aware position sizing */
+  streakSizing?: StreakSizingConfig;
+}
 
 interface SimulatedPosition {
   entryPrice: number;
@@ -236,6 +300,410 @@ function closeAtEnd(
     pnlPercent: calculatePnlPercent(adjustedEntry, adjustedExit, position.direction),
     strategy: position.strategy,
   };
+}
+
+/**
+ * BREAKEVEN MODE: Move SL to entry + buffer after 1R profit.
+ * No trailing, no strategy exits. Just protects gains once position is 1R in profit.
+ */
+function simulatePositionBreakeven(
+  position: SimulatedPosition,
+  candles: Candle[],
+  startIndex: number,
+): TradeResult | null {
+  const adjustedEntry = applyEntryFriction(position.entryPrice, position.direction);
+  let currentSL = position.stopLoss;
+
+  // Calculate 1R distance
+  const riskDistance = position.direction === 'long'
+    ? position.entryPrice - position.stopLoss
+    : position.stopLoss - position.entryPrice;
+  let breakEvenTriggered = false;
+
+  for (let i = startIndex; i < candles.length; i++) {
+    const candle = candles[i];
+    if (!candle) continue;
+
+    const barsHeld = i - position.entryIndex;
+
+    // Check SL (possibly moved to breakeven) and TP
+    if (position.direction === 'long') {
+      if (candle.low <= currentSL) {
+        const adjustedExit = applyExitFriction(currentSL, position.direction);
+        return {
+          entryTimestamp: position.entryTimestamp,
+          exitTimestamp: candle.timestamp,
+          direction: position.direction,
+          entryPrice: adjustedEntry,
+          exitPrice: adjustedExit,
+          pnlPercent: calculatePnlPercent(adjustedEntry, adjustedExit, position.direction),
+          strategy: position.strategy,
+        };
+      }
+      if (candle.high >= position.takeProfit) {
+        const adjustedExit = applyExitFriction(position.takeProfit, position.direction);
+        return {
+          entryTimestamp: position.entryTimestamp,
+          exitTimestamp: candle.timestamp,
+          direction: position.direction,
+          entryPrice: adjustedEntry,
+          exitPrice: adjustedExit,
+          pnlPercent: calculatePnlPercent(adjustedEntry, adjustedExit, position.direction),
+          strategy: position.strategy,
+        };
+      }
+    } else {
+      if (candle.high >= currentSL) {
+        const adjustedExit = applyExitFriction(currentSL, position.direction);
+        return {
+          entryTimestamp: position.entryTimestamp,
+          exitTimestamp: candle.timestamp,
+          direction: position.direction,
+          entryPrice: adjustedEntry,
+          exitPrice: adjustedExit,
+          pnlPercent: calculatePnlPercent(adjustedEntry, adjustedExit, position.direction),
+          strategy: position.strategy,
+        };
+      }
+      if (candle.low <= position.takeProfit) {
+        const adjustedExit = applyExitFriction(position.takeProfit, position.direction);
+        return {
+          entryTimestamp: position.entryTimestamp,
+          exitTimestamp: candle.timestamp,
+          direction: position.direction,
+          entryPrice: adjustedEntry,
+          exitPrice: adjustedExit,
+          pnlPercent: calculatePnlPercent(adjustedEntry, adjustedExit, position.direction),
+          strategy: position.strategy,
+        };
+      }
+    }
+
+    // Move SL to breakeven at 1R profit
+    if (!breakEvenTriggered && riskDistance > 0) {
+      const unrealizedR = position.direction === 'long'
+        ? (candle.close - position.entryPrice) / riskDistance
+        : (position.entryPrice - candle.close) / riskDistance;
+
+      if (unrealizedR >= 1.0) {
+        breakEvenTriggered = true;
+        // Buffer = 0.1 × risk distance (same scale as ATR-based buffer in enhanced mode)
+        const buffer = riskDistance * 0.1;
+        if (position.direction === 'long') {
+          currentSL = Math.max(currentSL, position.entryPrice + buffer);
+        } else {
+          currentSL = Math.min(currentSL, position.entryPrice - buffer);
+        }
+      }
+    }
+
+    // Max bars
+    if (barsHeld >= MAX_POSITION_BARS) {
+      const adjustedExit = applyExitFriction(candle.close, position.direction);
+      return {
+        entryTimestamp: position.entryTimestamp,
+        exitTimestamp: candle.timestamp,
+        direction: position.direction,
+        entryPrice: adjustedEntry,
+        exitPrice: adjustedExit,
+        pnlPercent: calculatePnlPercent(adjustedEntry, adjustedExit, position.direction),
+        strategy: position.strategy,
+      };
+    }
+  }
+
+  return closeAtEnd(position, candles, adjustedEntry);
+}
+
+/**
+ * PARTIAL TP MODE: Close a fraction at triggerR, move SL to breakeven, let rest run to TP.
+ * PnL = weighted average of partial exit + final exit.
+ */
+function simulatePositionPartialTP(
+  position: SimulatedPosition,
+  candles: Candle[],
+  startIndex: number,
+  partialConfig: PartialTPConfig,
+): TradeResult | null {
+  const adjustedEntry = applyEntryFriction(position.entryPrice, position.direction);
+  let currentSL = position.stopLoss;
+
+  const riskDistance = position.direction === 'long'
+    ? position.entryPrice - position.stopLoss
+    : position.stopLoss - position.entryPrice;
+  let partialTaken = false;
+  let partialPnl = 0;
+
+  for (let i = startIndex; i < candles.length; i++) {
+    const candle = candles[i];
+    if (!candle) continue;
+
+    const barsHeld = i - position.entryIndex;
+
+    // Check SL and TP
+    if (position.direction === 'long') {
+      if (candle.low <= currentSL) {
+        const adjustedExit = applyExitFriction(currentSL, position.direction);
+        const exitPnl = calculatePnlPercent(adjustedEntry, adjustedExit, position.direction);
+        const finalPnl = partialTaken
+          ? partialConfig.fraction * partialPnl + (1 - partialConfig.fraction) * exitPnl
+          : exitPnl;
+        return {
+          entryTimestamp: position.entryTimestamp,
+          exitTimestamp: candle.timestamp,
+          direction: position.direction,
+          entryPrice: adjustedEntry,
+          exitPrice: adjustedExit,
+          pnlPercent: finalPnl,
+          strategy: position.strategy,
+        };
+      }
+      if (candle.high >= position.takeProfit) {
+        const adjustedExit = applyExitFriction(position.takeProfit, position.direction);
+        const exitPnl = calculatePnlPercent(adjustedEntry, adjustedExit, position.direction);
+        const finalPnl = partialTaken
+          ? partialConfig.fraction * partialPnl + (1 - partialConfig.fraction) * exitPnl
+          : exitPnl;
+        return {
+          entryTimestamp: position.entryTimestamp,
+          exitTimestamp: candle.timestamp,
+          direction: position.direction,
+          entryPrice: adjustedEntry,
+          exitPrice: adjustedExit,
+          pnlPercent: finalPnl,
+          strategy: position.strategy,
+        };
+      }
+    } else {
+      if (candle.high >= currentSL) {
+        const adjustedExit = applyExitFriction(currentSL, position.direction);
+        const exitPnl = calculatePnlPercent(adjustedEntry, adjustedExit, position.direction);
+        const finalPnl = partialTaken
+          ? partialConfig.fraction * partialPnl + (1 - partialConfig.fraction) * exitPnl
+          : exitPnl;
+        return {
+          entryTimestamp: position.entryTimestamp,
+          exitTimestamp: candle.timestamp,
+          direction: position.direction,
+          entryPrice: adjustedEntry,
+          exitPrice: adjustedExit,
+          pnlPercent: finalPnl,
+          strategy: position.strategy,
+        };
+      }
+      if (candle.low <= position.takeProfit) {
+        const adjustedExit = applyExitFriction(position.takeProfit, position.direction);
+        const exitPnl = calculatePnlPercent(adjustedEntry, adjustedExit, position.direction);
+        const finalPnl = partialTaken
+          ? partialConfig.fraction * partialPnl + (1 - partialConfig.fraction) * exitPnl
+          : exitPnl;
+        return {
+          entryTimestamp: position.entryTimestamp,
+          exitTimestamp: candle.timestamp,
+          direction: position.direction,
+          entryPrice: adjustedEntry,
+          exitPrice: adjustedExit,
+          pnlPercent: finalPnl,
+          strategy: position.strategy,
+        };
+      }
+    }
+
+    // Partial TP: close fraction at triggerR, move SL to breakeven
+    if (!partialTaken && riskDistance > 0) {
+      const unrealizedR = position.direction === 'long'
+        ? (candle.close - position.entryPrice) / riskDistance
+        : (position.entryPrice - candle.close) / riskDistance;
+
+      if (unrealizedR >= partialConfig.triggerR) {
+        partialTaken = true;
+        const partialExit = applyExitFriction(candle.close, position.direction);
+        partialPnl = calculatePnlPercent(adjustedEntry, partialExit, position.direction);
+        // Move SL to breakeven + buffer (skip if beBuffer < 0)
+        if (partialConfig.beBuffer >= 0) {
+          const buffer = riskDistance * partialConfig.beBuffer;
+          if (position.direction === 'long') {
+            currentSL = Math.max(currentSL, position.entryPrice + buffer);
+          } else {
+            currentSL = Math.min(currentSL, position.entryPrice - buffer);
+          }
+        }
+      }
+    }
+
+    // Max bars
+    if (barsHeld >= MAX_POSITION_BARS) {
+      const adjustedExit = applyExitFriction(candle.close, position.direction);
+      const exitPnl = calculatePnlPercent(adjustedEntry, adjustedExit, position.direction);
+      const finalPnl = partialTaken
+        ? partialConfig.fraction * partialPnl + (1 - partialConfig.fraction) * exitPnl
+        : exitPnl;
+      return {
+        entryTimestamp: position.entryTimestamp,
+        exitTimestamp: candle.timestamp,
+        direction: position.direction,
+        entryPrice: adjustedEntry,
+        exitPrice: adjustedExit,
+        pnlPercent: finalPnl,
+        strategy: position.strategy,
+      };
+    }
+  }
+
+  // Close at end with partial consideration
+  const lastCandle = candles[candles.length - 1];
+  if (!lastCandle) return null;
+  const adjustedExit = applyExitFriction(lastCandle.close, position.direction);
+  const exitPnl = calculatePnlPercent(adjustedEntry, adjustedExit, position.direction);
+  const finalPnl = partialTaken
+    ? partialConfig.fraction * partialPnl + (1 - partialConfig.fraction) * exitPnl
+    : exitPnl;
+  return {
+    entryTimestamp: position.entryTimestamp,
+    exitTimestamp: lastCandle.timestamp,
+    direction: position.direction,
+    entryPrice: adjustedEntry,
+    exitPrice: adjustedExit,
+    pnlPercent: finalPnl,
+    strategy: position.strategy,
+  };
+}
+
+/**
+ * MULTI-LEVEL TP MODE: Close fractions at multiple R-levels with optional trailing stop.
+ *
+ * Example: Close 45% at 0.85R (SL→BE), close 25% at 1.5R (SL→0.5R), trail remaining 30%.
+ * PnL = weighted sum of each partial exit + final remaining exit.
+ */
+function simulatePositionMultiTP(
+  position: SimulatedPosition,
+  candles: Candle[],
+  startIndex: number,
+  multiConfig: MultiTPConfig,
+): TradeResult | null {
+  const adjustedEntry = applyEntryFriction(position.entryPrice, position.direction);
+  let currentSL = position.stopLoss;
+
+  const riskDistance = position.direction === 'long'
+    ? position.entryPrice - position.stopLoss
+    : position.stopLoss - position.entryPrice;
+
+  // Track which levels have been taken
+  const levelsTaken: boolean[] = multiConfig.levels.map(() => false);
+  const levelPnls: number[] = multiConfig.levels.map(() => 0);
+  let totalFractionTaken = 0;
+
+  // Trailing stop state
+  let trailActive = false;
+  const trailDistR = multiConfig.trailDistanceR ?? 0;
+  const trailActivR = multiConfig.trailActivationR ?? (multiConfig.levels[multiConfig.levels.length - 1]?.triggerR ?? 1.5);
+
+  /** Compute weighted PnL from all taken partials + the final remaining portion */
+  function computeFinalPnl(remainingExitPnl: number): number {
+    let pnl = 0;
+    for (let k = 0; k < multiConfig.levels.length; k++) {
+      if (levelsTaken[k]) {
+        pnl += multiConfig.levels[k]!.fraction * levelPnls[k]!;
+      }
+    }
+    const remainingFraction = 1 - totalFractionTaken;
+    if (remainingFraction > 0) {
+      pnl += remainingFraction * remainingExitPnl;
+    }
+    return pnl;
+  }
+
+  /** Build a trade result from an exit */
+  function buildResult(exitPrice: number, exitTimestamp: number): TradeResult {
+    const adjustedExit = applyExitFriction(exitPrice, position.direction);
+    const exitPnl = calculatePnlPercent(adjustedEntry, adjustedExit, position.direction);
+    return {
+      entryTimestamp: position.entryTimestamp,
+      exitTimestamp,
+      direction: position.direction,
+      entryPrice: adjustedEntry,
+      exitPrice: adjustedExit,
+      pnlPercent: computeFinalPnl(exitPnl),
+      strategy: position.strategy,
+    };
+  }
+
+  for (let i = startIndex; i < candles.length; i++) {
+    const candle = candles[i];
+    if (!candle) continue;
+
+    const barsHeld = i - position.entryIndex;
+
+    // Check SL hit
+    const slHit = position.direction === 'long'
+      ? candle.low <= currentSL
+      : candle.high >= currentSL;
+    if (slHit) return buildResult(currentSL, candle.timestamp);
+
+    // Check TP hit (remaining position hits full TP)
+    const tpHit = position.direction === 'long'
+      ? candle.high >= position.takeProfit
+      : candle.low <= position.takeProfit;
+    if (tpHit) return buildResult(position.takeProfit, candle.timestamp);
+
+    // Check partial TP levels
+    if (riskDistance > 0) {
+      const unrealizedR = position.direction === 'long'
+        ? (candle.close - position.entryPrice) / riskDistance
+        : (position.entryPrice - candle.close) / riskDistance;
+
+      for (let k = 0; k < multiConfig.levels.length; k++) {
+        if (levelsTaken[k]) continue;
+        const level = multiConfig.levels[k]!;
+
+        if (unrealizedR >= level.triggerR) {
+          levelsTaken[k] = true;
+          const partialExit = applyExitFriction(candle.close, position.direction);
+          levelPnls[k] = calculatePnlPercent(adjustedEntry, partialExit, position.direction);
+          totalFractionTaken += level.fraction;
+
+          // Move SL to level.slMoveR * riskDistance above entry
+          if (level.slMoveR >= 0) {
+            const newSLOffset = riskDistance * level.slMoveR;
+            if (position.direction === 'long') {
+              currentSL = Math.max(currentSL, position.entryPrice + newSLOffset);
+            } else {
+              currentSL = Math.min(currentSL, position.entryPrice - newSLOffset);
+            }
+          }
+        }
+      }
+
+      // Trailing stop after all partials taken
+      if (trailDistR > 0 && totalFractionTaken > 0) {
+        const allTaken = levelsTaken.every(Boolean);
+        if (allTaken && unrealizedR >= trailActivR) {
+          trailActive = true;
+        }
+
+        if (trailActive) {
+          const trailDistance = riskDistance * trailDistR;
+          if (position.direction === 'long') {
+            const trailStop = candle.close - trailDistance;
+            if (trailStop > currentSL) currentSL = trailStop;
+          } else {
+            const trailStop = candle.close + trailDistance;
+            if (trailStop < currentSL) currentSL = trailStop;
+          }
+        }
+      }
+    }
+
+    // Max bars
+    if (barsHeld >= MAX_POSITION_BARS) {
+      return buildResult(candle.close, candle.timestamp);
+    }
+  }
+
+  // Close at end
+  const lastCandle = candles[candles.length - 1];
+  if (!lastCandle) return null;
+  return buildResult(lastCandle.close, lastCandle.timestamp);
 }
 
 /**
@@ -443,31 +911,50 @@ function simulatePositionEnhanced(
  */
 function createConfluenceRunner(
   threshold: number,
-  useEnhancedExits: boolean,
+  exitMode: ExitMode,
   scorerConfig?: Partial<ConfluenceConfig>,
+  circuitBreaker?: CircuitBreakerConfig,
+  partialTP?: PartialTPConfig,
+  regimeSLMultipliers?: Record<string, number>,
+  riskConfig?: RiskConfig,
+  multiTP?: MultiTPConfig,
+  futuresDataMap?: Map<string, { timestamp: number; fundingRate: number }[]>,
 ): {
   runner: WalkForwardStrategyRunner;
   allTrades: TradeResult[];
   signalCounts: Map<string, number>;
   tradeRegimes: Map<number, string>;
+  circuitBreakerFirings: number;
 } {
   const allTrades: TradeResult[] = [];
   const signalCounts = new Map<string, number>();
   /** Maps trade entry timestamp to regime label */
   const tradeRegimes = new Map<number, string>();
+  let circuitBreakerFirings = 0;
 
-  const modeName = useEnhancedExits ? 'enhanced' : 'simple';
+  const modeName = exitMode;
+  const cbLabel = circuitBreaker ? `,cb=${circuitBreaker.maxConsecutiveLosses}/${circuitBreaker.cooldownBars}` : '';
+  const partialLabel = partialTP ? `,partial=${partialTP.fraction}@${partialTP.triggerR}R` : '';
   const runner: WalkForwardStrategyRunner = {
-    name: `ConfluenceScorer(threshold=${threshold},exits=${modeName})`,
+    name: `ConfluenceScorer(threshold=${threshold},exits=${modeName}${cbLabel}${partialLabel})`,
 
     async run(
       trainCandles: Candle[],
       valCandles: Candle[],
+      meta?: { symbol?: string },
     ): Promise<TradeResult[]> {
       const scorer = new ConfluenceScorer({
         minThreshold: threshold,
         ...scorerConfig,
       });
+
+      // Inject futures data for funding rate filtering
+      if (futuresDataMap && meta?.symbol) {
+        const snapshots = futuresDataMap.get(meta.symbol);
+        if (snapshots) {
+          scorer.setFuturesData(snapshots);
+        }
+      }
 
       // Concatenate for full lookback -- scorer needs historical context
       const allCandles = [...trainCandles, ...valCandles];
@@ -476,6 +963,16 @@ function createConfluenceRunner(
       const windowTrades: TradeResult[] = [];
       let currentPosition: SimulatedPosition | null = null;
       let positionExitIndex = -1;
+
+      // Circuit breaker state (reset per window)
+      let consecutiveLosses = 0;
+      let cbActiveUntilBar = -1;
+
+      // Risk management state (reset per window)
+      let cumulativeWindowPnl = 0;
+      let winStreak = 0;
+      let lossStreak = 0;
+      let windowDDTriggered = false;
 
       // Iterate through validation period only
       for (let i = valStartIndex; i < allCandles.length; i++) {
@@ -487,6 +984,16 @@ function createConfluenceRunner(
           continue;
         }
         currentPosition = null;
+
+        // Circuit breaker: skip entry if breaker is active
+        if (circuitBreaker && i < cbActiveUntilBar) {
+          continue;
+        }
+
+        // Window DD limit: stop trading after cumulative loss exceeds threshold
+        if (riskConfig?.maxWindowDD !== undefined && windowDDTriggered) {
+          continue;
+        }
 
         // Evaluate confluence at this bar
         const result: ConfluenceScorerResult = scorer.evaluate(allCandles, i);
@@ -502,10 +1009,30 @@ function createConfluenceRunner(
         if (result.action === 'trade' && result.selectedSignal !== null) {
           const signal = result.selectedSignal.signal;
 
+          // Apply per-regime SL/TP multiplier if configured
+          let adjustedSL = signal.stopLoss;
+          let adjustedTP = signal.takeProfit;
+          if (regimeSLMultipliers && Object.keys(regimeSLMultipliers).length > 0) {
+            const regime = detectRegime(allCandles, i);
+            const label = regimeLabel(regime);
+            const mult = regimeSLMultipliers[label];
+            if (mult !== undefined && mult !== 1.0) {
+              const slDist = Math.abs(signal.entryPrice - signal.stopLoss);
+              const tpDist = Math.abs(signal.takeProfit - signal.entryPrice);
+              if (signal.direction === 'long') {
+                adjustedSL = signal.entryPrice - slDist * mult;
+                adjustedTP = signal.entryPrice + tpDist * mult;
+              } else {
+                adjustedSL = signal.entryPrice + slDist * mult;
+                adjustedTP = signal.entryPrice - tpDist * mult;
+              }
+            }
+          }
+
           const position: SimulatedPosition = {
             entryPrice: signal.entryPrice,
-            stopLoss: signal.stopLoss,
-            takeProfit: signal.takeProfit,
+            stopLoss: adjustedSL,
+            takeProfit: adjustedTP,
             direction: signal.direction,
             entryIndex: i,
             entryTimestamp: candle.timestamp,
@@ -513,23 +1040,103 @@ function createConfluenceRunner(
           };
 
           // Simulate the trade from the next bar forward
-          const trade = useEnhancedExits
-            ? simulatePositionEnhanced(position, allCandles, i + 1, scorer)
-            : simulatePositionSimple(position, allCandles, i + 1);
+          let trade: TradeResult | null;
+          switch (exitMode) {
+            case 'enhanced':
+              trade = simulatePositionEnhanced(position, allCandles, i + 1, scorer);
+              break;
+            case 'breakeven':
+              trade = simulatePositionBreakeven(position, allCandles, i + 1);
+              break;
+            case 'simple':
+            default:
+              if (multiTP) {
+                trade = simulatePositionMultiTP(position, allCandles, i + 1, multiTP);
+              } else if (partialTP) {
+                trade = simulatePositionPartialTP(position, allCandles, i + 1, partialTP);
+              } else {
+                trade = simulatePositionSimple(position, allCandles, i + 1);
+              }
+              break;
+          }
 
           if (trade) {
-            windowTrades.push(trade);
-            allTrades.push(trade);
+            // Apply risk management adjustments to PnL
+            let adjustedPnl = trade.pnlPercent;
+
+            // Vol-sizing: scale PnL by inverse ATR percentile
+            if (riskConfig?.volSizing) {
+              const regime = detectRegime(allCandles, i);
+              // atrPercentile near 1.0 → smaller position, near 0.0 → larger
+              // Scale factor = 1 / atrPercentile, capped at [0.5, 2.0]
+              const pctile = Math.max(0.1, regime.atrPercentile);
+              const volScale = Math.min(2.0, Math.max(0.5, 1.0 / pctile));
+              // Normalize so median vol (0.5 pctile) = 1.0×
+              const normalizedScale = volScale / 2.0; // 1/0.5 = 2.0, /2 = 1.0 at median
+              adjustedPnl = trade.pnlPercent * normalizedScale;
+            }
+
+            // Streak-aware sizing
+            if (riskConfig?.streakSizing) {
+              const ss = riskConfig.streakSizing;
+              if (winStreak >= ss.streakLength) {
+                adjustedPnl = adjustedPnl * ss.winMultiplier;
+              } else if (lossStreak >= ss.streakLength) {
+                adjustedPnl = adjustedPnl * ss.lossMultiplier;
+              }
+            }
+
+            // Create adjusted trade
+            const adjustedTrade: TradeResult = { ...trade, pnlPercent: adjustedPnl };
+            windowTrades.push(adjustedTrade);
+            allTrades.push(adjustedTrade);
+
+            // Update streak tracking
+            if (trade.pnlPercent > 0) {
+              winStreak++;
+              lossStreak = 0;
+            } else {
+              lossStreak++;
+              winStreak = 0;
+            }
+
+            // Update window cumulative PnL and check DD limit
+            cumulativeWindowPnl += adjustedPnl;
+            if (riskConfig?.maxWindowDD !== undefined && cumulativeWindowPnl < riskConfig.maxWindowDD) {
+              windowDDTriggered = true;
+            }
 
             // Tag trade with regime at entry point
-            const regime = detectRegime(allCandles, i);
-            tradeRegimes.set(trade.entryTimestamp, regimeLabel(regime));
+            const tradeRegime = detectRegime(allCandles, i);
+            tradeRegimes.set(adjustedTrade.entryTimestamp, regimeLabel(tradeRegime));
+
+            // Circuit breaker: track consecutive losses
+            if (circuitBreaker) {
+              if (adjustedTrade.pnlPercent < 0) {
+                consecutiveLosses++;
+                if (consecutiveLosses >= circuitBreaker.maxConsecutiveLosses) {
+                  // Find the exit bar index for cooldown calculation
+                  let exitBar = i + 1;
+                  for (let j = i + 1; j < allCandles.length; j++) {
+                    const c = allCandles[j];
+                    if (c && c.timestamp >= adjustedTrade.exitTimestamp) {
+                      exitBar = j;
+                      break;
+                    }
+                  }
+                  cbActiveUntilBar = exitBar + circuitBreaker.cooldownBars;
+                  circuitBreakerFirings++;
+                }
+              } else {
+                consecutiveLosses = 0;
+              }
+            }
 
             // Figure out the exit index so we skip bars while in position
             let exitIdx = i + 1;
             for (let j = i + 1; j < allCandles.length; j++) {
               const c = allCandles[j];
-              if (c && c.timestamp >= trade.exitTimestamp) {
+              if (c && c.timestamp >= adjustedTrade.exitTimestamp) {
                 exitIdx = j;
                 break;
               }
@@ -544,7 +1151,7 @@ function createConfluenceRunner(
     },
   };
 
-  return { runner, allTrades, signalCounts, tradeRegimes };
+  return { runner, allTrades, signalCounts, tradeRegimes, circuitBreakerFirings };
 }
 
 // ============================================
@@ -862,8 +1469,8 @@ A weighted scoring system selecting strategies based on ICT confluence factors w
 - Confluence Scorer with 10 factors, threshold=${threshold}
 - Walk-forward validation: ${walkForwardResult.symbols[0]?.totalWindows ?? 0} windows per symbol
 - Symbols: ${symbols.join(', ')}
-- Commission: ${(COMMISSION_RATE * 100).toFixed(1)}% per side
-- Slippage: ${(SLIPPAGE_RATE * 100).toFixed(2)}% per side
+- Commission: ${(DEFAULT_COMMISSION * 100).toFixed(1)}% per side
+- Slippage: ${(DEFAULT_SLIPPAGE * 100).toFixed(2)}% per side
 - Max position hold: ${MAX_POSITION_BARS} bars
 
 ### Confluence Weights
@@ -1047,7 +1654,112 @@ async function main(): Promise<void> {
   const frictionArg = getArg('friction');   // --friction 0.0007 for maker mode
   const slModeArg = getArg('sl-mode');     // --sl-mode entry_based|dynamic_rr|ob_based
   const timeframeArg = getArg('timeframe'); // --timeframe 15m|1h (default: 1h)
-  const useEnhancedExits = !useSimple;
+  const cbArg = getArg('circuit-breaker'); // --circuit-breaker "3,50" (maxLosses,cooldownBars)
+  const exitModeArg = getArg('exit-mode'); // --exit-mode simple|breakeven|trailing|enhanced
+  const partialTpArg = getArg('partial-tp'); // --partial-tp "0.5,1.0" (fraction,triggerR)
+  const maxBarsArg = getArg('max-bars'); // --max-bars 60
+  const obHalfLifeArg = getArg('ob-half-life'); // --ob-half-life 15
+  const atrExtArg = getArg('atr-extension'); // --atr-extension 2.0
+  const obVolWeightArg = getArg('ob-volume-weight'); // --ob-volume-weight 1.0
+  const obMinMoveArg = getArg('ob-min-move'); // --ob-min-move 1.5 (percent)
+  const regimeThresholdArg = getArg('regime-threshold'); // --regime-threshold "uptrend+high:3.5,uptrend+normal:5.0"
+  const regimeSLMultArg = getArg('regime-sl-mult'); // --regime-sl-mult "uptrend+high:1.3,ranging+low:0.8"
+  const regimeConfGateArg = getArg('regime-conf-gate'); // --regime-conf-gate 0.3
+  const volSizing = hasFlag('vol-sizing'); // --vol-sizing
+  const maxWindowDDArg = getArg('max-window-dd'); // --max-window-dd -0.05
+  const streakArg = getArg('streak'); // --streak "2,1.5,0.5" (streakLen,winMult,lossMult)
+  const structureAgeArg = getArg('structure-age'); // --structure-age 80
+  const bosLookbackArg = getArg('bos-lookback'); // --bos-lookback 25
+  const momentumBarsArg = getArg('momentum-bars'); // --momentum-bars 2
+  const cooldownBarsArg = getArg('cooldown-bars'); // --cooldown-bars 4
+  const weightsArg = getArg('weights'); // --weights "structureAlignment:2.5,liquiditySweep:1.5,rrRatio:2.0"
+  const reactionBodyArg = getArg('reaction-body'); // --reaction-body 0.3 (min body % for OB reaction)
+  const multiTpArg = getArg('multi-tp'); // --multi-tp "0.45@0.85>0.1,0.25@1.5>0.5" (fraction@triggerR>slMoveR)
+  const trailArg = getArg('trail-after-partial'); // --trail-after-partial "0.8,1.5" (distanceR,activationR)
+  const trainBarsArg = getArg('train-bars'); // --train-bars 2880 (4 months instead of 3)
+  const valBarsArg = getArg('val-bars'); // --val-bars 1440 (2 months instead of 1)
+  const slideBarsArg = getArg('slide-bars'); // --slide-bars 360 (half-month slide)
+  const withOrderflow = hasFlag('with-orderflow'); // --with-orderflow to load futures data
+  const fundingMaxLongArg = getArg('funding-max-long'); // --funding-max-long 0.0002
+  const fundingMinShortArg = getArg('funding-min-short'); // --funding-min-short 0
+  const fundingScoringArg = getArg('funding-scoring'); // --funding-scoring contrarian|aligned
+
+  // Resolve exit mode (--exit-mode overrides --simple for backward compat)
+  let exitMode: ExitMode = 'enhanced';
+  if (exitModeArg) {
+    if (!['simple', 'breakeven', 'trailing', 'enhanced'].includes(exitModeArg)) {
+      console.error('Error: --exit-mode must be one of: simple, breakeven, trailing, enhanced');
+      process.exit(1);
+    }
+    exitMode = exitModeArg as ExitMode;
+  } else if (useSimple) {
+    exitMode = 'simple';
+  }
+
+  // Parse partial TP config
+  let partialTP: PartialTPConfig | undefined;
+  if (partialTpArg) {
+    const parts = partialTpArg.split(',');
+    if (parts.length < 2 || parts.length > 3) {
+      console.error('Error: --partial-tp format: "fraction,triggerR[,beBuffer]" e.g., "0.5,1.0" or "0.5,1.0,-1"');
+      process.exit(1);
+    }
+    const fraction = parseFloat(parts[0]!);
+    const triggerR = parseFloat(parts[1]!);
+    const beBuffer = parts.length === 3 ? parseFloat(parts[2]!) : 0.1;
+    if (Number.isNaN(fraction) || Number.isNaN(triggerR) || fraction <= 0 || fraction >= 1 || triggerR <= 0) {
+      console.error('Error: --partial-tp fraction must be (0,1) and triggerR must be > 0');
+      process.exit(1);
+    }
+    partialTP = { fraction, triggerR, beBuffer };
+  }
+
+  // Parse multi-level TP config
+  let multiTP: MultiTPConfig | undefined;
+  if (multiTpArg) {
+    const levels: TPLevel[] = [];
+    for (const levelStr of multiTpArg.split(',')) {
+      // Format: fraction@triggerR>slMoveR e.g. "0.45@0.85>0.1"
+      const match = levelStr.trim().match(/^([\d.]+)@([\d.]+)>([-\d.]+)$/);
+      if (!match) {
+        console.error(`Error: Invalid multi-tp level format "${levelStr}". Use "fraction@triggerR>slMoveR"`);
+        process.exit(1);
+      }
+      levels.push({
+        fraction: parseFloat(match[1]!),
+        triggerR: parseFloat(match[2]!),
+        slMoveR: parseFloat(match[3]!),
+      });
+    }
+    // Validate total fraction <= 1
+    const totalFrac = levels.reduce((sum, l) => sum + l.fraction, 0);
+    if (totalFrac > 1.0) {
+      console.error(`Error: Multi-tp fractions sum to ${totalFrac}, must be <= 1.0`);
+      process.exit(1);
+    }
+    multiTP = { levels };
+
+    // Parse trailing stop if provided
+    if (trailArg) {
+      const trailParts = trailArg.split(',');
+      if (trailParts.length !== 2) {
+        console.error('Error: --trail-after-partial format: "distanceR,activationR" e.g., "0.8,1.5"');
+        process.exit(1);
+      }
+      multiTP.trailDistanceR = parseFloat(trailParts[0]!);
+      multiTP.trailActivationR = parseFloat(trailParts[1]!);
+    }
+  }
+
+  // Parse max bars override
+  if (maxBarsArg) {
+    const parsed = parseInt(maxBarsArg, 10);
+    if (Number.isNaN(parsed) || parsed < 10) {
+      console.error('Error: --max-bars must be an integer >= 10');
+      process.exit(1);
+    }
+    MAX_POSITION_BARS = parsed;
+  }
 
   // Apply friction override
   if (frictionArg) {
@@ -1077,10 +1789,23 @@ async function main(): Promise<void> {
 
   const minSignalRR = minRRArg ? parseFloat(minRRArg) : 1.5;
 
-  const configOverrides: { symbols?: string[] } = {};
+  const configOverrides: Partial<import('./walk-forward-validate').WalkForwardConfig> = {};
   if (symbolsArg) {
     configOverrides.symbols = symbolsArg.split(',').map((s) => s.trim());
   }
+  if (timeframe !== '1h') {
+    configOverrides.timeframe = timeframe;
+    // Scale walk-forward windows for 15m (4× more bars per time period)
+    if (timeframe === '15m') {
+      configOverrides.trainWindowBars = 2160 * 4; // 8640 bars (~3 months at 15m)
+      configOverrides.valWindowBars = 720 * 4;    // 2880 bars (~1 month at 15m)
+      configOverrides.slideStepBars = 720 * 4;    // 2880 bars
+    }
+  }
+  // Manual WF window overrides (applied after timeframe defaults)
+  if (trainBarsArg) configOverrides.trainWindowBars = parseInt(trainBarsArg, 10);
+  if (valBarsArg) configOverrides.valWindowBars = parseInt(valBarsArg, 10);
+  if (slideBarsArg) configOverrides.slideStepBars = parseInt(slideBarsArg, 10);
 
   // Build regime filter if enabled
   let regimeFilter: RegimeFilterConfig | undefined;
@@ -1108,20 +1833,104 @@ async function main(): Promise<void> {
     ? { ...DEFAULT_MTF_BIAS, enabled: true }
     : undefined;
 
-  // Build strategy config with SL mode
-  const baseStrategyConfig = useProduction ? { ...PRODUCTION_STRATEGY_CONFIG } : {};
-  const strategyConfig = { ...baseStrategyConfig, slPlacementMode };
+  // Parse circuit breaker config
+  let circuitBreaker: CircuitBreakerConfig | undefined;
+  if (cbArg) {
+    const parts = cbArg.split(',');
+    if (parts.length !== 2) {
+      console.error('Error: --circuit-breaker format: "maxLosses,cooldownBars" e.g., "3,50"');
+      process.exit(1);
+    }
+    const maxLosses = parseInt(parts[0]!, 10);
+    const cooldown = parseInt(parts[1]!, 10);
+    if (Number.isNaN(maxLosses) || Number.isNaN(cooldown) || maxLosses < 1 || cooldown < 1) {
+      console.error('Error: --circuit-breaker values must be positive integers');
+      process.exit(1);
+    }
+    circuitBreaker = { maxConsecutiveLosses: maxLosses, cooldownBars: cooldown };
+  }
 
-  // Scorer configuration
+  // Parse regime threshold overrides
+  const regimeThresholdOverrides: Record<string, number> = {};
+  if (regimeThresholdArg) {
+    for (const pair of regimeThresholdArg.split(',')) {
+      const [regime, val] = pair.split(':');
+      if (regime && val) {
+        const parsed = parseFloat(val);
+        if (!Number.isNaN(parsed)) {
+          regimeThresholdOverrides[regime.trim()] = parsed;
+        }
+      }
+    }
+  }
+
+  // Parse regime SL multipliers
+  const regimeSLMultipliers: Record<string, number> = {};
+  if (regimeSLMultArg) {
+    for (const pair of regimeSLMultArg.split(',')) {
+      const [regime, val] = pair.split(':');
+      if (regime && val) {
+        const parsed = parseFloat(val);
+        if (!Number.isNaN(parsed) && parsed > 0) {
+          regimeSLMultipliers[regime.trim()] = parsed;
+        }
+      }
+    }
+  }
+
+  // Build strategy config with SL mode + timeframe scaling
+  const is15m = timeframe === '15m';
+  const baseStrategyConfig = is15m
+    ? { ...FIFTEEN_MIN_STRATEGY_CONFIG }
+    : (useProduction ? { ...PRODUCTION_STRATEGY_CONFIG } : {});
+  const strategyConfig = {
+    ...baseStrategyConfig,
+    slPlacementMode,
+    ...(reactionBodyArg ? { minReactionBodyPercent: parseFloat(reactionBodyArg) } : {}),
+  };
+
+  // Scorer configuration (apply 15m bar-scaling overrides when on 15m)
   const scorerConfig: Partial<ConfluenceConfig> = {
     minSignalRR,
     requireKillZone: killZone,
     strategyConfig,
+    ...(is15m ? FIFTEEN_MIN_CONFLUENCE_OVERRIDES : {}),
     ...(regimeFilter ? { regimeFilter } : {}),
     ...(activeStrategies ? { activeStrategies } : {}),
     ...(suppressedRegimes.length > 0 ? { suppressedRegimes } : {}),
     ...(mtfBias ? { mtfBias } : {}),
+    ...(obHalfLifeArg ? { obFreshnessHalfLife: parseFloat(obHalfLifeArg) } : {}),
+    ...(atrExtArg ? { atrExtensionBands: parseFloat(atrExtArg) } : {}),
+    ...((() => {
+      const baseWeights = { ...DEFAULT_WEIGHTS };
+      if (obVolWeightArg) baseWeights.obVolumeQuality = parseFloat(obVolWeightArg);
+      if (weightsArg) {
+        for (const pair of weightsArg.split(',')) {
+          const [key, val] = pair.split(':');
+          if (key && val && key.trim() in baseWeights) {
+            (baseWeights as Record<string, number>)[key.trim()] = parseFloat(val);
+          }
+        }
+      }
+      if (obVolWeightArg || weightsArg) return { weights: baseWeights };
+      return {};
+    })()),
+    ...(Object.keys(regimeThresholdOverrides).length > 0 ? { regimeThresholdOverrides } : {}),
+    ...(regimeConfGateArg ? { regimeConfidenceGate: parseFloat(regimeConfGateArg) } : {}),
+    ...(structureAgeArg ? { maxStructureAge: parseInt(structureAgeArg, 10) } : {}),
+    ...(bosLookbackArg ? { bosLookback: parseInt(bosLookbackArg, 10) } : {}),
+    ...(momentumBarsArg ? { momentumBars: parseInt(momentumBarsArg, 10) } : {}),
+    ...(cooldownBarsArg ? { cooldownBars: parseInt(cooldownBarsArg, 10) } : {}),
+    ...(fundingMaxLongArg ? { fundingMaxForLong: parseFloat(fundingMaxLongArg) } : {}),
+    ...(fundingMinShortArg ? { fundingMinForShort: parseFloat(fundingMinShortArg) } : {}),
+    ...(fundingScoringArg && ['contrarian', 'aligned'].includes(fundingScoringArg)
+      ? { fundingScoringMode: fundingScoringArg as 'contrarian' | 'aligned' } : {}),
   };
+
+  // MAX_POSITION_BARS scaling for 15m (module-level isn't const so can't reassign, but passed through config)
+  // The MAX_POSITION_BARS = 100 constant is equivalent to ~100 hours at 1H or ~25 hours at 15m
+  // For 15m, we'd want 400 bars to maintain the same ~100 hour window — but this is a module const
+  // and the backtest already respects it as-is. Future: make configurable.
 
   if (!jsonOutputMode) {
     log('============================================================');
@@ -1131,7 +1940,10 @@ async function main(): Promise<void> {
     log(`Threshold:     ${threshold}`);
     log(`Strategies:    ${activeStrategies ? activeStrategies.join(', ') : 'default (order_block, fvg)'}`);
     log(`Min Signal RR: ${minSignalRR}`);
-    log(`Exit mode:     ${useEnhancedExits ? 'ENHANCED (strategy exits + trailing)' : 'SIMPLE (SL/TP only)'}`);
+    const exitLabel = multiTP
+      ? `MULTI-TP [${multiTP.levels.map(l => `${(l.fraction*100).toFixed(0)}%@${l.triggerR}R→SL${l.slMoveR}R`).join(', ')}]${multiTP.trailDistanceR ? ` + trail ${multiTP.trailDistanceR}R@${multiTP.trailActivationR}R` : ''}`
+      : partialTP ? ` + partial ${partialTP.fraction*100}%@${partialTP.triggerR}R` : '';
+    log(`Exit mode:     ${exitMode.toUpperCase()}${exitLabel}`);
     log(`Strategy cfg:  ${useProduction ? 'PRODUCTION (tighter entries)' : 'DEFAULT (RL-loosened)'}`);
     log(`Kill zone:     ${killZone ? 'REQUIRED' : useProduction ? 'via strategy config' : 'optional (scored)'}`);
     log(`Regime filter: ${useRegime ? 'ENABLED' : 'disabled'}`);
@@ -1144,16 +1956,70 @@ async function main(): Promise<void> {
     log(`SL mode:       ${slPlacementMode}`);
     log(`Timeframe:     ${timeframe}`);
     log(`Friction:      ${(FRICTION_PER_SIDE * 100).toFixed(3)}% per side (${(FRICTION_PER_SIDE * 2 * 100).toFixed(3)}% RT)`);
+    if (fundingMaxLongArg || fundingMinShortArg) {
+      log(`Funding filter: maxLong=${fundingMaxLongArg ?? 'off'} minShort=${fundingMinShortArg ?? 'off'}`);
+    }
+    log(`Circuit break: ${circuitBreaker ? `${circuitBreaker.maxConsecutiveLosses} losses → ${circuitBreaker.cooldownBars} bar pause` : 'disabled'}`);
+    log(`Regime thresh: ${Object.keys(regimeThresholdOverrides).length > 0 ? Object.entries(regimeThresholdOverrides).map(([k, v]) => `${k}:${v}`).join(', ') : 'none (global)'}`);
     log(`Max hold:      ${MAX_POSITION_BARS} bars`);
     log('');
   }
 
+  // Apply OB min-move override (mutates the detection-level config)
+  if (obMinMoveArg) {
+    const parsed = parseFloat(obMinMoveArg);
+    if (!Number.isNaN(parsed) && parsed > 0) {
+      DEFAULT_OB_CONFIG.minMovePercent = parsed;
+    }
+  }
+
+  // Build risk config
+  let riskConfig: RiskConfig | undefined;
+  if (volSizing || maxWindowDDArg || streakArg) {
+    riskConfig = { volSizing };
+    if (maxWindowDDArg) {
+      const parsed = parseFloat(maxWindowDDArg);
+      if (!Number.isNaN(parsed) && parsed < 0) {
+        riskConfig.maxWindowDD = parsed;
+      }
+    }
+    if (streakArg) {
+      const parts = streakArg.split(',');
+      if (parts.length === 3) {
+        const streakLength = parseInt(parts[0]!, 10);
+        const winMult = parseFloat(parts[1]!);
+        const lossMult = parseFloat(parts[2]!);
+        if (!Number.isNaN(streakLength) && !Number.isNaN(winMult) && !Number.isNaN(lossMult)) {
+          riskConfig.streakSizing = { streakLength, winMultiplier: winMult, lossMultiplier: lossMult };
+        }
+      }
+    }
+  }
+
+  // Load futures data for order flow filtering
+  type FuturesSnapshot = { timestamp: number; fundingRate: number };
+  let futuresDataMap: Map<string, FuturesSnapshot[]> | undefined;
+  if (withOrderflow || fundingMaxLongArg || fundingMinShortArg || fundingScoringArg) {
+    futuresDataMap = new Map();
+    const symbols = configOverrides.symbols ?? ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'];
+    for (const symbol of symbols) {
+      const futuresPath = path.join(process.cwd(), 'data', `${symbol}_futures_1h.json`);
+      if (fs.existsSync(futuresPath)) {
+        const snapshots: FuturesSnapshot[] = JSON.parse(fs.readFileSync(futuresPath, 'utf-8'));
+        futuresDataMap.set(symbol, snapshots);
+        if (!jsonOutputMode) log(`[OrderFlow] Loaded ${snapshots.length} futures snapshots for ${symbol}`);
+      } else {
+        if (!jsonOutputMode) log(`[OrderFlow] Warning: ${futuresPath} not found. Run sync-binance-futures.ts first.`);
+      }
+    }
+  }
+
   // Create the confluence runner
-  const { runner, allTrades, signalCounts, tradeRegimes } =
-    createConfluenceRunner(threshold, useEnhancedExits, scorerConfig);
+  const { runner, allTrades, signalCounts, tradeRegimes, circuitBreakerFirings } =
+    createConfluenceRunner(threshold, exitMode, scorerConfig, circuitBreaker, partialTP, regimeSLMultipliers, riskConfig, multiTP, futuresDataMap);
 
   // Run walk-forward validation
-  const walkForwardResult = await runWalkForward(runner, configOverrides);
+  const walkForwardResult = await runWalkForward(runner, configOverrides, { quiet: jsonOutputMode });
 
   // Compute strategy breakdown from all trades collected
   const strategyBreakdown = computeStrategyBreakdown(allTrades, signalCounts);
@@ -1206,6 +2072,9 @@ async function main(): Promise<void> {
       printRegimeBreakdown(regimeBreakdown);
     }
     printOverallSummary(backtestResult);
+    if (circuitBreaker) {
+      log(`Circuit breaker fired: ${circuitBreakerFirings} times`);
+    }
 
     // Print comparison to exp-014
     const rlResult = loadExp014Results();

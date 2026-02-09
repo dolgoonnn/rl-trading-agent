@@ -38,6 +38,8 @@ export interface MarketRegime {
   efficiency: number;
   /** Smoothed directional index (0-1, higher = stronger directional movement) */
   directionalIndex: number;
+  /** Classification confidence (0-1): how far from classification boundaries */
+  confidence: number;
 }
 
 export interface RegimeDetectorConfig {
@@ -97,6 +99,7 @@ export function detectRegime(
       atrPercentile: 0.5,
       efficiency: 0,
       directionalIndex: 0,
+      confidence: 0,
     };
   }
 
@@ -137,6 +140,16 @@ export function detectRegime(
     config.highVolatilityPercentile,
   );
 
+  // 7. Calculate classification confidence
+  const confidence = calculateRegimeConfidence(
+    efficiency,
+    atrPercentile,
+    config.rangingEfficiencyThreshold,
+    config.trendingEfficiencyThreshold,
+    config.lowVolatilityPercentile,
+    config.highVolatilityPercentile,
+  );
+
   return {
     trend,
     volatility,
@@ -145,6 +158,7 @@ export function detectRegime(
     atrPercentile,
     efficiency,
     directionalIndex,
+    confidence,
   };
 }
 
@@ -382,6 +396,47 @@ function classifyTrend(
   }
 
   return 'ranging';
+}
+
+/**
+ * Calculate classification confidence (0-1).
+ * Higher when efficiency and ATR percentile are far from classification boundaries.
+ * Lower when they're near the thresholds (ambiguous regime).
+ */
+function calculateRegimeConfidence(
+  efficiency: number,
+  atrPercentile: number,
+  rangingThreshold: number,
+  trendingThreshold: number,
+  lowVolPct: number,
+  highVolPct: number,
+): number {
+  // Trend confidence: distance from nearest classification boundary
+  const trendMidpoint = (rangingThreshold + trendingThreshold) / 2;
+  const trendRange = trendingThreshold - rangingThreshold;
+  const trendDist = trendRange > 0
+    ? Math.min(
+        Math.abs(efficiency - rangingThreshold),
+        Math.abs(efficiency - trendingThreshold),
+      ) / trendRange
+    : 0;
+  // If clearly ranging (below threshold) or clearly trending (above), high confidence
+  const trendConfidence = efficiency < rangingThreshold || efficiency > trendingThreshold
+    ? Math.min(1, 0.5 + trendDist)
+    : Math.max(0, 0.5 - (0.5 - trendDist));
+
+  // Volatility confidence: distance from classification boundaries
+  const volDist = Math.min(
+    Math.abs(atrPercentile - lowVolPct),
+    Math.abs(atrPercentile - highVolPct),
+  );
+  const volRange = highVolPct - lowVolPct;
+  const volConfidence = volRange > 0
+    ? Math.min(1, volDist / (volRange * 0.5))
+    : 0.5;
+
+  // Combined: geometric mean (both must be confident)
+  return Math.sqrt(trendConfidence * volConfidence);
 }
 
 /**

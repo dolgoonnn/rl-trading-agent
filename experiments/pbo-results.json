@@ -1,0 +1,17 @@
+{
+  "variants": [
+    "prod",
+    "thresh-3.5",
+    "thresh-4.5",
+    "atr-2.0",
+    "atr-2.5",
+    "no-regime-thresh",
+    "no-suppress",
+    "2-suppress"
+  ],
+  "pbo": 0.185,
+  "numCombinations": 2000,
+  "numOverfit": 370,
+  "avgLogitOOS": -1.8172892550191202,
+  "passes": true
+}

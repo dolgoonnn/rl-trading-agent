@@ -33,7 +33,7 @@ import {
   detectRegime,
   regimeLabel,
 } from '../src/lib/ict/regime-detector';
-import type { StrategyName } from '../src/lib/rl/strategies/ict-strategies';
+import type { StrategyName, SLPlacementMode } from '../src/lib/rl/strategies/ict-strategies';
 
 // ============================================
 // Types
@@ -84,9 +84,9 @@ interface SimulatedPosition {
 // ============================================
 
 const MAX_POSITION_BARS = 100;
-const COMMISSION_RATE = 0.001;
-const SLIPPAGE_RATE = 0.0005;
-const FRICTION_PER_SIDE = COMMISSION_RATE + SLIPPAGE_RATE;
+const DEFAULT_COMMISSION = 0.001;
+const DEFAULT_SLIPPAGE = 0.0005;
+let FRICTION_PER_SIDE = DEFAULT_COMMISSION + DEFAULT_SLIPPAGE;
 
 // ============================================
 // Position Simulation (Extended with exit reason tracking)
@@ -763,6 +763,8 @@ async function main(): Promise<void> {
   const strategyArg = getArg('strategy');
   const suppressRegimeArg = getArg('suppress-regime');
   const timeframeArg = getArg('timeframe');
+  const frictionArg = getArg('friction');
+  const slModeArg = getArg('sl-mode');
 
   const threshold = thresholdArg ? parseFloat(thresholdArg) : DEFAULT_CONFLUENCE_CONFIG.minThreshold;
   const timeframe = timeframeArg ?? '1h';
@@ -774,23 +776,38 @@ async function main(): Promise<void> {
     ? suppressRegimeArg.split(',').map((s) => s.trim())
     : [];
 
+  // Apply friction override
+  if (frictionArg) {
+    FRICTION_PER_SIDE = parseFloat(frictionArg);
+    if (Number.isNaN(FRICTION_PER_SIDE) || FRICTION_PER_SIDE < 0) {
+      console.error('Error: --friction must be a non-negative number (per-side fraction, e.g., 0.0007)');
+      process.exit(1);
+    }
+  }
+
+  // Parse SL placement mode
+  const slPlacementMode: SLPlacementMode = (['ob_based', 'entry_based', 'dynamic_rr'] as const).includes(
+    slModeArg as SLPlacementMode
+  ) ? (slModeArg as SLPlacementMode) : 'ob_based';
+
   const scorerConfig: Partial<ConfluenceConfig> = {
     minSignalRR: 1.5,
-    strategyConfig: PRODUCTION_STRATEGY_CONFIG,
+    strategyConfig: { ...PRODUCTION_STRATEGY_CONFIG, slPlacementMode },
     ...(activeStrategies ? { activeStrategies } : {}),
     ...(suppressedRegimes.length > 0 ? { suppressedRegimes } : {}),
   };
 
   console.log('='.repeat(80));
-  console.log('ITERATION 9: EXIT-TYPE DIAGNOSTICS');
+  console.log('ITERATION 10: EXIT-TYPE DIAGNOSTICS');
   console.log('='.repeat(80));
   console.log(`Threshold:  ${threshold}`);
   console.log(`Symbols:    ${symbols.join(', ')}`);
   console.log(`Strategies: ${activeStrategies ? activeStrategies.join(', ') : 'default (ob, fvg)'}`);
   console.log(`Suppress:   ${suppressedRegimes.length > 0 ? suppressedRegimes.join(', ') : 'none'}`);
+  console.log(`SL mode:    ${slPlacementMode}`);
   console.log(`Timeframe:  ${timeframe}`);
   console.log(`Max bars:   ${MAX_POSITION_BARS}`);
-  console.log(`Friction:   ${(FRICTION_PER_SIDE * 100).toFixed(2)}% per side`);
+  console.log(`Friction:   ${(FRICTION_PER_SIDE * 100).toFixed(3)}% per side (${(FRICTION_PER_SIDE * 2 * 100).toFixed(3)}% RT)`);
 
   const allTrades: DiagnosticTrade[] = [];
 

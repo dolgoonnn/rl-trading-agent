@@ -1,0 +1,66 @@
+{
+  "config": {
+    "episodes": 1,
+    "symbols": [
+      "BTCUSDT",
+      "ETHUSDT",
+      "SOLUSDT"
+    ],
+    "dataDir": "/Users/apple/projects/ict-trading/data",
+    "timeframe": "1h",
+    "modelDir": "/Users/apple/projects/ict-trading/models",
+    "saveInterval": 50,
+    "logInterval": 10,
+    "loadModel": null,
+    "decisionInterval": 24,
+    "episodeLength": 720,
+    "commission": 0.0005,
+    "slippage": 0.0002,
+    "maxHoldBars": 72,
+    "learningRate": 0.0002,
+    "nSteps": 30,
+    "nEpochs": 3,
+    "miniBatchSize": 15,
+    "gamma": 0.99,
+    "lambda": 0.95,
+    "clipRatio": 0.15,
+    "entropyCoef": 0.1,
+    "windowSlide": 360
+  },
+  "paramCount": {
+    "actor": 1110,
+    "critic": 1025,
+    "total": 2135
+  },
+  "history": [
+    {
+      "episode": 0,
+      "symbol": "SOLUSDT",
+      "totalReward": -3.8221255419490268,
+      "trades": 15,
+      "wins": 4,
+      "pnl": -0.2145260797515245,
+      "winRate": 0.26666666666666666,
+      "avgMultiplier": 0.488948387000661,
+      "loss": 8.858744333187738
+    }
+  ],
+  "summary": {
+    "totalEpisodes": 1,
+    "avgReward": -3.8221255419490268,
+    "avgTrades": 15,
+    "avgWinRate": 0.26666666666666666,
+    "avgPnL": -0.2145260797515245,
+    "bestEpisodeReward": -3.8221255419490268,
+    "worstEpisodeReward": -3.8221255419490268,
+    "rewardTrend": "stable",
+    "perSymbol": {
+      "SOLUSDT": {
+        "avgReward": -3.8221255419490268,
+        "avgWR": 0.26666666666666666,
+        "avgPnL": -0.2145260797515245,
+        "episodes": 1
+      }
+    }
+  }
+}
