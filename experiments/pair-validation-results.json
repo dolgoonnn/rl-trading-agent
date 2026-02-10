@@ -1,0 +1,194 @@
+{
+  "date": "2026-02-09T23:10:36.478Z",
+  "minPassRate": 0.6,
+  "config": "cmaes-run18",
+  "results": [
+    {
+      "symbol": "BNBUSDT",
+      "passRate": 0.3548387096774194,
+      "totalWindows": 31,
+      "passedWindows": 11,
+      "totalTrades": 200,
+      "winRate": 43,
+      "avgSharpe": -29.419676263505366,
+      "totalPnl": -57.41583307259906,
+      "passed": false
+    },
+    {
+      "symbol": "XRPUSDT",
+      "passRate": 0.45454545454545453,
+      "totalWindows": 33,
+      "passedWindows": 15,
+      "totalTrades": 265,
+      "winRate": 52.45283018867924,
+      "avgSharpe": -4.375537483072432,
+      "totalPnl": -8.291109477744818,
+      "passed": false
+    },
+    {
+      "symbol": "ADAUSDT",
+      "passRate": 0.5625,
+      "totalWindows": 32,
+      "passedWindows": 18,
+      "totalTrades": 304,
+      "winRate": 51.64473684210527,
+      "avgSharpe": 3.846535114415908,
+      "totalPnl": 69.48241112901401,
+      "passed": false
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "passRate": 0.5757575757575758,
+      "totalWindows": 33,
+      "passedWindows": 19,
+      "totalTrades": 303,
+      "winRate": 50.165016501650165,
+      "avgSharpe": -0.2804659942920163,
+      "totalPnl": -63.458738076285435,
+      "passed": false
+    },
+    {
+      "symbol": "AVAXUSDT",
+      "passRate": 0.48484848484848486,
+      "totalWindows": 33,
+      "passedWindows": 16,
+      "totalTrades": 327,
+      "winRate": 52.59938837920489,
+      "avgSharpe": 6.928577407962764,
+      "totalPnl": 3.2321590352455853,
+      "passed": false
+    },
+    {
+      "symbol": "LINKUSDT",
+      "passRate": 0.6060606060606061,
+      "totalWindows": 33,
+      "passedWindows": 20,
+      "totalTrades": 313,
+      "winRate": 51.118210862619804,
+      "avgSharpe": 2.1781253072300935,
+      "totalPnl": 20.97811141382595,
+      "passed": true
+    },
+    {
+      "symbol": "DOTUSDT",
+      "passRate": 0.48484848484848486,
+      "totalWindows": 33,
+      "passedWindows": 16,
+      "totalTrades": 275,
+      "winRate": 50.90909090909091,
+      "avgSharpe": -4.602822000086136,
+      "totalPnl": -43.36461094838029,
+      "passed": false
+    },
+    {
+      "symbol": "MATICUSDT",
+      "passRate": 0.5,
+      "totalWindows": 16,
+      "passedWindows": 8,
+      "totalTrades": 139,
+      "winRate": 45.32374100719424,
+      "avgSharpe": -7.596171874270789,
+      "totalPnl": -45.40380440394266,
+      "passed": false
+    },
+    {
+      "symbol": "LTCUSDT",
+      "passRate": 0.3939393939393939,
+      "totalWindows": 33,
+      "passedWindows": 13,
+      "totalTrades": 261,
+      "winRate": 43.29501915708812,
+      "avgSharpe": -13.608716121289541,
+      "totalPnl": -89.35484622593857,
+      "passed": false
+    },
+    {
+      "symbol": "ATOMUSDT",
+      "passRate": 0.45454545454545453,
+      "totalWindows": 33,
+      "passedWindows": 15,
+      "totalTrades": 289,
+      "winRate": 50.17301038062284,
+      "avgSharpe": 1.0045296542776905,
+      "totalPnl": -29.7658827066812,
+      "passed": false
+    },
+    {
+      "symbol": "NEARUSDT",
+      "passRate": 0.5757575757575758,
+      "totalWindows": 33,
+      "passedWindows": 19,
+      "totalTrades": 329,
+      "winRate": 50.455927051671736,
+      "avgSharpe": 0.20451849191108204,
+      "totalPnl": -38.986059895347715,
+      "passed": false
+    },
+    {
+      "symbol": "FILUSDT",
+      "passRate": 0.30303030303030304,
+      "totalWindows": 33,
+      "passedWindows": 10,
+      "totalTrades": 311,
+      "winRate": 44.69453376205787,
+      "avgSharpe": -10.26898411330378,
+      "totalPnl": -85.35738277939646,
+      "passed": false
+    },
+    {
+      "symbol": "APTUSDT",
+      "passRate": 0.5454545454545454,
+      "totalWindows": 33,
+      "passedWindows": 18,
+      "totalTrades": 304,
+      "winRate": 52.960526315789465,
+      "avgSharpe": 5.570025808198614,
+      "totalPnl": 28.784572772418592,
+      "passed": false
+    },
+    {
+      "symbol": "ARBUSDT",
+      "passRate": 0.53125,
+      "totalWindows": 32,
+      "passedWindows": 17,
+      "totalTrades": 310,
+      "winRate": 52.25806451612903,
+      "avgSharpe": 1.4089666193979729,
+      "totalPnl": -32.497182122406066,
+      "passed": false
+    },
+    {
+      "symbol": "UNIUSDT",
+      "passRate": 0.36363636363636365,
+      "totalWindows": 33,
+      "passedWindows": 12,
+      "totalTrades": 300,
+      "winRate": 52,
+      "avgSharpe": 1.4724702754911312,
+      "totalPnl": -3.4757903127283885,
+      "passed": false
+    },
+    {
+      "symbol": "AAVEUSDT",
+      "passRate": 0.36363636363636365,
+      "totalWindows": 33,
+      "passedWindows": 12,
+      "totalTrades": 341,
+      "winRate": 45.74780058651026,
+      "avgSharpe": -9.455380256709738,
+      "totalPnl": -85.97472368028983,
+      "passed": false
+    },
+    {
+      "symbol": "ICPUSDT",
+      "passRate": 0.45454545454545453,
+      "totalWindows": 33,
+      "passedWindows": 15,
+      "totalTrades": 329,
+      "winRate": 47.72036474164133,
+      "avgSharpe": -3.562932393594179,
+      "totalPnl": 0.003728942476644015,
+      "passed": false
+    }
+  ]
+}
