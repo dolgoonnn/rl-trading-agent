@@ -15,13 +15,8 @@ import type { Candle } from '@/types';
 import {
   ConfluenceScorer,
   type ConfluenceConfig,
-  PRODUCTION_STRATEGY_CONFIG,
-  DEFAULT_WEIGHTS,
+  type ConfluenceWeights,
 } from '../src/lib/rl/strategies/confluence-scorer';
-import {
-  detectRegime,
-  regimeLabel,
-} from '../src/lib/ict/regime-detector';
 import type { StrategyName, SLPlacementMode } from '../src/lib/rl/strategies/ict-strategies';
 import {
   runWalkForward,
@@ -29,6 +24,43 @@ import {
   type TradeResult,
 } from './walk-forward-validate';
 import { estimatePBO, type WindowResult } from '../src/lib/rl/utils/pbo';
+
+// ============================================
+// Production Config (Broad Run 4 — 7-symbol)
+// ============================================
+
+const PROD_WEIGHTS: Partial<ConfluenceWeights> = {
+  structureAlignment: 2.561,
+  killZoneActive: 0.566,
+  liquiditySweep: 1.347,
+  obProximity: 1.374,
+  fvgAtCE: 0.674,
+  recentBOS: 1.492,
+  rrRatio: 0.294,
+  oteZone: 0.610,
+  obFvgConfluence: 1.162,
+  momentumConfirmation: 0,
+};
+
+const PROD_REGIME_THRESHOLDS: Record<string, number> = {
+  'uptrend+high': 2.90,
+  'uptrend+normal': 5.21,
+  'uptrend+low': 2.90,
+  'downtrend+normal': 5.20,
+  'downtrend+low': 4.16,
+};
+
+const PROD_SUPPRESS = ['ranging+normal', 'ranging+high', 'downtrend+high'];
+const PROD_THRESHOLD = 4.80;
+const PROD_ATR_EXT = 2.63;
+const PROD_HALF_LIFE = 19;
+const PROD_COOLDOWN = 8;
+const PROD_MAX_BARS = 112;
+const PROD_PARTIAL_FRACTION = 0.44;
+const PROD_PARTIAL_TRIGGER_R = 0.94;
+const PROD_PARTIAL_BE_BUFFER = 0.12;
+
+const SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'LINKUSDT', 'DOGEUSDT', 'NEARUSDT', 'ADAUSDT'];
 
 // ============================================
 // Config Variants to Test
@@ -40,90 +72,61 @@ interface ConfigVariant {
   atrExtension: number;
   regimeThresholds: Record<string, number>;
   suppressedRegimes: string[];
+  weights: Partial<ConfluenceWeights>;
+  halfLife: number;
+  cooldown: number;
+  maxBars: number;
+  partialFraction: number;
+  partialTriggerR: number;
+  partialBeBuffer: number;
 }
 
-/** Production regime thresholds */
-const PROD_REGIME_THRESHOLDS = {
-  'uptrend+high': 3.5,
-  'uptrend+normal': 5.0,
-  'downtrend+low': 5.0,
-  'uptrend+low': 3.5,
-  'downtrend+normal': 4.5,
-};
-const PROD_SUPPRESS = ['ranging+normal', 'ranging+high', 'downtrend+high'];
+function prodVariant(id: string, overrides: Partial<ConfigVariant> = {}): ConfigVariant {
+  return {
+    id,
+    threshold: PROD_THRESHOLD,
+    atrExtension: PROD_ATR_EXT,
+    regimeThresholds: { ...PROD_REGIME_THRESHOLDS },
+    suppressedRegimes: [...PROD_SUPPRESS],
+    weights: { ...PROD_WEIGHTS },
+    halfLife: PROD_HALF_LIFE,
+    cooldown: PROD_COOLDOWN,
+    maxBars: PROD_MAX_BARS,
+    partialFraction: PROD_PARTIAL_FRACTION,
+    partialTriggerR: PROD_PARTIAL_TRIGGER_R,
+    partialBeBuffer: PROD_PARTIAL_BE_BUFFER,
+    ...overrides,
+  };
+}
 
 /** Configs spanning the parameter space around production values */
 const VARIANTS: ConfigVariant[] = [
-  // Production config (iter 40)
-  {
-    id: 'prod',
-    threshold: 4.15,
-    atrExtension: 3.0,
-    regimeThresholds: { ...PROD_REGIME_THRESHOLDS },
-    suppressedRegimes: [...PROD_SUPPRESS],
-  },
+  // Production config (Broad Run 4)
+  prodVariant('prod'),
+
   // Threshold variants
-  {
-    id: 'thresh-3.5',
-    threshold: 3.5,
-    atrExtension: 3.0,
-    regimeThresholds: {},
-    suppressedRegimes: [...PROD_SUPPRESS],
-  },
-  {
-    id: 'thresh-4.5',
-    threshold: 4.5,
-    atrExtension: 3.0,
-    regimeThresholds: { ...PROD_REGIME_THRESHOLDS },
-    suppressedRegimes: [...PROD_SUPPRESS],
-  },
+  prodVariant('thresh-4.2', { threshold: 4.2 }),
+  prodVariant('thresh-5.2', { threshold: 5.2 }),
+
   // ATR extension variants
-  {
-    id: 'atr-2.0',
-    threshold: 4.15,
-    atrExtension: 2.0,
-    regimeThresholds: { ...PROD_REGIME_THRESHOLDS },
-    suppressedRegimes: [...PROD_SUPPRESS],
-  },
-  {
-    id: 'atr-2.5',
-    threshold: 4.15,
-    atrExtension: 2.5,
-    regimeThresholds: { ...PROD_REGIME_THRESHOLDS },
-    suppressedRegimes: [...PROD_SUPPRESS],
-  },
-  // No regime thresholds
-  {
-    id: 'no-regime-thresh',
-    threshold: 4.15,
-    atrExtension: 3.0,
-    regimeThresholds: {},
-    suppressedRegimes: [...PROD_SUPPRESS],
-  },
-  // No suppress
-  {
-    id: 'no-suppress',
-    threshold: 4.15,
-    atrExtension: 3.0,
-    regimeThresholds: { ...PROD_REGIME_THRESHOLDS },
-    suppressedRegimes: [],
-  },
-  // 2-regime suppress
-  {
-    id: '2-suppress',
-    threshold: 4.15,
-    atrExtension: 3.0,
-    regimeThresholds: { ...PROD_REGIME_THRESHOLDS },
-    suppressedRegimes: ['ranging+normal', 'ranging+high'],
-  },
+  prodVariant('atr-2.0', { atrExtension: 2.0 }),
+  prodVariant('atr-3.2', { atrExtension: 3.2 }),
+
+  // No regime thresholds (flat threshold across all regimes)
+  prodVariant('no-regime-thresh', { regimeThresholds: {} }),
+
+  // No suppress (allow all regimes)
+  prodVariant('no-suppress', { suppressedRegimes: [] }),
+
+  // 2-regime suppress (less filtering)
+  prodVariant('2-suppress', { suppressedRegimes: ['ranging+normal', 'ranging+high'] }),
 ];
 
 // ============================================
-// Position Simulation (simplified from backtest-confluence.ts)
+// Position Simulation (matching backtest-confluence.ts)
 // ============================================
 
 const FRICTION_PER_SIDE = 0.0007;
-const MAX_POSITION_BARS = 100;
 
 interface SimulatedPosition {
   entryPrice: number;
@@ -139,6 +142,7 @@ function simulatePositionPartialTP(
   position: SimulatedPosition,
   candles: Candle[],
   startIndex: number,
+  config: ConfigVariant,
 ): TradeResult | null {
   const friction = FRICTION_PER_SIDE;
   const adjustedEntry = position.direction === 'long'
@@ -174,7 +178,10 @@ function simulatePositionPartialTP(
       const exitPnl = position.direction === 'long'
         ? (adjustedExit - adjustedEntry) / adjustedEntry
         : (adjustedEntry - adjustedExit) / adjustedEntry;
-      const finalPnl = partialTaken ? 0.45 * partialPnl + 0.55 * exitPnl : exitPnl;
+      const remainingFraction = 1 - config.partialFraction;
+      const finalPnl = partialTaken
+        ? config.partialFraction * partialPnl + remainingFraction * exitPnl
+        : exitPnl;
       return {
         entryTimestamp: position.entryTimestamp,
         exitTimestamp: candle.timestamp,
@@ -186,12 +193,12 @@ function simulatePositionPartialTP(
       };
     }
 
-    // Partial TP at 0.85R (45% fraction, matching production config)
+    // Partial TP
     if (!partialTaken && riskDistance > 0) {
       const unrealizedR = position.direction === 'long'
         ? (candle.close - position.entryPrice) / riskDistance
         : (position.entryPrice - candle.close) / riskDistance;
-      if (unrealizedR >= 0.85) {
+      if (unrealizedR >= config.partialTriggerR) {
         partialTaken = true;
         const partialExit = position.direction === 'long'
           ? candle.close * (1 - friction)
@@ -199,7 +206,7 @@ function simulatePositionPartialTP(
         partialPnl = position.direction === 'long'
           ? (partialExit - adjustedEntry) / adjustedEntry
           : (adjustedEntry - partialExit) / adjustedEntry;
-        const buffer = riskDistance * 0.1;
+        const buffer = riskDistance * config.partialBeBuffer;
         if (position.direction === 'long') {
           currentSL = Math.max(currentSL, position.entryPrice + buffer);
         } else {
@@ -209,14 +216,17 @@ function simulatePositionPartialTP(
     }
 
     // Max bars
-    if (barsHeld >= MAX_POSITION_BARS) {
+    if (barsHeld >= config.maxBars) {
       const adjustedExit = position.direction === 'long'
         ? candle.close * (1 - friction)
         : candle.close * (1 + friction);
       const exitPnl = position.direction === 'long'
         ? (adjustedExit - adjustedEntry) / adjustedEntry
         : (adjustedEntry - adjustedExit) / adjustedEntry;
-      const finalPnl = partialTaken ? 0.45 * partialPnl + 0.55 * exitPnl : exitPnl;
+      const remainingFraction = 1 - config.partialFraction;
+      const finalPnl = partialTaken
+        ? config.partialFraction * partialPnl + remainingFraction * exitPnl
+        : exitPnl;
       return {
         entryTimestamp: position.entryTimestamp,
         exitTimestamp: candle.timestamp,
@@ -248,7 +258,9 @@ function createPBORunner(variant: ConfigVariant): WalkForwardStrategyRunner {
         suppressedRegimes: variant.suppressedRegimes,
         atrExtensionBands: variant.atrExtension,
         regimeThresholdOverrides: variant.regimeThresholds,
-        obFreshnessHalfLife: 15,
+        obFreshnessHalfLife: variant.halfLife,
+        cooldownBars: variant.cooldown,
+        weights: variant.weights as ConfluenceWeights,
       };
       const scorer = new ConfluenceScorer(scorerConfig);
       const allCandles = [...trainCandles, ...valCandles];
@@ -276,7 +288,7 @@ function createPBORunner(variant: ConfigVariant): WalkForwardStrategyRunner {
             strategy: signal.strategy,
           };
 
-          const trade = simulatePositionPartialTP(position, allCandles, i + 1);
+          const trade = simulatePositionPartialTP(position, allCandles, i + 1, variant);
           if (trade) {
             trades.push(trade);
             let exitIdx = i + 1;
@@ -305,7 +317,8 @@ async function main(): Promise<void> {
   console.log('============================================================');
   console.log('PBO TEST: Probability of Backtest Overfitting');
   console.log('============================================================');
-  console.log(`Testing ${VARIANTS.length} config variants...`);
+  console.log(`Testing ${VARIANTS.length} config variants on ${SYMBOLS.length} symbols...`);
+  console.log(`Symbols: ${SYMBOLS.join(', ')}`);
   console.log('');
 
   // Run walk-forward for each variant and collect per-window Sharpe
@@ -314,7 +327,7 @@ async function main(): Promise<void> {
   for (const variant of VARIANTS) {
     console.log(`Running ${variant.id}...`);
     const runner = createPBORunner(variant);
-    const wfResult = await runWalkForward(runner);
+    const wfResult = await runWalkForward(runner, { symbols: SYMBOLS }, { quiet: true });
 
     // Collect per-window Sharpe ratios across all symbols
     const windowMetrics: number[] = [];
@@ -359,8 +372,9 @@ async function main(): Promise<void> {
   }
 
   // Save results
-  const outputPath = path.resolve('experiments/pbo-results.json');
+  const outputPath = path.resolve('experiments/pbo-results-7sym.json');
   fs.writeFileSync(outputPath, JSON.stringify({
+    symbols: SYMBOLS,
     variants: VARIANTS.map((v) => v.id),
     pbo: pboResult.pbo,
     numCombinations: pboResult.numCombinations,
@@ -369,7 +383,7 @@ async function main(): Promise<void> {
     passes: pboResult.passes,
   }, null, 2));
 
-  console.log(`\nResults saved to: experiments/pbo-results.json`);
+  console.log(`\nResults saved to: experiments/pbo-results-7sym.json`);
 }
 
 main().catch((err: unknown) => {

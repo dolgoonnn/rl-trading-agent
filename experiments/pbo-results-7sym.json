@@ -1,0 +1,26 @@
+{
+  "symbols": [
+    "BTCUSDT",
+    "ETHUSDT",
+    "SOLUSDT",
+    "LINKUSDT",
+    "DOGEUSDT",
+    "NEARUSDT",
+    "ADAUSDT"
+  ],
+  "variants": [
+    "prod",
+    "thresh-4.2",
+    "thresh-5.2",
+    "atr-2.0",
+    "atr-3.2",
+    "no-regime-thresh",
+    "no-suppress",
+    "2-suppress"
+  ],
+  "pbo": 0.124,
+  "numCombinations": 2000,
+  "numOverfit": 248,
+  "avgLogitOOS": -2.1418311401813965,
+  "passes": true
+}
