@@ -1,0 +1,44 @@
+{
+  "trialCounting": {
+    "singleParamExperiments": 190,
+    "cmaes3SymRuns": 18,
+    "cmaesBroadRuns": 4,
+    "totalIndependent": 212
+  },
+  "numTrialsUsed": 212,
+  "results": [
+    {
+      "config": "3sym (Run 18)",
+      "originalSharpe": 7.6645013278319665,
+      "deflatedSharpe": 6.768616873797131,
+      "haircut": 0.8958844540348354,
+      "numTrials": 212,
+      "numTrades": 701,
+      "skewness": 0.1931753084166227,
+      "kurtosis": 2.608712616462612,
+      "isSignificant": true,
+      "minBacktestLength": 6,
+      "actualObservations": 701,
+      "mblPass": true,
+      "minSignificantSharpe": 0.13661859547680905,
+      "passRate": 0.7684210526315789
+    },
+    {
+      "config": "7sym (Broad Run 4)",
+      "originalSharpe": 3.7303356014960856,
+      "deflatedSharpe": 3.4078780100059927,
+      "haircut": 0.3224575914900927,
+      "numTrials": 212,
+      "numTrades": 1687,
+      "skewness": 0.5706303146350179,
+      "kurtosis": 4.031019789179989,
+      "isSignificant": true,
+      "minBacktestLength": 7,
+      "actualObservations": 1687,
+      "mblPass": true,
+      "minSignificantSharpe": 0.09297591370468078,
+      "passRate": 0.6517857142857143
+    }
+  ],
+  "allPass": true
+}
