@@ -56,7 +56,7 @@ export const pgPaperTrades = pgTable('paper_trades', {
   exitIndex: integer('exit_index'),
   barsHeld: integer('bars_held'),
 
-  entryConfluence: integer('entry_confluence'),
+  entryConfluence: doublePrecision('entry_confluence'),
   entryFactors: text('entry_factors'),
   exitAction: text('exit_action'),
   exitReason: text('exit_reason'),
@@ -110,7 +110,7 @@ CREATE TABLE IF NOT EXISTS paper_trades (
   entry_index INTEGER NOT NULL,
   exit_index INTEGER,
   bars_held INTEGER,
-  entry_confluence INTEGER,
+  entry_confluence DOUBLE PRECISION,
   entry_factors TEXT,
   exit_action TEXT,
   exit_reason TEXT,
