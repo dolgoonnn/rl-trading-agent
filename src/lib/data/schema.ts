@@ -277,7 +277,7 @@ export const paperTrades = sqliteTable('paper_trades', {
   barsHeld: integer('bars_held'),
 
   // Agent decision
-  entryConfluence: integer('entry_confluence'),
+  entryConfluence: real('entry_confluence'),
   entryFactors: text('entry_factors'), // JSON array
   exitAction: text('exit_action'), // 'hold' | 'exit_market' | 'tighten_stop' | 'take_partial'
   exitReason: text('exit_reason'), // 'agent' | 'stop_loss' | 'take_profit' | 'max_bars' | 'shutdown'

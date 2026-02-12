@@ -20,6 +20,7 @@
  */
 
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { execSync } from 'child_process';
 import { CMAES } from '../src/lib/rl/utils/cma-es';
@@ -235,7 +236,7 @@ interface BacktestResult {
   pnl: number;
 }
 
-function buildCLIArgs(decoded: DecodedParams): string[] {
+function buildCLIArgs(decoded: DecodedParams, symbols?: string | null): string[] {
   const args: string[] = [
     '--strategy', 'ob',
     '--sl-mode', 'dynamic_rr',
@@ -249,6 +250,10 @@ function buildCLIArgs(decoded: DecodedParams): string[] {
     '--max-bars', decoded.maxBars.toString(),
     '--cooldown-bars', decoded.cooldownBars.toString(),
   ];
+
+  if (symbols) {
+    args.push('--symbols', symbols);
+  }
 
   // Regime thresholds
   const rtParts: string[] = [];
@@ -295,27 +300,32 @@ function parseBacktestOutput(output: string): BacktestResult | null {
   };
 }
 
-function runProductionBacktest(decoded: DecodedParams): BacktestResult | null {
-  const args = buildCLIArgs(decoded);
-  const cmd = `npx tsx scripts/backtest-confluence.ts ${args.map(a => `"${a}"`).join(' ')}`;
+function runProductionBacktest(decoded: DecodedParams, symbols?: string | null): BacktestResult | null {
+  const args = buildCLIArgs(decoded, symbols);
+  // Write output to temp file to avoid 8KB stdout truncation when exit code ≠ 0.
+  // With 10 symbols the text output easily exceeds the execSync pipe buffer.
+  const tmpFile = path.join(os.tmpdir(), `cmaes-bt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.txt`);
+  const cmd = `npx tsx scripts/backtest-confluence.ts ${args.map(a => `"${a}"`).join(' ')} > "${tmpFile}" 2>&1`;
 
   try {
-    const output = execSync(cmd, {
-      cwd: path.resolve(__dirname, '..'),
-      timeout: 120_000,
-      maxBuffer: 10 * 1024 * 1024,
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
-
-    return parseBacktestOutput(output);
-  } catch (err: unknown) {
-    // backtest-confluence.ts exits with code 1 when pass rate < 75%
-    // but still prints full output to stdout
-    const errObj = err as { stdout?: string };
-    if (errObj.stdout) {
-      return parseBacktestOutput(errObj.stdout);
+    try {
+      execSync(cmd, {
+        cwd: path.resolve(__dirname, '..'),
+        shell: true,
+        timeout: 300_000,
+      });
+    } catch {
+      // backtest-confluence.ts exits with code 1 when pass rate < 75%
+      // but still writes full output to tmpFile
     }
+
+    if (!fs.existsSync(tmpFile)) return null;
+
+    const output = fs.readFileSync(tmpFile, 'utf-8');
+    fs.unlinkSync(tmpFile);
+    return parseBacktestOutput(output);
+  } catch {
+    try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
     return null;
   }
 }
@@ -324,7 +334,7 @@ function runProductionBacktest(decoded: DecodedParams): BacktestResult | null {
 // Fitness Function
 // ============================================
 
-function computeFitness(result: BacktestResult): number {
+function computeFitness(result: BacktestResult, symbolCount: number): number {
   const passRate = result.passRate * 100;
   const trades = result.totalTrades;
   const winRate = result.winRate;
@@ -345,12 +355,13 @@ function computeFitness(result: BacktestResult): number {
     fitness += (winRate - 50) * 2;
   }
 
-  // Trade count: encourage enough trades for statistical significance
-  // Baseline has 748 trades. Heavily penalize < 200.
-  if (trades < 200) {
-    fitness -= (200 - trades) * 0.5;
-  } else if (trades >= 400) {
-    fitness += Math.min((trades - 400) * 0.02, 10);
+  // Trade count: scale thresholds by symbol count (~67 min trades per symbol)
+  const minTrades = Math.round(67 * symbolCount);
+  const bonusTrades = Math.round(133 * symbolCount);
+  if (trades < minTrades) {
+    fitness -= (minTrades - trades) * 0.5;
+  } else if (trades >= bonusTrades) {
+    fitness += Math.min((trades - bonusTrades) * 0.02, 10);
   }
 
   return fitness;
@@ -366,6 +377,7 @@ interface CLIConfig {
   sigma: number;
   warmStart: string | null;
   output: string | null;
+  symbols: string | null;
 }
 
 function parseCLI(): CLIConfig {
@@ -376,6 +388,7 @@ function parseCLI(): CLIConfig {
     sigma: 0.2,
     warmStart: null,
     output: null,
+    symbols: null,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -394,6 +407,9 @@ function parseCLI(): CLIConfig {
         break;
       case '--output': case '-o':
         config.output = args[++i] ?? null;
+        break;
+      case '--symbols':
+        config.symbols = args[++i] ?? null;
         break;
     }
   }
@@ -424,7 +440,10 @@ async function main() {
   log(`Sigma: ${config.sigma}`);
   log(`Warm start: ${config.warmStart ?? 'none'}`);
   log(`Output: ${config.output ?? 'cmaes_production.json'}`);
+  log(`Symbols: ${config.symbols ?? 'default (BTCUSDT,ETHUSDT,SOLUSDT)'}`);
   log('');
+
+  const symbolCount = config.symbols ? config.symbols.split(',').length : 3;
 
   // Load warm-start params if specified
   let initialMean: number[] | undefined;
@@ -492,8 +511,8 @@ async function main() {
     maxBars: 100,
     cooldownBars: 6,
   };
-  const baselineResult = runProductionBacktest(baselineDecoded);
-  const baselineFitness = baselineResult ? computeFitness(baselineResult) : 0;
+  const baselineResult = runProductionBacktest(baselineDecoded, config.symbols);
+  const baselineFitness = baselineResult ? computeFitness(baselineResult, symbolCount) : 0;
   log(`Baseline: fitness=${baselineFitness.toFixed(1)}, passRate=${(baselineResult?.passRate ?? 0) * 100 | 0}%, trades=${baselineResult?.totalTrades ?? 0}, PnL=${((baselineResult?.pnl ?? 0) * 100).toFixed(1)}%`);
   log('');
 
@@ -528,10 +547,10 @@ async function main() {
 
       const rawCandidate = denormalize(candidate);
       const decoded = decodeParams(rawCandidate, specs);
-      const result = runProductionBacktest(decoded);
+      const result = runProductionBacktest(decoded, config.symbols);
 
       if (result) {
-        const fitness = computeFitness(result);
+        const fitness = computeFitness(result, symbolCount);
         fitnesses.push(fitness);
         const improved = fitness > allTimeBestFitness;
         process.stdout.write(improved ? '+' : '.');
@@ -546,8 +565,8 @@ async function main() {
         process.stdout.write('x');
         if (gen === 0 && ci === 0) {
           log(`  C0 FAILED: no output from subprocess`);
-          const args = buildCLIArgs(decoded);
-          log(`  CMD: npx tsx scripts/backtest-confluence.ts ${args.slice(0, 8).join(' ')} ...`);
+          const debugArgs = buildCLIArgs(decoded, config.symbols);
+          log(`  CMD: npx tsx scripts/backtest-confluence.ts ${debugArgs.slice(0, 8).join(' ')} ...`);
         }
       }
     }
@@ -595,8 +614,8 @@ async function main() {
   const bestNormParams = allTimeBestParams ?? normMean;
   const bestParams = denormalize(bestNormParams);
   const bestDecoded = decodeParams(bestParams, specs);
-  const finalResult = runProductionBacktest(bestDecoded);
-  const finalFitness = finalResult ? computeFitness(finalResult) : 0;
+  const finalResult = runProductionBacktest(bestDecoded, config.symbols);
+  const finalFitness = finalResult ? computeFitness(finalResult, symbolCount) : 0;
 
   log('');
   log('============================================================');
@@ -646,7 +665,7 @@ async function main() {
   // Print CLI command to reproduce
   log('');
   log('Reproduce with:');
-  const cliArgs = buildCLIArgs(bestDecoded);
+  const cliArgs = buildCLIArgs(bestDecoded, config.symbols);
   log(`  npx tsx scripts/backtest-confluence.ts ${cliArgs.filter(a => a !== '--json').join(' ')}`);
 
   // Save model
@@ -664,6 +683,7 @@ async function main() {
     fitness: allTimeBestFitness,
     baselineFitness,
     generation: allTimeBestGen,
+    symbols: config.symbols ?? 'BTCUSDT,ETHUSDT,SOLUSDT',
     config: {
       generations: config.generations,
       populationSize: config.populationSize,

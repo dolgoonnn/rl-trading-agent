@@ -41,6 +41,8 @@ export class PgRepository implements PaperTradingRepository {
     try {
       await client.query(CREATE_SESSIONS_SQL);
       await client.query(CREATE_TRADES_SQL);
+      // Migrate existing tables: entry_confluence was INTEGER, now DOUBLE PRECISION
+      await client.query(`ALTER TABLE paper_trades ALTER COLUMN entry_confluence TYPE DOUBLE PRECISION`).catch(() => {});
     } finally {
       client.release();
     }
