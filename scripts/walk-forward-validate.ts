@@ -30,6 +30,7 @@
 import fs from 'fs';
 import path from 'path';
 import type { Candle } from '@/types';
+import { normalizeSymbolName } from '../src/lib/rl/config/symbols';
 import { DQNAgent, type SerializedWeights } from '../src/lib/rl/agent/dqn-agent';
 import { ReplayBuffer } from '../src/lib/rl/agent/replay-buffer';
 import { ICTMetaStrategyEnvironment } from '../src/lib/rl/environment/ict-meta-env';
@@ -338,7 +339,7 @@ async function evaluateSymbol(
   config: WalkForwardConfig,
   quiet: boolean
 ): Promise<SymbolWFResult> {
-  const dataPath = path.join(config.dataDir, `${symbol}_${config.timeframe}.json`);
+  const dataPath = path.join(config.dataDir, `${normalizeSymbolName(symbol)}_${config.timeframe}.json`);
 
   if (!fs.existsSync(dataPath)) {
     return {

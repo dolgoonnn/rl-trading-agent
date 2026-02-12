@@ -20,6 +20,7 @@
 import fs from 'fs';
 import path from 'path';
 import type { Candle } from '@/types';
+import { normalizeSymbolName } from '../src/lib/rl/config/symbols';
 import {
   ConfluenceScorer,
   type ConfluenceScorerResult,
@@ -2003,7 +2004,7 @@ async function main(): Promise<void> {
     futuresDataMap = new Map();
     const symbols = configOverrides.symbols ?? ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'];
     for (const symbol of symbols) {
-      const futuresPath = path.join(process.cwd(), 'data', `${symbol}_futures_1h.json`);
+      const futuresPath = path.join(process.cwd(), 'data', `${normalizeSymbolName(symbol)}_futures_1h.json`);
       if (fs.existsSync(futuresPath)) {
         const snapshots: FuturesSnapshot[] = JSON.parse(fs.readFileSync(futuresPath, 'utf-8'));
         futuresDataMap.set(symbol, snapshots);
