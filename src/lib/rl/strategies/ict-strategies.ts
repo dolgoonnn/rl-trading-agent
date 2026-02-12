@@ -33,6 +33,8 @@ import {
   type KillZoneConfig,
   type KillZoneInfo,
 } from '@/lib/ict';
+import { DEFAULT_OB_CONFIG, type OrderBlockConfig } from '@/lib/ict/order-blocks';
+import { type FVGConfig } from '@/lib/ict/fair-value-gaps';
 import type { LiquidityLevel, LiquiditySweep } from '@/types';
 
 // ============================================
@@ -98,6 +100,8 @@ export interface ICTStrategyContext {
   killZone?: KillZoneInfo;
   liquidityLevels?: LiquidityLevel[];
   recentSweeps?: LiquiditySweep[];
+  /** Volatility scale factor: ATR% / reference ATR% (~1.0 for crypto, ~0.1 for forex) */
+  volatilityScale: number;
 }
 
 // ============================================
@@ -1367,6 +1371,10 @@ export class ICTStrategyManager {
 
   /**
    * Build ICT context from candles
+   *
+   * Auto-scales OB/FVG detection thresholds based on asset volatility.
+   * Reference: BTC hourly ATR% ≈ 0.6%. Forex ATR% ≈ 0.07%.
+   * Scale factor = clamp(ATR% / 0.006, 0.05, 5.0)
    */
   buildContext(
     candles: Candle[],
@@ -1377,10 +1385,6 @@ export class ICTStrategyManager {
       currentIndex + 1
     );
 
-    const structure = analyzeMarketStructure(lookbackCandles);
-    const orderBlocks = detectOrderBlocks(lookbackCandles);
-    const fvgs = detectFairValueGaps(lookbackCandles);
-
     const current = candles[currentIndex];
     if (!current) {
       throw new Error(`No candle at index ${currentIndex}`);
@@ -1388,6 +1392,30 @@ export class ICTStrategyManager {
 
     // Calculate ATR
     const atr = this.calculateATR(lookbackCandles);
+
+    // Compute volatility scale factor for auto-scaling detection thresholds
+    // Reference ATR% = 0.006 (0.6%), typical for BTC hourly
+    const atrPercent = current.close > 0 ? atr / current.close : 0.006;
+    const REFERENCE_ATR_PERCENT = 0.006;
+    const volatilityScale = Math.max(0.05, Math.min(5.0, atrPercent / REFERENCE_ATR_PERCENT));
+
+    // Scale OB detection thresholds by volatility
+    const scaledOBConfig: OrderBlockConfig = {
+      ...DEFAULT_OB_CONFIG,
+      minMovePercent: DEFAULT_OB_CONFIG.minMovePercent * volatilityScale,
+    };
+
+    // Scale FVG detection thresholds by volatility
+    const scaledFVGConfig: FVGConfig = {
+      minSizePercent: 0.4 * volatilityScale,
+      maxAgeCandles: 30,
+      displacementMultiple: 1.5,
+      avgBodyLookback: 14,
+    };
+
+    const structure = analyzeMarketStructure(lookbackCandles);
+    const orderBlocks = detectOrderBlocks(lookbackCandles, scaledOBConfig);
+    const fvgs = detectFairValueGaps(lookbackCandles, scaledFVGConfig);
 
     // Get kill zone info
     const killZone = checkKillZone(current.timestamp);
@@ -1406,6 +1434,7 @@ export class ICTStrategyManager {
       killZone,
       liquidityLevels,
       recentSweeps,
+      volatilityScale,
     };
   }
 
