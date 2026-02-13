@@ -1,0 +1,103 @@
+{
+  "config": "Forex CMA-ES Run 3",
+  "symbols": [
+    "EURUSD=X",
+    "GBPUSD=X",
+    "USDJPY=X",
+    "AUDUSD=X"
+  ],
+  "friction": 0.0003,
+  "walkForward": {
+    "passRate": 0.6153846153846154,
+    "trades": 315,
+    "sharpe": 3.707083611795439
+  },
+  "pbo": {
+    "pbo": 0.318,
+    "numCombinations": 2000,
+    "numOverfit": 636,
+    "avgLogitOOS": -0.5677551918619479,
+    "passes": false
+  },
+  "dsr": {
+    "originalSharpe": 3.707083611795439,
+    "deflatedSharpe": 3.126656438957953,
+    "haircut": 0.5804271728374859,
+    "numTrials": 216,
+    "numTrades": 315,
+    "skewness": 0.601269722844407,
+    "kurtosis": 2.2309400838089006,
+    "isSignificant": true,
+    "minBacktestLength": 7,
+    "mblPass": true,
+    "minSignificantSharpe": 0.20534468058846617,
+    "passRate": 0.6153846153846154
+  },
+  "monteCarlo": {
+    "totalTrades": 315,
+    "realSharpe": 3.707083611795439,
+    "realMaxDD": 0.08436593070828272,
+    "realPnl": 0.08867712689960627,
+    "realWinRate": 0.43492063492063493,
+    "reshufflePass": true,
+    "bootstrapSharpeP5": -3.9414637942375017,
+    "bootstrapSharpePass": false,
+    "bootstrapPnlP5": -0.0933051859899061,
+    "bootstrapPnlPass": false,
+    "skip20ProfitPct": 0.948,
+    "skip20Pass": true,
+    "perturbation": {
+      "meanPassRate": 0.5396153846153848,
+      "fragilityScore": 0.76,
+      "fragilityPass": false
+    },
+    "verdict": "FAIL",
+    "verdictDetails": [
+      "PASS: Reshuffle — no adverse serial correlation",
+      "FAIL: Bootstrap Sharpe 5th pct <= 0 (-3.941)",
+      "FAIL: Bootstrap PnL 5th pct <= 0 (-9.3%)",
+      "PASS: Skip 20% profitable in 95% of iterations",
+      "FAIL: Parameter fragility 76% (>= 50%)"
+    ]
+  },
+  "scorecard": [
+    {
+      "check": "Walk-Forward >60%",
+      "value": "61.5%",
+      "pass": true
+    },
+    {
+      "check": "PBO <25%",
+      "value": "31.8%",
+      "pass": false
+    },
+    {
+      "check": "DSR >0",
+      "value": "3.13",
+      "pass": true
+    },
+    {
+      "check": "MC Bootstrap Sharpe",
+      "value": "-3.941",
+      "pass": false
+    },
+    {
+      "check": "MC Bootstrap PnL",
+      "value": "-9.3%",
+      "pass": false
+    },
+    {
+      "check": "MC Skip 20%",
+      "value": "95%",
+      "pass": true
+    },
+    {
+      "check": "Param Fragility <50%",
+      "value": "76%",
+      "pass": false
+    }
+  ],
+  "overallPass": false,
+  "tradePassOnly": false,
+  "timestamp": "2026-02-13T03:04:48.644Z"
+}

@@ -236,12 +236,12 @@ interface BacktestResult {
   pnl: number;
 }
 
-function buildCLIArgs(decoded: DecodedParams, symbols?: string | null): string[] {
+function buildCLIArgs(decoded: DecodedParams, symbols?: string | null, friction?: number, suppressRegime?: string): string[] {
   const args: string[] = [
     '--strategy', 'ob',
     '--sl-mode', 'dynamic_rr',
-    '--friction', '0.0007',
-    '--suppress-regime', 'ranging+normal,ranging+high,downtrend+high',
+    '--friction', (friction ?? 0.0007).toString(),
+    '--suppress-regime', suppressRegime ?? 'ranging+normal,ranging+high,downtrend+high',
     '--threshold', decoded.baseThreshold.toFixed(3),
     '--exit-mode', 'simple',
     '--partial-tp', `${decoded.partialFraction.toFixed(2)},${decoded.partialTriggerR.toFixed(2)},${decoded.partialBeBuffer.toFixed(2)}`,
@@ -300,8 +300,8 @@ function parseBacktestOutput(output: string): BacktestResult | null {
   };
 }
 
-function runProductionBacktest(decoded: DecodedParams, symbols?: string | null): BacktestResult | null {
-  const args = buildCLIArgs(decoded, symbols);
+function runProductionBacktest(decoded: DecodedParams, symbols?: string | null, friction?: number, suppressRegime?: string): BacktestResult | null {
+  const args = buildCLIArgs(decoded, symbols, friction, suppressRegime);
   // Write output to temp file to avoid 8KB stdout truncation when exit code ≠ 0.
   // With 10 symbols the text output easily exceeds the execSync pipe buffer.
   const tmpFile = path.join(os.tmpdir(), `cmaes-bt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.txt`);
@@ -340,6 +340,10 @@ function computeFitness(result: BacktestResult, symbolCount: number): number {
   const winRate = result.winRate;
   const pnl = result.pnl * 100;
 
+  // Hard floor: fewer than 30 trades per symbol = zero fitness
+  const hardFloor = 30 * symbolCount;
+  if (trades < hardFloor) return 0;
+
   // Primary: pass rate (×10 for dominance)
   let fitness = passRate * 10;
 
@@ -359,7 +363,8 @@ function computeFitness(result: BacktestResult, symbolCount: number): number {
   const minTrades = Math.round(67 * symbolCount);
   const bonusTrades = Math.round(133 * symbolCount);
   if (trades < minTrades) {
-    fitness -= (minTrades - trades) * 0.5;
+    // Multiplicative penalty: fitness scaled down proportionally
+    fitness *= (trades / minTrades);
   } else if (trades >= bonusTrades) {
     fitness += Math.min((trades - bonusTrades) * 0.02, 10);
   }
@@ -378,6 +383,8 @@ interface CLIConfig {
   warmStart: string | null;
   output: string | null;
   symbols: string | null;
+  friction: number;
+  suppressRegime: string;
 }
 
 function parseCLI(): CLIConfig {
@@ -389,6 +396,8 @@ function parseCLI(): CLIConfig {
     warmStart: null,
     output: null,
     symbols: null,
+    friction: 0.0007,
+    suppressRegime: 'ranging+normal,ranging+high,downtrend+high',
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -410,6 +419,12 @@ function parseCLI(): CLIConfig {
         break;
       case '--symbols':
         config.symbols = args[++i] ?? null;
+        break;
+      case '--friction':
+        config.friction = parseFloat(args[++i] ?? '0.0007');
+        break;
+      case '--suppress-regime':
+        config.suppressRegime = args[++i] ?? config.suppressRegime;
         break;
     }
   }
@@ -441,6 +456,8 @@ async function main() {
   log(`Warm start: ${config.warmStart ?? 'none'}`);
   log(`Output: ${config.output ?? 'cmaes_production.json'}`);
   log(`Symbols: ${config.symbols ?? 'default (BTCUSDT,ETHUSDT,SOLUSDT)'}`);
+  log(`Friction: ${config.friction}`);
+  log(`Suppress: ${config.suppressRegime}`);
   log('');
 
   const symbolCount = config.symbols ? config.symbols.split(',').length : 3;
@@ -511,7 +528,7 @@ async function main() {
     maxBars: 100,
     cooldownBars: 6,
   };
-  const baselineResult = runProductionBacktest(baselineDecoded, config.symbols);
+  const baselineResult = runProductionBacktest(baselineDecoded, config.symbols, config.friction, config.suppressRegime);
   const baselineFitness = baselineResult ? computeFitness(baselineResult, symbolCount) : 0;
   log(`Baseline: fitness=${baselineFitness.toFixed(1)}, passRate=${(baselineResult?.passRate ?? 0) * 100 | 0}%, trades=${baselineResult?.totalTrades ?? 0}, PnL=${((baselineResult?.pnl ?? 0) * 100).toFixed(1)}%`);
   log('');
@@ -547,7 +564,7 @@ async function main() {
 
       const rawCandidate = denormalize(candidate);
       const decoded = decodeParams(rawCandidate, specs);
-      const result = runProductionBacktest(decoded, config.symbols);
+      const result = runProductionBacktest(decoded, config.symbols, config.friction, config.suppressRegime);
 
       if (result) {
         const fitness = computeFitness(result, symbolCount);
@@ -565,7 +582,7 @@ async function main() {
         process.stdout.write('x');
         if (gen === 0 && ci === 0) {
           log(`  C0 FAILED: no output from subprocess`);
-          const debugArgs = buildCLIArgs(decoded, config.symbols);
+          const debugArgs = buildCLIArgs(decoded, config.symbols, config.friction, config.suppressRegime);
           log(`  CMD: npx tsx scripts/backtest-confluence.ts ${debugArgs.slice(0, 8).join(' ')} ...`);
         }
       }
@@ -614,7 +631,7 @@ async function main() {
   const bestNormParams = allTimeBestParams ?? normMean;
   const bestParams = denormalize(bestNormParams);
   const bestDecoded = decodeParams(bestParams, specs);
-  const finalResult = runProductionBacktest(bestDecoded, config.symbols);
+  const finalResult = runProductionBacktest(bestDecoded, config.symbols, config.friction, config.suppressRegime);
   const finalFitness = finalResult ? computeFitness(finalResult, symbolCount) : 0;
 
   log('');
@@ -665,7 +682,7 @@ async function main() {
   // Print CLI command to reproduce
   log('');
   log('Reproduce with:');
-  const cliArgs = buildCLIArgs(bestDecoded, config.symbols);
+  const cliArgs = buildCLIArgs(bestDecoded, config.symbols, config.friction, config.suppressRegime);
   log(`  npx tsx scripts/backtest-confluence.ts ${cliArgs.filter(a => a !== '--json').join(' ')}`);
 
   // Save model

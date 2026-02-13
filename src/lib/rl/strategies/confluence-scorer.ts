@@ -1159,7 +1159,7 @@ export class ConfluenceScorer {
     ctx: ICTStrategyContext,
   ): number {
     const price = ctx.currentPrice;
-    const proximity = this.config.obFvgProximity;
+    const proximity = this.config.obFvgProximity * (ctx.volatilityScale ?? 1);
 
     if (signal.direction === 'long') {
       // Need bullish OB near price

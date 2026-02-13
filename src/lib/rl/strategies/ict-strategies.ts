@@ -365,7 +365,7 @@ export class OrderBlockStrategy implements ICTStrategy {
     candle: Candle,
     ctx: ICTStrategyContext
   ): StrategySignal | null {
-    const proximity = this.config.proximityPercent;
+    const proximity = this.config.proximityPercent * (ctx.volatilityScale ?? 1);
     const reasoning: string[] = [];
 
     // Check for recent liquidity sweep confirmation
@@ -667,8 +667,8 @@ export class FVGStrategy implements ICTStrategy {
   ): StrategySignal | null {
     const reasoning: string[] = [];
 
-    // FVG quality filter: require meaningful size (>0.3% of price)
-    const minFVGSize = 0.003; // 0.3% minimum for meaningful gap
+    // FVG quality filter: require meaningful size, scaled by asset volatility
+    const minFVGSize = 0.003 * (ctx.volatilityScale ?? 1); // 0.3% for crypto, ~0.03% for forex
     if (fvg.sizePercent < minFVGSize) {
       return null;
     }
@@ -678,7 +678,7 @@ export class FVGStrategy implements ICTStrategy {
 
     // Get Consequent Encroachment (CE) - 50% midpoint
     const ce = fvg.consequentEncroachment;
-    const ceTolerance = ENTRY_CONFIG.fvgCeTolerance;
+    const ceTolerance = ENTRY_CONFIG.fvgCeTolerance * (ctx.volatilityScale ?? 1);
 
     // Check for recent liquidity sweep confirmation
     const hasLongSweep = ctx.recentSweeps?.some(s => s.level.type === 'ssl') ?? false;
@@ -949,11 +949,12 @@ export class BOSContinuationStrategy implements ICTStrategy {
           reasoning.push('Near optimal 70.5% entry');
         }
 
-        // OB confluence
+        // OB confluence (proximity scaled by asset volatility)
+        const obProxScale = 1 + 0.005 * (ctx.volatilityScale ?? 1);
         const supportOB = ctx.orderBlocks.find(
           (ob) => ob.type === 'bullish' &&
             ob.status === 'unmitigated' &&
-            current.low <= ob.high * 1.005
+            current.low <= ob.high * obProxScale
         );
 
         if (supportOB) {
@@ -1012,10 +1013,11 @@ export class BOSContinuationStrategy implements ICTStrategy {
           reasoning.push('Near optimal 70.5% entry');
         }
 
+        const obProxScaleShort = 1 - 0.005 * (ctx.volatilityScale ?? 1);
         const resistanceOB = ctx.orderBlocks.find(
           (ob) => ob.type === 'bearish' &&
             ob.status === 'unmitigated' &&
-            current.high >= ob.low * 0.995
+            current.high >= ob.low * obProxScaleShort
         );
 
         if (resistanceOB) {
@@ -1175,7 +1177,8 @@ export class CHoCHReversalStrategy implements ICTStrategy {
       );
 
       // Check if price is near the OB OR just enter on CHoCH directly
-      const hasOBConfluence = supportOB && Math.abs(current.close - supportOB.high) / current.close <= 0.02;
+      const obConfProx = 0.02 * (ctx.volatilityScale ?? 1);
+      const hasOBConfluence = supportOB && Math.abs(current.close - supportOB.high) / current.close <= obConfProx;
 
       if (hasOBConfluence) {
         reasoning.push('Found supporting OB confluence');
@@ -1214,7 +1217,8 @@ export class CHoCHReversalStrategy implements ICTStrategy {
           currentIndex - ob.index <= 50
       );
 
-      const hasOBConfluence = resistanceOB && Math.abs(current.close - resistanceOB.low) / current.close <= 0.02;
+      const obConfProxShort = 0.02 * (ctx.volatilityScale ?? 1);
+      const hasOBConfluence = resistanceOB && Math.abs(current.close - resistanceOB.low) / current.close <= obConfProxShort;
 
       if (hasOBConfluence) {
         reasoning.push('Found resistance OB confluence');
@@ -1393,11 +1397,26 @@ export class ICTStrategyManager {
     // Calculate ATR
     const atr = this.calculateATR(lookbackCandles);
 
-    // Compute volatility scale factor for auto-scaling detection thresholds
-    // Reference ATR% = 0.006 (0.6%), typical for BTC hourly
-    const atrPercent = current.close > 0 ? atr / current.close : 0.006;
-    const REFERENCE_ATR_PERCENT = 0.006;
-    const volatilityScale = Math.max(0.05, Math.min(5.0, atrPercent / REFERENCE_ATR_PERCENT));
+    // Compute volatility scale factor for auto-scaling detection thresholds.
+    // Uses MEDIAN ATR% over 50 bars for stable asset-class classification
+    // (14-bar ATR fluctuates too much and affects ~1% of quiet crypto bars).
+    // Crypto (median ATR% >= 0.15%) → scale=1.0 (preserves calibrated config).
+    // Forex/low-vol (median ATR% < 0.15%) → scale ∝ ATR%/0.6% so thresholds ≈ 2 ATR.
+    const medianWindow = Math.min(50, lookbackCandles.length - 1);
+    const trPcts: number[] = [];
+    for (let k = lookbackCandles.length - medianWindow; k < lookbackCandles.length; k++) {
+      const c = lookbackCandles[k]!;
+      const prevC = lookbackCandles[k - 1];
+      const prevClose = prevC ? prevC.close : c.open;
+      const tr = Math.max(c.high - c.low, Math.abs(c.high - prevClose), Math.abs(c.low - prevClose));
+      trPcts.push(c.close > 0 ? tr / c.close : 0);
+    }
+    trPcts.sort((a, b) => a - b);
+    const medianAtrPct = trPcts[Math.floor(trPcts.length / 2)] ?? 0.006;
+    const CRYPTO_FLOOR = 0.002; // 0.20% — 50-bar median: BTC never below, EURUSD always below
+    const volatilityScale = medianAtrPct >= CRYPTO_FLOOR
+      ? 1.0
+      : Math.max(0.05, medianAtrPct / 0.006);
 
     // Scale OB detection thresholds by volatility
     const scaledOBConfig: OrderBlockConfig = {
