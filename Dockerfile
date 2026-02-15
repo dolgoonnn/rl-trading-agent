@@ -25,4 +25,4 @@ COPY data/BTCUSDT_1h.json data/ETHUSDT_1h.json data/SOLUSDT_1h.json ./data/
 RUN addgroup --system app && adduser --system --ingroup app app
 USER app
 
-CMD ["npx", "tsx", "scripts/paper-trade-confluence.ts"]
+CMD ["npx", "tsx", "scripts/paper-trade-confluence.ts", "--symbols", "BTCUSDT,ETHUSDT,SOLUSDT,LINKUSDT,DOGEUSDT,NEARUSDT,ADAUSDT,APTUSDT,ARBUSDT,MATICUSDT"]
