@@ -53,7 +53,7 @@ export const StrategyActions = {
 
 export const STRATEGY_COUNT = 5;
 
-export type StrategyName = 'wait' | 'order_block' | 'fvg' | 'bos_continuation' | 'choch_reversal';
+export type StrategyName = 'wait' | 'order_block' | 'fvg' | 'bos_continuation' | 'choch_reversal' | 'asian_range_gold';
 
 export function strategyActionToName(action: StrategyAction): StrategyName {
   switch (action) {
@@ -1322,6 +1322,414 @@ export class CHoCHReversalStrategy implements ICTStrategy {
 }
 
 // ============================================
+// Asian Range Gold Strategy (XAUUSD)
+// ============================================
+
+/**
+ * Gold-native ICT strategy based on session microstructure:
+ *   1. Calculate Asian Range (7pm-12am NY) high/low
+ *   2. Detect liquidity sweep of Asian boundary in London/NY session
+ *   3. Confirm with displacement candle + FVG formation
+ *   4. Enter at FVG Consequent Encroachment (CE)
+ *   5. SL below/above the sweep extreme, TP at opposite Asian boundary
+ *
+ * Key differences from crypto OB strategy:
+ *   - Session-driven (only trades during London Open / NY Open kill zones)
+ *   - Uses Asian Range as the setup framework instead of generic OBs
+ *   - Gold-specific volatility scaling (ATR% ≈ 0.3% vs crypto 0.6%)
+ *   - Optional long bias multiplier (gold's positive skewness)
+ */
+
+/** Asian Range info for a single trading day */
+export interface AsianRangeInfo {
+  high: number;
+  low: number;
+  rangeSize: number;
+  rangePct: number;
+  startTimestamp: number;
+  endTimestamp: number;
+  candleCount: number;
+}
+
+/** Config for the Asian Range Gold strategy */
+export interface AsianRangeGoldConfig {
+  /** Minimum Asian range size as % of price (default: 0.08%) */
+  minRangePct: number;
+  /** Minimum sweep penetration beyond Asian boundary as % of price (default: 0.01%) */
+  minSweepPct: number;
+  /** Displacement candle body must be > this × average body (default: 1.2) */
+  displacementMultiple: number;
+  /** Tolerance around FVG CE for entry as fraction of price (default: 0.005 = 0.5%) */
+  ceTolerance: number;
+  /** ATR extension for SL beyond sweep extreme (default: 0.5) */
+  slAtrExtension: number;
+  /** Target R:R for TP at opposite Asian boundary (default: 2.0) */
+  targetRR: number;
+  /** TP multiplier for long trades (gold positive skew, default: 1.0 = no bias) */
+  longBiasMultiplier: number;
+  /** Only trade during these kill zones (default: london_open, ny_open) */
+  allowedKillZones: string[];
+  /** Gold-specific vol scale (applied to detection thresholds, default: 0.5) */
+  goldVolScale: number;
+  /** How many bars back to look for Asian session (default: 48) */
+  asianLookback: number;
+  /** How many bars back to look for sweep (default: 20) */
+  sweepLookback: number;
+  /** How many bars after sweep to search for displacement+FVG (default: 12) */
+  fvgSearchWindow: number;
+  /** If true, allow entry anywhere within FVG zone, not just at CE (default: false) */
+  entryInFvgZone: boolean;
+}
+
+const DEFAULT_GOLD_CONFIG: AsianRangeGoldConfig = {
+  minRangePct: 0.08,
+  minSweepPct: 0.01,
+  displacementMultiple: 1.2,
+  ceTolerance: 0.005,
+  slAtrExtension: 0.5,
+  targetRR: 2.0,
+  longBiasMultiplier: 1.0,
+  allowedKillZones: ['london_open', 'ny_open'],
+  goldVolScale: 0.5,
+  asianLookback: 48,
+  sweepLookback: 20,
+  fvgSearchWindow: 12,
+  entryInFvgZone: false,
+};
+
+/** Get NY hour from timestamp (re-exported for strategy use) */
+function getGoldNYHour(timestampMs: number): number {
+  const date = new Date(timestampMs);
+  let hour = parseInt(
+    date.toLocaleString('en-US', { timeZone: 'America/New_York', hour: 'numeric', hour12: false }),
+    10,
+  );
+  if (hour === 24) hour = 0;
+  return hour;
+}
+
+export class AsianRangeGoldStrategy implements ICTStrategy {
+  readonly name: StrategyName = 'asian_range_gold';
+  private goldConfig: AsianRangeGoldConfig;
+
+  constructor(
+    _config: Partial<StrategyConfig> = {},
+    goldConfig: Partial<AsianRangeGoldConfig> = {},
+  ) {
+    this.goldConfig = { ...DEFAULT_GOLD_CONFIG, ...goldConfig };
+  }
+
+  /**
+   * Build the Asian Range from the candle history leading up to current bar.
+   * Asian session: hours 19, 20, 21, 22, 23 NY (7pm-11pm).
+   * Returns the most recent completed Asian range, or null if not enough data.
+   */
+  private buildAsianRange(candles: Candle[], currentIndex: number): AsianRangeInfo | null {
+    // Walk backward from currentIndex to find the most recent Asian session
+    let asianHigh = -Infinity;
+    let asianLow = Infinity;
+    let asianBars = 0;
+    let startTs = 0;
+    let endTs = 0;
+    let foundAsian = false;
+    let pastAsian = false;
+
+    for (let i = currentIndex; i >= Math.max(0, currentIndex - this.goldConfig.asianLookback); i--) {
+      const c = candles[i];
+      if (!c) continue;
+      const hour = getGoldNYHour(c.timestamp);
+      const isAsianHour = hour >= 19 && hour <= 23;
+
+      if (isAsianHour) {
+        if (pastAsian) break; // We've gone past a full session, use the one we found
+        foundAsian = true;
+        asianHigh = Math.max(asianHigh, c.high);
+        asianLow = Math.min(asianLow, c.low);
+        asianBars++;
+        startTs = c.timestamp; // Will be overwritten backward, final value = earliest
+        if (endTs === 0) endTs = c.timestamp;
+      } else if (foundAsian) {
+        pastAsian = true;
+        // Continue to see if there's another session further back
+      }
+    }
+
+    if (asianBars < 3 || asianHigh <= asianLow) return null;
+
+    const mid = (asianHigh + asianLow) / 2;
+    const rangePct = mid > 0 ? (asianHigh - asianLow) / mid : 0;
+
+    return {
+      high: asianHigh,
+      low: asianLow,
+      rangeSize: asianHigh - asianLow,
+      rangePct,
+      startTimestamp: startTs,
+      endTimestamp: endTs,
+      candleCount: asianBars,
+    };
+  }
+
+  /**
+   * Detect a liquidity sweep of an Asian range boundary.
+   * Sweep = price exceeds the boundary then closes back.
+   */
+  private detectAsianSweep(
+    candles: Candle[],
+    currentIndex: number,
+    asianRange: AsianRangeInfo,
+  ): { direction: 'long' | 'short'; sweepExtreme: number; sweepBar: number } | null {
+    const price = candles[currentIndex]!.close;
+    const minSweep = price * this.goldConfig.minSweepPct / 100;
+
+    // Check recent bars for sweep
+    for (let i = currentIndex; i >= Math.max(0, currentIndex - this.goldConfig.sweepLookback); i--) {
+      const c = candles[i];
+      if (!c) continue;
+      const hour = getGoldNYHour(c.timestamp);
+
+      // Only consider sweeps during London/NY (hours 2-15)
+      if (hour < 2 || hour >= 16) continue;
+
+      // Sweep below Asian low → potential long
+      if (c.low < asianRange.low - minSweep) {
+        // Check that price reversed (current candle or subsequent closes back above)
+        const currentClose = candles[currentIndex]!.close;
+        if (currentClose > asianRange.low) {
+          return { direction: 'long', sweepExtreme: c.low, sweepBar: i };
+        }
+      }
+
+      // Sweep above Asian high → potential short
+      if (c.high > asianRange.high + minSweep) {
+        const currentClose = candles[currentIndex]!.close;
+        if (currentClose < asianRange.high) {
+          return { direction: 'short', sweepExtreme: c.high, sweepBar: i };
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Look for a displacement candle + FVG after the sweep.
+   * Displacement = body > displacementMultiple × average body.
+   * FVG = 3-candle imbalance in the reversal direction.
+   */
+  private findDisplacementFVG(
+    candles: Candle[],
+    currentIndex: number,
+    sweepBar: number,
+    direction: 'long' | 'short',
+  ): FairValueGap | null {
+    // Calculate average body size for displacement check
+    const lookback = Math.min(14, sweepBar);
+    let avgBody = 0;
+    for (let i = sweepBar - lookback; i < sweepBar; i++) {
+      if (i < 0) continue;
+      avgBody += bodySize(candles[i]!);
+    }
+    avgBody /= lookback || 1;
+
+    // Search from sweep bar to current bar for displacement + FVG
+    for (let i = sweepBar; i <= Math.min(currentIndex, sweepBar + this.goldConfig.fvgSearchWindow); i++) {
+      const c = candles[i];
+      if (!c) continue;
+
+      // Check displacement
+      const isDisplacement = bodySize(c) > avgBody * this.goldConfig.displacementMultiple;
+      const isDirectionMatch = direction === 'long'
+        ? c.close > c.open  // Bullish displacement for long
+        : c.close < c.open; // Bearish displacement for short
+
+      if (isDisplacement && isDirectionMatch) {
+        // Look for FVG in the next 2 bars after displacement
+        for (let j = i; j <= Math.min(currentIndex - 2, i + 2); j++) {
+          const c1 = candles[j];
+          const c2 = candles[j + 1];
+          const c3 = candles[j + 2];
+          if (!c1 || !c2 || !c3) continue;
+
+          if (direction === 'long' && c3.low > c1.high) {
+            // Bullish FVG
+            const ce = (c3.low + c1.high) / 2;
+            return {
+              type: 'bullish',
+              status: 'unfilled',
+              high: c3.low,
+              low: c1.high,
+              size: c3.low - c1.high,
+              sizePercent: ((c3.low - c1.high) / c2.close) * 100,
+              index: j + 1,
+              timestamp: c2.timestamp,
+              fillPercent: 0,
+              consequentEncroachment: ce,
+              displacement: true,
+            };
+          }
+
+          if (direction === 'short' && c3.high < c1.low) {
+            // Bearish FVG
+            const ce = (c1.low + c3.high) / 2;
+            return {
+              type: 'bearish',
+              status: 'unfilled',
+              high: c1.low,
+              low: c3.high,
+              size: c1.low - c3.high,
+              sizePercent: ((c1.low - c3.high) / c2.close) * 100,
+              index: j + 1,
+              timestamp: c2.timestamp,
+              fillPercent: 0,
+              consequentEncroachment: ce,
+              displacement: true,
+            };
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
+  detectEntry(
+    candles: Candle[],
+    currentIndex: number,
+    ctx: ICTStrategyContext,
+  ): StrategySignal | null {
+    const current = candles[currentIndex];
+    if (!current) return null;
+
+    // 1. Kill zone filter — only London Open and NY Open
+    if (!ctx.killZone?.inKillZone) return null;
+    if (!this.goldConfig.allowedKillZones.includes(ctx.killZone.type)) return null;
+
+    // 2. Build Asian Range
+    const asianRange = this.buildAsianRange(candles, currentIndex);
+    if (!asianRange) return null;
+    if (asianRange.rangePct * 100 < this.goldConfig.minRangePct) return null;
+
+    // 3. Detect sweep of Asian boundary
+    const sweep = this.detectAsianSweep(candles, currentIndex, asianRange);
+    if (!sweep) return null;
+
+    // 4. Find displacement + FVG after sweep
+    const fvg = this.findDisplacementFVG(candles, currentIndex, sweep.sweepBar, sweep.direction);
+    if (!fvg) return null;
+
+    // 5. Check if price is at FVG CE (or anywhere in FVG zone if entryInFvgZone=true)
+    const ce = fvg.consequentEncroachment!;
+    const ceTol = current.close * this.goldConfig.ceTolerance;
+
+    let atEntry = false;
+    if (this.goldConfig.entryInFvgZone) {
+      // Looser: price touches anywhere in FVG zone
+      atEntry = sweep.direction === 'long'
+        ? (current.low <= fvg.high && current.close > fvg.low)
+        : (current.high >= fvg.low && current.close < fvg.high);
+    } else {
+      // Stricter: price at CE ± tolerance
+      atEntry = sweep.direction === 'long'
+        ? (current.low <= ce + ceTol && current.close > ce - ceTol)
+        : (current.high >= ce - ceTol && current.close < ce + ceTol);
+    }
+
+    if (!atEntry) return null;
+
+    // 6. Calculate SL/TP
+    const atr = ctx.atr;
+    const reasoning: string[] = [];
+
+    if (sweep.direction === 'long') {
+      const entryPrice = current.close;
+      const stopLoss = sweep.sweepExtreme - atr * this.goldConfig.slAtrExtension;
+      const risk = entryPrice - stopLoss;
+      if (risk <= 0) return null;
+
+      // TP at opposite Asian boundary (high), optionally extended
+      const conservativeTP = asianRange.high;
+      const targetTP = entryPrice + risk * this.goldConfig.targetRR;
+      const takeProfit = Math.max(conservativeTP, targetTP) * this.goldConfig.longBiasMultiplier;
+      const riskReward = (takeProfit - entryPrice) / risk;
+
+      reasoning.push(`Asian range sweep below ${asianRange.low.toFixed(1)}`);
+      reasoning.push(`Displacement FVG at CE ${ce.toFixed(1)}`);
+      reasoning.push(`${ctx.killZone.name} session`);
+      reasoning.push(`SL below sweep extreme ${sweep.sweepExtreme.toFixed(1)}`);
+
+      return {
+        direction: 'long',
+        entryPrice,
+        stopLoss,
+        takeProfit,
+        riskReward,
+        confidence: 0.65,
+        strategy: this.name,
+        reasoning,
+        fvg,
+      };
+    } else {
+      const entryPrice = current.close;
+      const stopLoss = sweep.sweepExtreme + atr * this.goldConfig.slAtrExtension;
+      const risk = stopLoss - entryPrice;
+      if (risk <= 0) return null;
+
+      const conservativeTP = asianRange.low;
+      const targetTP = entryPrice - risk * this.goldConfig.targetRR;
+      const takeProfit = Math.min(conservativeTP, targetTP);
+      const riskReward = (entryPrice - takeProfit) / risk;
+
+      reasoning.push(`Asian range sweep above ${asianRange.high.toFixed(1)}`);
+      reasoning.push(`Displacement FVG at CE ${ce.toFixed(1)}`);
+      reasoning.push(`${ctx.killZone.name} session`);
+      reasoning.push(`SL above sweep extreme ${sweep.sweepExtreme.toFixed(1)}`);
+
+      return {
+        direction: 'short',
+        entryPrice,
+        stopLoss,
+        takeProfit,
+        riskReward,
+        confidence: 0.65,
+        strategy: this.name,
+        reasoning,
+        fvg,
+      };
+    }
+  }
+
+  detectExit(
+    _position: HybridPosition,
+    _candles: Candle[],
+    _currentIndex: number,
+    _ctx: ICTStrategyContext,
+  ): StrategyExitSignal {
+    // Exit managed by SL/TP in the backtest framework (simple mode)
+    return { shouldExit: false, confidence: 0 };
+  }
+
+  getFeatures(
+    candles: Candle[],
+    currentIndex: number,
+    ctx: ICTStrategyContext,
+  ): number[] {
+    // 4 features matching the other strategies
+    const asianRange = this.buildAsianRange(candles, currentIndex);
+    const rangePct = asianRange?.rangePct ?? 0;
+    const sweep = asianRange ? this.detectAsianSweep(candles, currentIndex, asianRange) : null;
+    const inKZ = ctx.killZone?.inKillZone && this.goldConfig.allowedKillZones.includes(ctx.killZone.type) ? 1 : 0;
+
+    return [
+      rangePct * 100,        // Asian range size in %
+      sweep ? 1 : 0,         // Sweep detected
+      inKZ,                  // In allowed kill zone
+      ctx.atr / (candles[currentIndex]?.close ?? 1), // Normalized ATR
+    ];
+  }
+}
+
+// ============================================
 // Wait Strategy (No Trade)
 // ============================================
 
@@ -1351,13 +1759,14 @@ export class WaitStrategy implements ICTStrategy {
 export class ICTStrategyManager {
   private strategies: Map<StrategyName, ICTStrategy>;
 
-  constructor(config: Partial<StrategyConfig> = {}) {
+  constructor(config: Partial<StrategyConfig> = {}, goldConfig?: Partial<AsianRangeGoldConfig>) {
     this.strategies = new Map<StrategyName, ICTStrategy>([
       ['wait', new WaitStrategy()],
       ['order_block', new OrderBlockStrategy(config)],
       ['fvg', new FVGStrategy(config)],
       ['bos_continuation', new BOSContinuationStrategy(config)],
       ['choch_reversal', new CHoCHReversalStrategy(config)],
+      ['asian_range_gold', new AsianRangeGoldStrategy(config, goldConfig)],
     ]);
   }
 
@@ -1400,8 +1809,10 @@ export class ICTStrategyManager {
     // Compute volatility scale factor for auto-scaling detection thresholds.
     // Uses MEDIAN ATR% over 50 bars for stable asset-class classification
     // (14-bar ATR fluctuates too much and affects ~1% of quiet crypto bars).
-    // Crypto (median ATR% >= 0.15%) → scale=1.0 (preserves calibrated config).
-    // Forex/low-vol (median ATR% < 0.15%) → scale ∝ ATR%/0.6% so thresholds ≈ 2 ATR.
+    // Crypto (median ATR% >= 0.20%) → scale=1.0 (preserves calibrated config).
+    // Forex/low-vol (median ATR% < 0.20%) → scale ∝ ATR%/0.6% so thresholds ≈ 2 ATR.
+    // NOTE: Gold (ATR% ≈ 0.3%) exceeds the floor and gets scale=1.0 here.
+    // The AsianRangeGoldStrategy handles gold-specific scaling internally.
     const medianWindow = Math.min(50, lookbackCandles.length - 1);
     const trPcts: number[] = [];
     for (let k = lookbackCandles.length - medianWindow; k < lookbackCandles.length; k++) {

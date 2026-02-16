@@ -4,10 +4,13 @@
  * Takes candle arrays and produces scored trade signals using the
  * same ConfluenceScorer and ICT detectors used in backtesting.
  * Ensures zero simulation mismatch between backtest and live.
+ *
+ * Supports per-symbol strategy selection: crypto symbols use order_block,
+ * gold symbols use asian_range_gold with Run 12 config.
  */
 
 import type { Candle } from '@/types/candle';
-import type { BotSymbol } from '@/types/bot';
+import type { BotSymbol, StrategyConfig } from '@/types/bot';
 import {
   ConfluenceScorer,
   type ConfluenceScorerResult,
@@ -15,7 +18,7 @@ import {
   PRODUCTION_STRATEGY_CONFIG,
 } from '@/lib/rl/strategies/confluence-scorer';
 import { regimeLabel } from '@/lib/ict/regime-detector';
-import type { StrategyConfig } from '@/types/bot';
+import { getStrategyConfigForSymbol, isGoldSymbol } from './config';
 
 export interface SignalResult {
   /** Whether a trade signal was produced */
@@ -32,10 +35,29 @@ export interface SignalResult {
 
 export class SignalEngine {
   private scorers: Map<string, ConfluenceScorer> = new Map();
-  private config: StrategyConfig;
+  /** Per-symbol strategy config override. If not set, uses getStrategyConfigForSymbol(). */
+  private configOverrides: Map<string, StrategyConfig> = new Map();
 
-  constructor(config: StrategyConfig) {
-    this.config = config;
+  /**
+   * Create a signal engine.
+   * @param defaultConfig Default strategy config (used for symbols without overrides)
+   */
+  constructor(defaultConfig?: StrategyConfig) {
+    // If a default config is provided, it's used for non-gold symbols
+    // Gold symbols always use GOLD_RUN12_STRATEGY_CONFIG via getStrategyConfigForSymbol()
+    if (defaultConfig) {
+      // Store as a fallback — but getStrategyConfigForSymbol handles routing
+      this.configOverrides.set('__default__', defaultConfig);
+    }
+  }
+
+  /**
+   * Set a strategy config override for a specific symbol.
+   * Clears any cached scorer for the symbol.
+   */
+  setSymbolConfig(symbol: string, config: StrategyConfig): void {
+    this.configOverrides.set(symbol, config);
+    this.scorers.delete(symbol); // Force re-creation with new config
   }
 
   /**
@@ -44,13 +66,16 @@ export class SignalEngine {
    *
    * @param candles Full candle history for the symbol (chronological)
    * @param symbol Symbol being evaluated
+   * @param currentIndex Optional explicit index into the candle array. Defaults to
+   *   candles.length - 1. Pass this when the candle array is the full dataset and
+   *   you want to evaluate at a specific point (e.g., replay/backtest mode).
    * @returns SignalResult with signal details
    */
-  evaluate(candles: Candle[], symbol: BotSymbol): SignalResult {
+  evaluate(candles: Candle[], symbol: BotSymbol, currentIndex?: number): SignalResult {
     const scorer = this.getOrCreateScorer(symbol);
-    const currentIndex = candles.length - 1;
+    const idx = currentIndex ?? candles.length - 1;
 
-    if (currentIndex < 50) {
+    if (idx < 50) {
       return {
         hasSignal: false,
         signal: null,
@@ -60,7 +85,7 @@ export class SignalEngine {
       };
     }
 
-    const result: ConfluenceScorerResult = scorer.evaluate(candles, currentIndex);
+    const result: ConfluenceScorerResult = scorer.evaluate(candles, idx);
 
     const regime = result.regime
       ? regimeLabel(result.regime)
@@ -77,23 +102,47 @@ export class SignalEngine {
 
   /**
    * Get or create a ConfluenceScorer for a symbol.
-   * Each symbol gets its own scorer to maintain independent cooldown tracking.
+   * Each symbol gets its own scorer with the appropriate strategy config.
+   * Gold symbols get gold-specific config; crypto symbols get Run 18 config.
    */
   private getOrCreateScorer(symbol: BotSymbol): ConfluenceScorer {
     let scorer = this.scorers.get(symbol);
     if (!scorer) {
+      const config = this.configOverrides.get(symbol)
+        ?? this.configOverrides.get('__default__')
+        ?? getStrategyConfigForSymbol(symbol);
+
+      // For gold symbols, always use the gold strategy config regardless of overrides
+      const effectiveConfig = isGoldSymbol(symbol)
+        ? getStrategyConfigForSymbol(symbol)
+        : config;
+
       scorer = new ConfluenceScorer({
-        weights: { ...this.config.weights },
-        minThreshold: this.config.baseThreshold,
-        activeStrategies: this.config.activeStrategies,
-        suppressedRegimes: this.config.suppressedRegimes,
-        obFreshnessHalfLife: this.config.obHalfLife,
-        atrExtensionBands: this.config.atrExtensionBands,
-        cooldownBars: this.config.cooldownBars,
-        regimeThresholdOverrides: this.config.regimeThresholds,
+        weights: { ...effectiveConfig.weights },
+        minThreshold: effectiveConfig.baseThreshold,
+        activeStrategies: effectiveConfig.activeStrategies,
+        suppressedRegimes: effectiveConfig.suppressedRegimes,
+        obFreshnessHalfLife: effectiveConfig.obHalfLife,
+        atrExtensionBands: effectiveConfig.atrExtensionBands,
+        cooldownBars: effectiveConfig.cooldownBars,
+        regimeThresholdOverrides: effectiveConfig.regimeThresholds,
         strategyConfig: {
           ...PRODUCTION_STRATEGY_CONFIG,
         },
+        // Pass gold config if this is a gold symbol
+        ...(effectiveConfig.goldConfig ? {
+          goldConfig: {
+            minRangePct: effectiveConfig.goldConfig.minRangePct,
+            minSweepPct: effectiveConfig.goldConfig.minSweepPct,
+            longBiasMultiplier: effectiveConfig.goldConfig.longBiasMultiplier,
+            goldVolScale: effectiveConfig.goldConfig.goldVolScale,
+            targetRR: effectiveConfig.goldConfig.targetRR,
+            displacementMultiple: effectiveConfig.goldConfig.displacementMultiple,
+            sweepLookback: effectiveConfig.goldConfig.sweepLookback,
+            fvgSearchWindow: effectiveConfig.goldConfig.fvgSearchWindow,
+            ceTolerance: effectiveConfig.goldConfig.ceTolerance,
+          },
+        } : {}),
       });
       this.scorers.set(symbol, scorer);
     }

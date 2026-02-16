@@ -19,7 +19,7 @@ import type {
 } from '@/types/bot';
 import type { ScoredSignal } from '@/lib/rl/strategies/confluence-scorer';
 import type { StrategyConfig } from '@/types/bot';
-import { SYMBOL_ALLOCATION } from './config';
+import { SYMBOL_ALLOCATION, getStrategyConfigForSymbol } from './config';
 
 // ============================================
 // Position Manager
@@ -27,17 +27,22 @@ import { SYMBOL_ALLOCATION } from './config';
 
 export class OrderManager {
   private mode: BotMode;
-  private config: StrategyConfig;
+  private defaultConfig: StrategyConfig;
   private paperSlippage: number;
 
   constructor(
     mode: BotMode,
-    config: StrategyConfig,
+    defaultConfig: StrategyConfig,
     paperSlippage = 0.001,
   ) {
     this.mode = mode;
-    this.config = config;
+    this.defaultConfig = defaultConfig;
     this.paperSlippage = paperSlippage;
+  }
+
+  /** Get the appropriate strategy config for a symbol */
+  private getConfig(symbol: string): StrategyConfig {
+    return getStrategyConfigForSymbol(symbol) ?? this.defaultConfig;
   }
 
   /**
@@ -58,9 +63,10 @@ export class OrderManager {
     barIndex: number,
   ): BotPosition | null {
     const { entryPrice, stopLoss, takeProfit, direction, strategy } = signal.signal;
+    const config = this.getConfig(symbol);
 
     // Apply entry friction (slippage simulation for paper)
-    const adjustedEntry = this.applyEntrySlippage(entryPrice, direction);
+    const adjustedEntry = this.applyEntrySlippage(entryPrice, direction, config);
 
     // Calculate risk distance
     const riskDistance = direction === 'long'
@@ -116,6 +122,7 @@ export class OrderManager {
     candle: Candle,
     currentBarIndex: number,
   ): { position: BotPosition; exitReason: ExitReason } | null {
+    const config = this.getConfig(position.symbol);
     const barsHeld = currentBarIndex - position.entryBarIndex;
     const direction = position.direction;
     const currentSL = position.currentSL;
@@ -137,7 +144,7 @@ export class OrderManager {
     }
 
     // 3. Partial TP check (if configured and not yet taken)
-    if (this.config.exitMode === 'partial_tp' && !position.partialTaken) {
+    if (config.exitMode === 'partial_tp' && !position.partialTaken) {
       const riskDistance = direction === 'long'
         ? position.entryPrice - position.stopLoss
         : position.stopLoss - position.entryPrice;
@@ -147,17 +154,17 @@ export class OrderManager {
           ? (candle.close - position.entryPrice) / riskDistance
           : (position.entryPrice - candle.close) / riskDistance;
 
-        if (unrealizedR >= this.config.partialTP.triggerR) {
+        if (unrealizedR >= config.partialTP.triggerR) {
           // Take partial — simulate exit for the fraction
-          const partialExit = this.applyExitSlippage(candle.close, direction);
+          const partialExit = this.applyExitSlippage(candle.close, direction, config);
           const partialPnl = this.calculatePnlPercent(position.entryPrice, partialExit, direction);
 
           position.partialTaken = true;
           position.partialPnlPercent = partialPnl;
 
           // Move SL to breakeven + buffer (skip if beBuffer < 0)
-          if (this.config.partialTP.beBuffer >= 0) {
-            const buffer = riskDistance * this.config.partialTP.beBuffer;
+          if (config.partialTP.beBuffer >= 0) {
+            const buffer = riskDistance * config.partialTP.beBuffer;
             if (direction === 'long') {
               position.currentSL = Math.max(position.currentSL, position.entryPrice + buffer);
             } else {
@@ -171,7 +178,7 @@ export class OrderManager {
     }
 
     // 4. Max bars time exit
-    if (barsHeld >= this.config.maxBars) {
+    if (barsHeld >= config.maxBars) {
       return this.closePosition(position, candle.close, candle.timestamp, barsHeld, 'max_bars');
     }
 
@@ -201,14 +208,15 @@ export class OrderManager {
     barsHeld: number,
     reason: ExitReason,
   ): { position: BotPosition; exitReason: ExitReason } {
-    const adjustedExit = this.applyExitSlippage(rawExitPrice, position.direction);
+    const config = this.getConfig(position.symbol);
+    const adjustedExit = this.applyExitSlippage(rawExitPrice, position.direction, config);
 
     // Calculate PnL (accounting for partial TP if taken)
     const exitPnl = this.calculatePnlPercent(position.entryPrice, adjustedExit, position.direction);
     let finalPnl: number;
 
-    if (position.partialTaken && this.config.exitMode === 'partial_tp') {
-      const fraction = this.config.partialTP.fraction;
+    if (position.partialTaken && config.exitMode === 'partial_tp') {
+      const fraction = config.partialTP.fraction;
       finalPnl = fraction * position.partialPnlPercent + (1 - fraction) * exitPnl;
     } else {
       finalPnl = exitPnl;
@@ -231,9 +239,9 @@ export class OrderManager {
     };
   }
 
-  private applyEntrySlippage(price: number, direction: 'long' | 'short'): number {
+  private applyEntrySlippage(price: number, direction: 'long' | 'short', config?: StrategyConfig): number {
     if (this.mode === 'paper') {
-      const friction = this.config.frictionPerSide;
+      const friction = (config ?? this.defaultConfig).frictionPerSide;
       return direction === 'long'
         ? price * (1 + friction)
         : price * (1 - friction);
@@ -241,9 +249,9 @@ export class OrderManager {
     return price; // Live mode: exchange handles fills
   }
 
-  private applyExitSlippage(price: number, direction: 'long' | 'short'): number {
+  private applyExitSlippage(price: number, direction: 'long' | 'short', config?: StrategyConfig): number {
     if (this.mode === 'paper') {
-      const friction = this.config.frictionPerSide;
+      const friction = (config ?? this.defaultConfig).frictionPerSide;
       return direction === 'long'
         ? price * (1 - friction)
         : price * (1 + friction);

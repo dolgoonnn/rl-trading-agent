@@ -1,0 +1,312 @@
+{
+  "specs": [
+    "w_structureAlignment",
+    "w_killZoneActive",
+    "w_liquiditySweep",
+    "w_obProximity",
+    "w_fvgAtCE",
+    "w_recentBOS",
+    "w_rrRatio",
+    "w_oteZone",
+    "w_obFvgConfluence",
+    "w_momentumConfirmation",
+    "t_uptrend+high",
+    "t_uptrend+normal",
+    "t_uptrend+low",
+    "t_downtrend+normal",
+    "t_downtrend+low",
+    "baseThreshold",
+    "obFreshnessHalfLife",
+    "atrExtensionBands",
+    "partialFraction",
+    "partialTriggerR",
+    "partialBeBuffer",
+    "maxBars",
+    "cooldownBars",
+    "goldMinRangePct",
+    "goldMinSweepPct",
+    "goldLongBias",
+    "goldVolScale",
+    "goldTargetRR",
+    "goldDispMult",
+    "goldSweepLookback",
+    "goldFvgWindow",
+    "goldCeTolerance"
+  ],
+  "bestParams": [
+    1.3698489029231198,
+    2.5738887055214024,
+    1.4182515410577765,
+    0.8441095342992639,
+    1.5852097349521954,
+    1.7354293443029702,
+    2.4879589352932063,
+    1.240860361058342,
+    1.2780483253369976,
+    0.4934616733830969,
+    3.879111596679424,
+    6.495661872510882,
+    4.740287792820185,
+    3.4935230071875534,
+    5.039438565866957,
+    3.158126701875034,
+    14.297266099326595,
+    3.2204463391222458,
+    0.28739536541100685,
+    0.5813945139180516,
+    0,
+    92.65983887920412,
+    4.322155245604895,
+    0.1777508788693219,
+    0.07477321393608137,
+    1.2646054763078414,
+    0.5630228005982503,
+    1,
+    1,
+    24.762602214597802,
+    18.88687304264463,
+    0.0027195276919985832
+  ],
+  "decoded": {
+    "weightMultipliers": {
+      "structureAlignment": 2.7396978058462396,
+      "killZoneActive": 1.2869443527607012,
+      "liquiditySweep": 2.836503082115553,
+      "obProximity": 0.8441095342992639,
+      "fvgAtCE": 1.5852097349521954,
+      "recentBOS": 1.7354293443029702,
+      "rrRatio": 3.7319384029398095,
+      "oteZone": 0.620430180529171,
+      "obFvgConfluence": 1.2780483253369976,
+      "momentumConfirmation": 0
+    },
+    "regimeThresholds": {
+      "uptrend+high": 3.879111596679424,
+      "uptrend+normal": 6.495661872510882,
+      "uptrend+low": 4.740287792820185,
+      "downtrend+normal": 3.4935230071875534,
+      "downtrend+low": 5.039438565866957
+    },
+    "baseThreshold": 3.158126701875034,
+    "obFreshnessHalfLife": 14,
+    "atrExtensionBands": 3.2204463391222458,
+    "partialFraction": 0.28739536541100685,
+    "partialTriggerR": 0.5813945139180516,
+    "partialBeBuffer": 0,
+    "maxBars": 93,
+    "cooldownBars": 4,
+    "goldMinRangePct": 0.1777508788693219,
+    "goldMinSweepPct": 0.07477321393608137,
+    "goldLongBias": 1.2646054763078414,
+    "goldVolScale": 0.5630228005982503,
+    "goldTargetRR": 1,
+    "goldDispMult": 1,
+    "goldSweepLookback": 25,
+    "goldFvgWindow": 19,
+    "goldCeTolerance": 0.0027195276919985832
+  },
+  "fitness": 1112.99,
+  "baselineFitness": 220.37350746268658,
+  "generation": 7,
+  "symbols": "GC_F",
+  "config": {
+    "generations": 30,
+    "populationSize": 16,
+    "sigma": 0.08,
+    "warmStart": "models/gold_run03.json"
+  },
+  "history": [
+    {
+      "generation": 0,
+      "meanFitness": 767.18,
+      "bestFitness": 922,
+      "sigma": 0.08
+    },
+    {
+      "generation": 1,
+      "meanFitness": 819.3163992537313,
+      "bestFitness": 1011.9300000000001,
+      "sigma": 0.08
+    },
+    {
+      "generation": 2,
+      "meanFitness": 813.7425,
+      "bestFitness": 1011.8199999999999,
+      "sigma": 0.08
+    },
+    {
+      "generation": 3,
+      "meanFitness": 861.8219962686568,
+      "bestFitness": 1110.9499999999998,
+      "sigma": 0.08
+    },
+    {
+      "generation": 4,
+      "meanFitness": 884.474375,
+      "bestFitness": 1023.05,
+      "sigma": 0.08
+    },
+    {
+      "generation": 5,
+      "meanFitness": 875.9917910447762,
+      "bestFitness": 969.5380597014926,
+      "sigma": 0.08
+    },
+    {
+      "generation": 6,
+      "meanFitness": 876.0448880597015,
+      "bestFitness": 1099.8500000000001,
+      "sigma": 0.08
+    },
+    {
+      "generation": 7,
+      "meanFitness": 928.218619402985,
+      "bestFitness": 1112.99,
+      "sigma": 0.08
+    },
+    {
+      "generation": 8,
+      "meanFitness": 905.2492537313433,
+      "bestFitness": 1022.26,
+      "sigma": 0.08
+    },
+    {
+      "generation": 9,
+      "meanFitness": 876.635401119403,
+      "bestFitness": 1098.03,
+      "sigma": 0.08
+    },
+    {
+      "generation": 10,
+      "meanFitness": 881.2562873134328,
+      "bestFitness": 1006.5699999999999,
+      "sigma": 0.08
+    },
+    {
+      "generation": 11,
+      "meanFitness": 888.907005597015,
+      "bestFitness": 1018.25,
+      "sigma": 0.08
+    },
+    {
+      "generation": 12,
+      "meanFitness": 824.7936940298507,
+      "bestFitness": 1016.44,
+      "sigma": 0.08
+    },
+    {
+      "generation": 13,
+      "meanFitness": 886.8354291044776,
+      "bestFitness": 997.0999999999999,
+      "sigma": 0.08
+    },
+    {
+      "generation": 14,
+      "meanFitness": 822.5115111940298,
+      "bestFitness": 987.45,
+      "sigma": 0.08
+    },
+    {
+      "generation": 15,
+      "meanFitness": 895.0326585820894,
+      "bestFitness": 999.74,
+      "sigma": 0.08
+    },
+    {
+      "generation": 16,
+      "meanFitness": 886.7237500000001,
+      "bestFitness": 1018.12,
+      "sigma": 0.08
+    },
+    {
+      "generation": 17,
+      "meanFitness": 900.584375,
+      "bestFitness": 1014.9,
+      "sigma": 0.08
+    },
+    {
+      "generation": 18,
+      "meanFitness": 835.2901119402984,
+      "bestFitness": 1003.1099999999999,
+      "sigma": 0.08
+    },
+    {
+      "generation": 19,
+      "meanFitness": 891.7262499999999,
+      "bestFitness": 1010.03,
+      "sigma": 0.08
+    },
+    {
+      "generation": 20,
+      "meanFitness": 924.4527891791046,
+      "bestFitness": 1099.42,
+      "sigma": 0.08
+    },
+    {
+      "generation": 21,
+      "meanFitness": 917.7152705223881,
+      "bestFitness": 1083.74,
+      "sigma": 0.08
+    },
+    {
+      "generation": 22,
+      "meanFitness": 933.3432089552241,
+      "bestFitness": 1096.8400000000001,
+      "sigma": 0.08
+    },
+    {
+      "generation": 23,
+      "meanFitness": 910.1931249999999,
+      "bestFitness": 1098.29,
+      "sigma": 0.08
+    },
+    {
+      "generation": 24,
+      "meanFitness": 912.1374999999997,
+      "bestFitness": 1012.22,
+      "sigma": 0.08
+    },
+    {
+      "generation": 25,
+      "meanFitness": 926.1181063432836,
+      "bestFitness": 1105.8400000000001,
+      "sigma": 0.08
+    },
+    {
+      "generation": 26,
+      "meanFitness": 965.6425,
+      "bestFitness": 1103.27,
+      "sigma": 0.08
+    },
+    {
+      "generation": 27,
+      "meanFitness": 956.2675000000002,
+      "bestFitness": 1103.3,
+      "sigma": 0.08
+    },
+    {
+      "generation": 28,
+      "meanFitness": 939.6091697761194,
+      "bestFitness": 1100.68,
+      "sigma": 0.08
+    },
+    {
+      "generation": 29,
+      "meanFitness": 969.9393936567164,
+      "bestFitness": 1102.97,
+      "sigma": 0.08
+    }
+  ],
+  "baselineResult": {
+    "passRate": 0.273,
+    "totalTrades": 55,
+    "winRate": 45.5,
+    "pnl": -0.0909
+  },
+  "finalResult": {
+    "passRate": 1,
+    "totalTrades": 70,
+    "winRate": 77.1,
+    "pnl": 0.5879
+  }
+}

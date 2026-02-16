@@ -1620,6 +1620,9 @@ const STRATEGY_SHORTHAND: Record<string, StrategyName> = {
   bos_continuation: 'bos_continuation',
   choch: 'choch_reversal',
   choch_reversal: 'choch_reversal',
+  'asian-range-gold': 'asian_range_gold',
+  asian_range_gold: 'asian_range_gold',
+  gold: 'asian_range_gold',
 };
 
 function parseStrategyArg(arg: string): StrategyName[] {
@@ -1684,6 +1687,21 @@ async function main(): Promise<void> {
   const fundingMaxLongArg = getArg('funding-max-long'); // --funding-max-long 0.0002
   const fundingMinShortArg = getArg('funding-min-short'); // --funding-min-short 0
   const fundingScoringArg = getArg('funding-scoring'); // --funding-scoring contrarian|aligned
+
+  // Gold-specific args
+  const goldRangeMinArg = getArg('asian-range-min'); // --asian-range-min 0.15 (min Asian range %)
+  const goldSweepMinArg = getArg('sweep-min'); // --sweep-min 0.03 (min sweep penetration %)
+  const goldLongBiasArg = getArg('long-bias'); // --long-bias 1.2 (TP multiplier for longs)
+  const goldSessionArg = getArg('session-filter'); // --session-filter london_open,ny_open
+  const goldVolScaleArg = getArg('gold-vol-scale'); // --gold-vol-scale 0.5
+  const goldSlAtrArg = getArg('gold-sl-atr'); // --gold-sl-atr 0.5 (ATR extension for SL)
+  const goldTargetRRArg = getArg('gold-target-rr'); // --gold-target-rr 2.0
+  const goldCeToleranceArg = getArg('gold-ce-tolerance'); // --gold-ce-tolerance 0.005
+  const goldDispMultArg = getArg('gold-disp-mult'); // --gold-disp-mult 1.2
+  const goldSweepLookbackArg = getArg('gold-sweep-lookback'); // --gold-sweep-lookback 20
+  const goldFvgWindowArg = getArg('gold-fvg-window'); // --gold-fvg-window 12
+  const goldAsianLookbackArg = getArg('gold-asian-lookback'); // --gold-asian-lookback 48
+  const goldEntryFvgZoneArg = getArg('gold-entry-fvg-zone'); // --gold-entry-fvg-zone true
 
   // Resolve exit mode (--exit-mode overrides --simple for backward compat)
   let exitMode: ExitMode = 'enhanced';
@@ -1926,6 +1944,24 @@ async function main(): Promise<void> {
     ...(fundingMinShortArg ? { fundingMinForShort: parseFloat(fundingMinShortArg) } : {}),
     ...(fundingScoringArg && ['contrarian', 'aligned'].includes(fundingScoringArg)
       ? { fundingScoringMode: fundingScoringArg as 'contrarian' | 'aligned' } : {}),
+    // Gold-specific config (asian-range-gold strategy)
+    ...(goldRangeMinArg || goldSweepMinArg || goldLongBiasArg || goldSessionArg || goldVolScaleArg || goldSlAtrArg || goldTargetRRArg || goldCeToleranceArg || goldDispMultArg || goldSweepLookbackArg || goldFvgWindowArg || goldAsianLookbackArg || goldEntryFvgZoneArg ? {
+      goldConfig: {
+        ...(goldRangeMinArg ? { minRangePct: parseFloat(goldRangeMinArg) } : {}),
+        ...(goldSweepMinArg ? { minSweepPct: parseFloat(goldSweepMinArg) } : {}),
+        ...(goldLongBiasArg ? { longBiasMultiplier: parseFloat(goldLongBiasArg) } : {}),
+        ...(goldSessionArg ? { allowedKillZones: goldSessionArg.split(',').map((s: string) => s.trim()) } : {}),
+        ...(goldVolScaleArg ? { goldVolScale: parseFloat(goldVolScaleArg) } : {}),
+        ...(goldSlAtrArg ? { slAtrExtension: parseFloat(goldSlAtrArg) } : {}),
+        ...(goldTargetRRArg ? { targetRR: parseFloat(goldTargetRRArg) } : {}),
+        ...(goldCeToleranceArg ? { ceTolerance: parseFloat(goldCeToleranceArg) } : {}),
+        ...(goldDispMultArg ? { displacementMultiple: parseFloat(goldDispMultArg) } : {}),
+        ...(goldSweepLookbackArg ? { sweepLookback: parseInt(goldSweepLookbackArg, 10) } : {}),
+        ...(goldFvgWindowArg ? { fvgSearchWindow: parseInt(goldFvgWindowArg, 10) } : {}),
+        ...(goldAsianLookbackArg ? { asianLookback: parseInt(goldAsianLookbackArg, 10) } : {}),
+        ...(goldEntryFvgZoneArg ? { entryInFvgZone: goldEntryFvgZoneArg === 'true' } : {}),
+      },
+    } : {}),
   };
 
   // MAX_POSITION_BARS scaling for 15m (module-level isn't const so can't reassign, but passed through config)

@@ -7,8 +7,9 @@
  * achieved 78.1% walk-forward pass rate (fitness=1071.7).
  *
  * Modes:
- *   Live:     npx tsx scripts/paper-trade-confluence.ts
- *   Backtest: npx tsx scripts/paper-trade-confluence.ts --backtest 500
+ *   Live:       npx tsx scripts/paper-trade-confluence.ts
+ *   Backtest:   npx tsx scripts/paper-trade-confluence.ts --backtest 500
+ *   Simulate:   npx tsx scripts/paper-trade-confluence.ts --simulate --start-date 2025-06-01
  *
  * Options:
  *   --symbols BTCUSDT,ETHUSDT,SOLUSDT  (default: all three)
@@ -27,6 +28,10 @@
  *   --weights "key:val,key:val"      (override confluence weights)
  *   --regime-threshold "uptrend+high:2.86,uptrend+normal:6.17,..."
  *   --backtest <bars>                 (run on last N bars of saved data)
+ *   --simulate                        (replay local data files at accelerated speed)
+ *   --start-date 2025-01-01           (simulation start date, default: all data)
+ *   --end-date 2026-02-01             (simulation end date, default: all data)
+ *   --speed 1                         (candles/sec, 0=max speed, default: 0)
  *   --verbose                         (debug logging)
  */
 
@@ -122,6 +127,10 @@ interface CLIArgs {
   threshold: number;
   capital: number;
   backtest: number | null;
+  simulate: boolean;
+  startDate: string | null;
+  endDate: string | null;
+  speed: number;
   verbose: boolean;
   suppressRegime: string[];
   slMode: SLPlacementMode;
@@ -133,6 +142,7 @@ interface CLIArgs {
   cooldownBars: number;
   weights: Record<string, number>;
   regimeThresholds: Record<string, number>;
+  noRiskManager: boolean;
 }
 
 // ============================================
@@ -146,6 +156,10 @@ function parseArgs(): CLIArgs {
     threshold: 4.672,
     capital: 10000,
     backtest: null,
+    simulate: false,
+    startDate: null,
+    endDate: null,
+    speed: 0,
     verbose: false,
     suppressRegime: ['ranging+normal', 'ranging+high', 'downtrend+high'],
     slMode: 'dynamic_rr',
@@ -157,6 +171,7 @@ function parseArgs(): CLIArgs {
     cooldownBars: 8,
     weights: { ...PRODUCTION_WEIGHTS },
     regimeThresholds: { ...PRODUCTION_REGIME_THRESHOLDS },
+    noRiskManager: false,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -176,6 +191,18 @@ function parseArgs(): CLIArgs {
         break;
       case '--backtest':
         result.backtest = parseInt(args[++i] ?? '500', 10);
+        break;
+      case '--simulate':
+        result.simulate = true;
+        break;
+      case '--start-date':
+        result.startDate = args[++i] ?? null;
+        break;
+      case '--end-date':
+        result.endDate = args[++i] ?? null;
+        break;
+      case '--speed':
+        result.speed = parseFloat(args[++i] ?? '0');
         break;
       case '--verbose':
         result.verbose = true;
@@ -204,6 +231,9 @@ function parseArgs(): CLIArgs {
       }
       case '--no-partial-tp':
         result.partialTp = null;
+        break;
+      case '--no-risk-manager':
+        result.noRiskManager = true;
         break;
       case '--atr-extension':
         result.atrExtension = parseFloat(args[++i] ?? '4.10');
@@ -276,12 +306,14 @@ class ConfluencePaperTrader {
   private position: LivePosition | null = null;
   private candleCount = 0;
   private totalSignals = 0;
+  private tradeCounter = 0;
   private sessionId: string;
   private verbose: boolean;
   private symbol: string;
   private friction: number;
   private partialTp: PartialTPConfig | null;
   private maxBars: number;
+  private noRiskManager: boolean;
   private shuttingDown = false;
 
   constructor(
@@ -294,6 +326,7 @@ class ConfluencePaperTrader {
     this.friction = args.friction;
     this.partialTp = args.partialTp;
     this.maxBars = args.maxBars;
+    this.noRiskManager = args.noRiskManager;
     this.sessionId = `confluence-${symbol}-${new Date().toISOString().replace(/[:.]/g, '-')}`;
 
     // Initialize scorer with full production config
@@ -447,6 +480,88 @@ class ConfluencePaperTrader {
     });
   }
 
+  // ------------------------------------------
+  // Simulation Mode
+  // ------------------------------------------
+
+  async runSimulation(startDate: string | null, endDate: string | null, speed: number): Promise<void> {
+    const dataPath = path.join(process.cwd(), `data/${this.symbol}_1h.json`);
+    if (!fs.existsSync(dataPath)) {
+      console.error(`  [${this.symbol}] Data file not found: ${dataPath}`);
+      console.error('    Run: npx tsx scripts/fetch-historical-data.ts first');
+      return;
+    }
+
+    const allCandles: Candle[] = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+    console.log(`  [${this.symbol}] Loaded ${allCandles.length} candles`);
+
+    // Parse date boundaries
+    const startTs = startDate ? new Date(startDate).getTime() : null;
+    const endTs = endDate ? new Date(endDate).getTime() : null;
+
+    // Find eval start index (first candle >= startDate)
+    let evalStartCandle = 0;
+    if (startTs) {
+      evalStartCandle = allCandles.findIndex((c) => c.timestamp >= startTs);
+      if (evalStartCandle === -1) {
+        console.error(`  [${this.symbol}] No candles found after ${startDate}`);
+        return;
+      }
+    }
+
+    // Find eval end index (last candle <= endDate)
+    let evalEndCandle = allCandles.length - 1;
+    if (endTs) {
+      const idx = allCandles.findIndex((c) => c.timestamp > endTs);
+      evalEndCandle = idx === -1 ? allCandles.length - 1 : idx - 1;
+    }
+
+    // Include 200-bar warmup before eval start
+    const warmup = 200;
+    const sliceStart = Math.max(0, evalStartCandle - warmup);
+    const candles = allCandles.slice(sliceStart, evalEndCandle + 1);
+    const evalStart = evalStartCandle - sliceStart;
+    const totalEvalBars = candles.length - evalStart;
+
+    const startStr = new Date(candles[evalStart]!.timestamp).toISOString().slice(0, 10);
+    const endStr = new Date(candles[candles.length - 1]!.timestamp).toISOString().slice(0, 10);
+    console.log(`  [${this.symbol}] Simulating ${totalEvalBars} bars (${startStr} to ${endStr}), ${evalStart} warmup`);
+
+    // Override session ID with sim- prefix
+    this.sessionId = `sim-${this.symbol}-${new Date().toISOString().replace(/[:.]/g, '-')}`;
+    await this.tradeLogger.initSession();
+
+    for (let i = evalStart; i < candles.length; i++) {
+      this.onCandleClosed(candles, i);
+
+      // Progress logging every 500 bars
+      const barsDone = i - evalStart + 1;
+      if (barsDone % 500 === 0 || i === candles.length - 1) {
+        const pct = ((barsDone / totalEvalBars) * 100).toFixed(0);
+        const m = this.perfMonitor.getMetrics();
+        console.log(`  [SIM] ${this.symbol} bar ${barsDone}/${totalEvalBars} (${pct}%) — ${m.closedTrades} trades`);
+      }
+
+      // Pacing
+      if (speed > 0) {
+        await new Promise((resolve) => setTimeout(resolve, 1000 / speed));
+      }
+    }
+
+    // Close any open position at the end
+    if (this.position) {
+      const lastCandle = candles[candles.length - 1]!;
+      this.closePosition(lastCandle.close, lastCandle.timestamp, candles.length - 1, 'shutdown');
+    }
+
+    const metrics = this.perfMonitor.getMetrics();
+    await this.tradeLogger.endSession({
+      totalPnl: metrics.totalPnl,
+      maxDrawdown: metrics.maxDrawdownPercent,
+      sharpe: metrics.sharpe,
+    });
+  }
+
   /** Force close open position and finalize session (for shutdown) */
   async shutdown(lastPrice?: number, lastTimestamp?: number, lastIndex?: number): Promise<void> {
     if (this.shuttingDown) return;
@@ -499,12 +614,14 @@ class ConfluencePaperTrader {
   // ------------------------------------------
 
   private evaluateEntry(candles: Candle[], currentIndex: number): void {
-    const riskCheck = this.riskManager.checkRisk();
-    if (!riskCheck.allowed) {
-      if (this.verbose) {
-        console.log(`  [${this.symbol}] [Risk] Blocked: ${riskCheck.reason}`);
+    if (!this.noRiskManager) {
+      const riskCheck = this.riskManager.checkRisk();
+      if (!riskCheck.allowed) {
+        if (this.verbose) {
+          console.log(`  [${this.symbol}] [Risk] Blocked: ${riskCheck.reason}`);
+        }
+        return;
       }
-      return;
     }
 
     const result = this.scorer.evaluate(candles, currentIndex);
@@ -546,7 +663,7 @@ class ConfluencePaperTrader {
       : signal.stopLoss - signal.entryPrice;
 
     // Open position
-    const tradeId = `${this.sessionId}-${Date.now()}`;
+    const tradeId = `${this.sessionId}-${++this.tradeCounter}`;
     this.position = {
       side: signal.direction,
       entryPrice: adjustedEntry,
@@ -796,7 +913,7 @@ class ConfluencePaperTrader {
 // Header Display
 // ============================================
 
-function printHeader(args: CLIArgs, mode: 'LIVE' | 'BACKTEST', backtestBars?: number): void {
+function printHeader(args: CLIArgs, mode: 'LIVE' | 'BACKTEST' | 'SIMULATE', backtestBars?: number): void {
   const regimeStr = Object.entries(args.regimeThresholds)
     .map(([k, v]) => `${k}:${v}`)
     .join(', ');
@@ -817,6 +934,9 @@ function printHeader(args: CLIArgs, mode: 'LIVE' | 'BACKTEST', backtestBars?: nu
   console.log(`  Regime thresholds: ${regimeStr || 'none (use base threshold)'}`);
   console.log(`  Max hold:   ${args.maxBars} bars`);
   console.log(`  Cooldown:   ${args.cooldownBars} bars between signals`);
+  if (args.noRiskManager) {
+    console.log(`  Risk mgmt:  DISABLED (--no-risk-manager)`);
+  }
 
   const weightOverrides = Object.entries(args.weights);
   if (weightOverrides.length > 0) {
@@ -890,7 +1010,29 @@ async function main(): Promise<void> {
   const args = parseArgs();
   const repo = await createRepository();
 
-  if (args.backtest !== null) {
+  if (args.simulate) {
+    // ---- SIMULATION MODE ----
+    printHeader(args, 'SIMULATE');
+    const dateRange = [
+      args.startDate ? `from ${args.startDate}` : 'all data',
+      args.endDate ? `to ${args.endDate}` : '',
+    ].filter(Boolean).join(' ');
+    console.log(`  Date range: ${dateRange}`);
+    console.log(`  Speed:      ${args.speed > 0 ? `${args.speed} candle/sec` : 'max'}`);
+    console.log('='.repeat(72));
+
+    const traders: ConfluencePaperTrader[] = [];
+
+    for (const symbol of args.symbols) {
+      console.log(`\n--- ${symbol} ---`);
+      const trader = new ConfluencePaperTrader(args, symbol, repo);
+      await trader.runSimulation(args.startDate, args.endDate, args.speed);
+      traders.push(trader);
+    }
+
+    printCombinedSummary(traders);
+    await repo.close();
+  } else if (args.backtest !== null) {
     // ---- BACKTEST MODE ----
     printHeader(args, 'BACKTEST', args.backtest);
 

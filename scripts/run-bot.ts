@@ -8,13 +8,18 @@
  *
  * PM2-compatible: handles SIGTERM/SIGINT for graceful shutdown.
  *
+ * Supports crypto (BTC/ETH/SOL with order_block strategy) and gold
+ * (XAUUSDT with asian_range_gold strategy) via per-symbol config routing.
+ *
  * Usage:
- *   npx tsx scripts/run-bot.ts
+ *   npx tsx scripts/run-bot.ts                    # Crypto only (default)
+ *   npx tsx scripts/run-bot.ts --gold             # Crypto + Gold
+ *   npx tsx scripts/run-bot.ts --gold-only        # Gold only
  *   npx tsx scripts/run-bot.ts --capital 5000
  *   npx tsx scripts/run-bot.ts --risk 0.003
  *   npx tsx scripts/run-bot.ts --telegram-token BOT_TOKEN --telegram-chat CHAT_ID
  *   npx tsx scripts/run-bot.ts --verbose
- *   npx tsx scripts/run-bot.ts --resume  # Resume from saved state
+ *   npx tsx scripts/run-bot.ts --resume           # Resume from saved state
  */
 
 import {
@@ -27,8 +32,9 @@ import {
   DEFAULT_BOT_CONFIG,
   RUN18_STRATEGY_CONFIG,
   DEFAULT_CIRCUIT_BREAKERS,
+  isGoldSymbol,
 } from '../src/lib/bot';
-import type { BotConfig, BotSymbol } from '../src/types/bot';
+import type { BotConfig, BotSymbol, BotPosition } from '../src/types/bot';
 
 // ============================================
 // Parse CLI arguments
@@ -41,6 +47,8 @@ function parseArgs(): {
   const args = process.argv.slice(2);
   const config = { ...DEFAULT_BOT_CONFIG };
   let resume = false;
+  let includeGold = false;
+  let goldOnly = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -74,7 +82,22 @@ function parseArgs(): {
       case '--poll-delay':
         config.pollDelaySeconds = parseInt(args[++i]!, 10);
         break;
+      case '--gold':
+        includeGold = true;
+        break;
+      case '--gold-only':
+        goldOnly = true;
+        break;
     }
+  }
+
+  // Handle gold flags (only if --symbols wasn't explicitly set)
+  if (goldOnly && !args.includes('--symbols')) {
+    config.symbols = ['XAUUSDT'];
+    config.maxPositions = 1;
+  } else if (includeGold && !args.includes('--symbols')) {
+    config.symbols = [...config.symbols, 'XAUUSDT'];
+    config.maxPositions = config.symbols.length;
   }
 
   return { config, resume };
@@ -124,21 +147,34 @@ class TradingBot {
 
   async start(): Promise<void> {
     this.running = true;
+
+    // Categorize symbols
+    const cryptoSymbols = this.config.symbols.filter(s => !isGoldSymbol(s));
+    const goldSymbols = this.config.symbols.filter(s => isGoldSymbol(s));
+
     console.log('='.repeat(60));
     console.log('ICT Paper Trading Bot');
     console.log('='.repeat(60));
     console.log(`Mode: ${this.config.mode}`);
     console.log(`Symbols: ${this.config.symbols.join(', ')}`);
+    if (cryptoSymbols.length > 0) {
+      console.log(`  Crypto (order_block): ${cryptoSymbols.join(', ')}`);
+    }
+    if (goldSymbols.length > 0) {
+      console.log(`  Gold (asian_range_gold): ${goldSymbols.join(', ')}`);
+    }
     console.log(`Capital: $${this.config.initialCapital}`);
     console.log(`Risk/trade: ${(this.config.riskPerTrade * 100).toFixed(2)}%`);
+    console.log(`Max positions: ${this.config.maxPositions}`);
     console.log(`Poll delay: ${this.config.pollDelaySeconds}s after hour close`);
     console.log('='.repeat(60));
 
     // Backfill candle history
     console.log('\nBackfilling candle history...');
     for (const symbol of this.config.symbols) {
+      const strategy = isGoldSymbol(symbol) ? 'asian_range_gold' : 'order_block';
       const count = await this.dataFeed.backfill(symbol);
-      console.log(`  ${symbol}: ${count} candles cached`);
+      console.log(`  ${symbol} [${strategy}]: ${count} candles cached`);
     }
 
     // Save initial state
@@ -227,8 +263,10 @@ class TradingBot {
     const lastProcessed = this.tracker.getLastProcessedTimestamp(symbol);
     if (latestCandle.timestamp <= lastProcessed) return;
 
+    const strategy = isGoldSymbol(symbol) ? 'asian_range_gold' : 'order_block';
+
     if (this.config.verbose) {
-      console.log(`[${new Date().toISOString()}] ${symbol}: new candle at ${new Date(latestCandle.timestamp).toISOString()}, close=$${latestCandle.close}`);
+      console.log(`[${new Date().toISOString()}] ${symbol} [${strategy}]: new candle at ${new Date(latestCandle.timestamp).toISOString()}, close=$${latestCandle.close}`);
     }
 
     // Mark as processed
@@ -252,7 +290,7 @@ class TradingBot {
 
     if (!this.riskEngine.canTradeSymbol(this.tracker, symbol)) return;
 
-    // 3. Evaluate signal
+    // 3. Evaluate signal (SignalEngine auto-routes to correct strategy per symbol)
     const result = this.signalEngine.evaluate(allCandles, symbol);
 
     if (!result.hasSignal || !result.signal) {
@@ -262,7 +300,7 @@ class TradingBot {
       return;
     }
 
-    // 4. Open position
+    // 4. Open position (OrderManager auto-routes to correct config per symbol)
     const position = this.orderManager.openPosition(
       result.signal,
       symbol,
@@ -290,7 +328,7 @@ class TradingBot {
     );
     await this.alerts.positionOpened(position);
 
-    console.log(`  ${symbol}: OPENED ${position.direction.toUpperCase()} @ $${position.entryPrice.toFixed(2)} (score: ${position.confluenceScore.toFixed(2)}, regime: ${position.regime})`);
+    console.log(`  ${symbol}: OPENED ${position.direction.toUpperCase()} @ $${position.entryPrice.toFixed(2)} (score: ${position.confluenceScore.toFixed(2)}, regime: ${position.regime}, strategy: ${position.strategy})`);
   }
 
   private async manageOpenPosition(

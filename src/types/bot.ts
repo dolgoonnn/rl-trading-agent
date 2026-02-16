@@ -18,7 +18,7 @@ export type BotMode = 'paper' | 'live';
 export type Exchange = 'bybit';
 
 /** Supported symbols for the bot */
-export type BotSymbol = 'BTCUSDT' | 'ETHUSDT' | 'SOLUSDT';
+export type BotSymbol = 'BTCUSDT' | 'ETHUSDT' | 'SOLUSDT' | 'XAUUSDT';
 
 /** Bot-level configuration */
 export interface BotConfig {
@@ -55,7 +55,7 @@ export interface BotConfig {
 // ============================================
 
 /** Strategy names that can be active */
-export type BotStrategyName = 'wait' | 'order_block' | 'fvg' | 'bos_continuation' | 'choch_reversal';
+export type BotStrategyName = 'wait' | 'order_block' | 'fvg' | 'bos_continuation' | 'choch_reversal' | 'asian_range_gold';
 
 /** Full strategy config — maps directly to confluence scorer + backtest params */
 export interface StrategyConfig {
@@ -87,6 +87,18 @@ export interface StrategyConfig {
   };
   /** Friction per side (commission + slippage combined) */
   frictionPerSide: number;
+  /** Gold-specific config (for asian_range_gold strategy) */
+  goldConfig?: {
+    minRangePct: number;
+    minSweepPct: number;
+    longBiasMultiplier: number;
+    goldVolScale: number;
+    targetRR: number;
+    displacementMultiple: number;
+    sweepLookback: number;
+    fvgSearchWindow: number;
+    ceTolerance: number;
+  };
 }
 
 // ============================================

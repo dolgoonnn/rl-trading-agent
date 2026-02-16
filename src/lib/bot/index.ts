@@ -7,6 +7,10 @@ export { AlertManager } from './alerts';
 export {
   DEFAULT_BOT_CONFIG,
   RUN18_STRATEGY_CONFIG,
+  GOLD_RUN12_STRATEGY_CONFIG,
   DEFAULT_CIRCUIT_BREAKERS,
   SYMBOL_ALLOCATION,
+  GOLD_SYMBOLS,
+  isGoldSymbol,
+  getStrategyConfigForSymbol,
 } from './config';

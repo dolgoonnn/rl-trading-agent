@@ -1,0 +1,101 @@
+{
+  "config": "Gold CMA-ES Run 12",
+  "symbols": [
+    "GC_F"
+  ],
+  "friction": 0.0002,
+  "strategy": "asian_range_gold",
+  "walkForward": {
+    "passRate": 0.6666666666666666,
+    "trades": 87,
+    "sharpe": 25.57111529519915
+  },
+  "pbo": {
+    "pbo": 0.3645,
+    "numCombinations": 2000,
+    "numOverfit": 729,
+    "avgLogitOOS": -1.1030355931058318,
+    "passes": false
+  },
+  "dsr": {
+    "originalSharpe": 25.57111529519915,
+    "deflatedSharpe": 15.309916360508677,
+    "haircut": 10.261198934690473,
+    "numTrials": 236,
+    "numTrades": 87,
+    "skewness": 1.0989789155293916,
+    "kurtosis": 4.2938013668466315,
+    "isSignificant": true,
+    "minBacktestLength": 6,
+    "mblPass": true,
+    "minSignificantSharpe": 0.4055633199716251,
+    "passRate": 0.6666666666666666
+  },
+  "monteCarlo": {
+    "totalTrades": 87,
+    "realSharpe": 25.57111529519915,
+    "realMaxDD": 0.060904183606692565,
+    "realPnl": 0.5306890548417138,
+    "realWinRate": 0.6896551724137931,
+    "reshufflePass": true,
+    "bootstrapSharpeP5": 13.220697264182293,
+    "bootstrapSharpePass": true,
+    "bootstrapPnlP5": 0.221207386042249,
+    "bootstrapPnlPass": true,
+    "skip20ProfitPct": 1,
+    "skip20Pass": true,
+    "perturbation": {
+      "meanPassRate": 0.6558333333333328,
+      "fragilityScore": 0.33,
+      "fragilityPass": true
+    },
+    "verdict": "PASS",
+    "verdictDetails": [
+      "PASS: Reshuffle — no adverse serial correlation",
+      "PASS: Bootstrap Sharpe 5th pct > 0 (13.221)",
+      "PASS: Bootstrap PnL 5th pct > 0 (22.1%)",
+      "PASS: Skip 20% profitable in 100% of iterations",
+      "PASS: Parameter fragility 33% (< 50%)"
+    ]
+  },
+  "scorecard": [
+    {
+      "check": "Walk-Forward >60%",
+      "value": "66.7%",
+      "pass": true
+    },
+    {
+      "check": "PBO <25%",
+      "value": "36.4%",
+      "pass": false
+    },
+    {
+      "check": "DSR >0",
+      "value": "15.31",
+      "pass": true
+    },
+    {
+      "check": "MC Bootstrap Sharpe",
+      "value": "13.221",
+      "pass": true
+    },
+    {
+      "check": "MC Bootstrap PnL",
+      "value": "22.1%",
+      "pass": true
+    },
+    {
+      "check": "MC Skip 20%",
+      "value": "100%",
+      "pass": true
+    },
+    {
+      "check": "Param Fragility <50%",
+      "value": "33%",
+      "pass": true
+    }
+  ],
+  "overallPass": false,
+  "tradePassOnly": false,
+  "timestamp": "2026-02-16T03:20:05.966Z"
+}

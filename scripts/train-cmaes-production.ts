@@ -11,12 +11,14 @@
  * - Base threshold
  * - OB freshness half-life
  * - ATR extension bands
+ * - (Gold mode) 5 additional gold-specific parameters
  *
- * Total: 18 dimensions
+ * Total: 23 dimensions (crypto) or 28 dimensions (gold)
  *
  * Usage:
  *   npx tsx scripts/train-cmaes-production.ts
  *   npx tsx scripts/train-cmaes-production.ts --generations 30 --pop 16 --parallel 4
+ *   npx tsx scripts/train-cmaes-production.ts --strategy gold --symbols GC_F --friction 0.0002
  */
 
 import fs from 'fs';
@@ -52,7 +54,7 @@ const REGIME_LABELS = [
   'downtrend+normal', 'downtrend+low',
 ];
 
-function buildParamSpecs(): ParamSpec[] {
+function buildParamSpecs(strategy: string = 'ob'): ParamSpec[] {
   const specs: ParamSpec[] = [];
 
   // 10 weight multipliers [0, 3]
@@ -156,6 +158,73 @@ function buildParamSpecs(): ParamSpec[] {
     type: 'hyperparameter',
   });
 
+  // Gold-specific parameters (asian-range-gold strategy)
+  if (strategy === 'gold' || strategy === 'asian-range-gold' || strategy === 'asian_range_gold') {
+    specs.push({
+      name: 'goldMinRangePct',
+      min: 0.05,
+      max: 0.40,
+      initial: 0.15,
+      type: 'hyperparameter',
+    });
+    specs.push({
+      name: 'goldMinSweepPct',
+      min: 0.01,
+      max: 0.10,
+      initial: 0.03,
+      type: 'hyperparameter',
+    });
+    specs.push({
+      name: 'goldLongBias',
+      min: 0.8,
+      max: 1.5,
+      initial: 1.0,
+      type: 'hyperparameter',
+    });
+    specs.push({
+      name: 'goldVolScale',
+      min: 0.2,
+      max: 1.0,
+      initial: 0.5,
+      type: 'hyperparameter',
+    });
+    specs.push({
+      name: 'goldTargetRR',
+      min: 1.0,
+      max: 4.0,
+      initial: 2.0,
+      type: 'hyperparameter',
+    });
+    specs.push({
+      name: 'goldDispMult',
+      min: 1.0,
+      max: 2.0,
+      initial: 1.2,
+      type: 'hyperparameter',
+    });
+    specs.push({
+      name: 'goldSweepLookback',
+      min: 8,
+      max: 30,
+      initial: 20,
+      type: 'hyperparameter',
+    });
+    specs.push({
+      name: 'goldFvgWindow',
+      min: 6,
+      max: 20,
+      initial: 12,
+      type: 'hyperparameter',
+    });
+    specs.push({
+      name: 'goldCeTolerance',
+      min: 0.001,
+      max: 0.01,
+      initial: 0.005,
+      type: 'hyperparameter',
+    });
+  }
+
   return specs;
 }
 
@@ -174,6 +243,16 @@ interface DecodedParams {
   partialBeBuffer: number;
   maxBars: number;
   cooldownBars: number;
+  // Gold-specific (optional)
+  goldMinRangePct?: number;
+  goldMinSweepPct?: number;
+  goldLongBias?: number;
+  goldVolScale?: number;
+  goldTargetRR?: number;
+  goldDispMult?: number;
+  goldSweepLookback?: number;
+  goldFvgWindow?: number;
+  goldCeTolerance?: number;
 }
 
 function decodeParams(params: number[], specs: ParamSpec[]): DecodedParams {
@@ -187,6 +266,7 @@ function decodeParams(params: number[], specs: ParamSpec[]): DecodedParams {
   let partialBeBuffer = 0.1;
   let maxBars = 100;
   let cooldownBars = 6;
+  const goldParams: Partial<Pick<DecodedParams, 'goldMinRangePct' | 'goldMinSweepPct' | 'goldLongBias' | 'goldVolScale' | 'goldTargetRR' | 'goldDispMult' | 'goldSweepLookback' | 'goldFvgWindow' | 'goldCeTolerance'>> = {};
 
   for (let i = 0; i < specs.length && i < params.length; i++) {
     const spec = specs[i]!;
@@ -214,6 +294,24 @@ function decodeParams(params: number[], specs: ParamSpec[]): DecodedParams {
       maxBars = Math.round(val);
     } else if (spec.name === 'cooldownBars') {
       cooldownBars = Math.round(val);
+    } else if (spec.name === 'goldMinRangePct') {
+      goldParams.goldMinRangePct = val;
+    } else if (spec.name === 'goldMinSweepPct') {
+      goldParams.goldMinSweepPct = val;
+    } else if (spec.name === 'goldLongBias') {
+      goldParams.goldLongBias = val;
+    } else if (spec.name === 'goldVolScale') {
+      goldParams.goldVolScale = val;
+    } else if (spec.name === 'goldTargetRR') {
+      goldParams.goldTargetRR = val;
+    } else if (spec.name === 'goldDispMult') {
+      goldParams.goldDispMult = val;
+    } else if (spec.name === 'goldSweepLookback') {
+      goldParams.goldSweepLookback = Math.round(val);
+    } else if (spec.name === 'goldFvgWindow') {
+      goldParams.goldFvgWindow = Math.round(val);
+    } else if (spec.name === 'goldCeTolerance') {
+      goldParams.goldCeTolerance = val;
     }
   }
 
@@ -222,6 +320,7 @@ function decodeParams(params: number[], specs: ParamSpec[]): DecodedParams {
     obFreshnessHalfLife, atrExtensionBands,
     partialFraction, partialTriggerR, partialBeBuffer,
     maxBars, cooldownBars,
+    ...goldParams,
   };
 }
 
@@ -236,9 +335,10 @@ interface BacktestResult {
   pnl: number;
 }
 
-function buildCLIArgs(decoded: DecodedParams, symbols?: string | null, friction?: number, suppressRegime?: string): string[] {
+function buildCLIArgs(decoded: DecodedParams, symbols?: string | null, friction?: number, suppressRegime?: string, strategy?: string): string[] {
+  const strat = strategy ?? 'ob';
   const args: string[] = [
-    '--strategy', 'ob',
+    '--strategy', strat,
     '--sl-mode', 'dynamic_rr',
     '--friction', (friction ?? 0.0007).toString(),
     '--suppress-regime', suppressRegime ?? 'ranging+normal,ranging+high,downtrend+high',
@@ -273,6 +373,35 @@ function buildCLIArgs(decoded: DecodedParams, symbols?: string | null, friction?
     args.push('--weights', wParts.join(','));
   }
 
+  // Gold-specific params
+  if (decoded.goldMinRangePct !== undefined) {
+    args.push('--asian-range-min', decoded.goldMinRangePct.toFixed(3));
+  }
+  if (decoded.goldMinSweepPct !== undefined) {
+    args.push('--sweep-min', decoded.goldMinSweepPct.toFixed(3));
+  }
+  if (decoded.goldLongBias !== undefined) {
+    args.push('--long-bias', decoded.goldLongBias.toFixed(2));
+  }
+  if (decoded.goldVolScale !== undefined) {
+    args.push('--gold-vol-scale', decoded.goldVolScale.toFixed(2));
+  }
+  if (decoded.goldTargetRR !== undefined) {
+    args.push('--gold-target-rr', decoded.goldTargetRR.toFixed(2));
+  }
+  if (decoded.goldDispMult !== undefined) {
+    args.push('--gold-disp-mult', decoded.goldDispMult.toFixed(2));
+  }
+  if (decoded.goldSweepLookback !== undefined) {
+    args.push('--gold-sweep-lookback', decoded.goldSweepLookback.toString());
+  }
+  if (decoded.goldFvgWindow !== undefined) {
+    args.push('--gold-fvg-window', decoded.goldFvgWindow.toString());
+  }
+  if (decoded.goldCeTolerance !== undefined) {
+    args.push('--gold-ce-tolerance', decoded.goldCeTolerance.toFixed(4));
+  }
+
   return args;
 }
 
@@ -300,8 +429,8 @@ function parseBacktestOutput(output: string): BacktestResult | null {
   };
 }
 
-function runProductionBacktest(decoded: DecodedParams, symbols?: string | null, friction?: number, suppressRegime?: string): BacktestResult | null {
-  const args = buildCLIArgs(decoded, symbols, friction, suppressRegime);
+function runProductionBacktest(decoded: DecodedParams, symbols?: string | null, friction?: number, suppressRegime?: string, strategy?: string): BacktestResult | null {
+  const args = buildCLIArgs(decoded, symbols, friction, suppressRegime, strategy);
   // Write output to temp file to avoid 8KB stdout truncation when exit code ≠ 0.
   // With 10 symbols the text output easily exceeds the execSync pipe buffer.
   const tmpFile = path.join(os.tmpdir(), `cmaes-bt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.txt`);
@@ -311,7 +440,7 @@ function runProductionBacktest(decoded: DecodedParams, symbols?: string | null, 
     try {
       execSync(cmd, {
         cwd: path.resolve(__dirname, '..'),
-        shell: true,
+        shell: '/bin/sh',
         timeout: 300_000,
       });
     } catch {
@@ -385,6 +514,7 @@ interface CLIConfig {
   symbols: string | null;
   friction: number;
   suppressRegime: string;
+  strategy: string;
 }
 
 function parseCLI(): CLIConfig {
@@ -398,6 +528,7 @@ function parseCLI(): CLIConfig {
     symbols: null,
     friction: 0.0007,
     suppressRegime: 'ranging+normal,ranging+high,downtrend+high',
+    strategy: 'ob',
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -426,6 +557,9 @@ function parseCLI(): CLIConfig {
       case '--suppress-regime':
         config.suppressRegime = args[++i] ?? config.suppressRegime;
         break;
+      case '--strategy':
+        config.strategy = args[++i] ?? 'ob';
+        break;
     }
   }
 
@@ -438,7 +572,8 @@ function parseCLI(): CLIConfig {
 
 async function main() {
   const config = parseCLI();
-  const specs = buildParamSpecs();
+  const isGold = config.strategy === 'gold' || config.strategy === 'asian-range-gold' || config.strategy === 'asian_range_gold';
+  const specs = buildParamSpecs(config.strategy);
   const dims = specs.length;
 
   const log = (msg: string) => console.log(`[${new Date().toLocaleTimeString('en-US', { hour12: false })}] ${msg}`);
@@ -446,10 +581,11 @@ async function main() {
   log('============================================================');
   log('CMA-ES Production-Matched Optimizer');
   log('============================================================');
+  log(`Strategy: ${config.strategy}${isGold ? ' (gold mode)' : ''}`);
   log(`Dimensions: ${dims}`);
   log(`  Weights: ${WEIGHT_NAMES.length}`);
   log(`  Regime thresholds: ${REGIME_LABELS.length}`);
-  log(`  Hyperparameters: 3 (baseThreshold, obFreshnessHalfLife, atrExtensionBands)`);
+  log(`  Hyperparameters: ${dims - WEIGHT_NAMES.length - REGIME_LABELS.length}${isGold ? ' (includes 5 gold params)' : ''}`);
   log(`Population: ${config.populationSize}`);
   log(`Generations: ${config.generations}`);
   log(`Sigma: ${config.sigma}`);
@@ -528,7 +664,7 @@ async function main() {
     maxBars: 100,
     cooldownBars: 6,
   };
-  const baselineResult = runProductionBacktest(baselineDecoded, config.symbols, config.friction, config.suppressRegime);
+  const baselineResult = runProductionBacktest(baselineDecoded, config.symbols, config.friction, config.suppressRegime, config.strategy);
   const baselineFitness = baselineResult ? computeFitness(baselineResult, symbolCount) : 0;
   log(`Baseline: fitness=${baselineFitness.toFixed(1)}, passRate=${(baselineResult?.passRate ?? 0) * 100 | 0}%, trades=${baselineResult?.totalTrades ?? 0}, PnL=${((baselineResult?.pnl ?? 0) * 100).toFixed(1)}%`);
   log('');
@@ -564,7 +700,7 @@ async function main() {
 
       const rawCandidate = denormalize(candidate);
       const decoded = decodeParams(rawCandidate, specs);
-      const result = runProductionBacktest(decoded, config.symbols, config.friction, config.suppressRegime);
+      const result = runProductionBacktest(decoded, config.symbols, config.friction, config.suppressRegime, config.strategy);
 
       if (result) {
         const fitness = computeFitness(result, symbolCount);
@@ -582,7 +718,7 @@ async function main() {
         process.stdout.write('x');
         if (gen === 0 && ci === 0) {
           log(`  C0 FAILED: no output from subprocess`);
-          const debugArgs = buildCLIArgs(decoded, config.symbols, config.friction, config.suppressRegime);
+          const debugArgs = buildCLIArgs(decoded, config.symbols, config.friction, config.suppressRegime, config.strategy);
           log(`  CMD: npx tsx scripts/backtest-confluence.ts ${debugArgs.slice(0, 8).join(' ')} ...`);
         }
       }
@@ -631,7 +767,7 @@ async function main() {
   const bestNormParams = allTimeBestParams ?? normMean;
   const bestParams = denormalize(bestNormParams);
   const bestDecoded = decodeParams(bestParams, specs);
-  const finalResult = runProductionBacktest(bestDecoded, config.symbols, config.friction, config.suppressRegime);
+  const finalResult = runProductionBacktest(bestDecoded, config.symbols, config.friction, config.suppressRegime, config.strategy);
   const finalFitness = finalResult ? computeFitness(finalResult, symbolCount) : 0;
 
   log('');
@@ -671,6 +807,19 @@ async function main() {
   log(`  ATR extension bands: ${bestDecoded.atrExtensionBands.toFixed(2)}`);
   log(`  Partial TP: ${(bestDecoded.partialFraction * 100).toFixed(0)}% @ ${bestDecoded.partialTriggerR.toFixed(2)}R, BE buffer ${bestDecoded.partialBeBuffer.toFixed(2)}`);
   log(`  Max bars: ${bestDecoded.maxBars}, Cooldown bars: ${bestDecoded.cooldownBars}`);
+  if (isGold) {
+    log('');
+    log('Gold-specific params:');
+    log(`  Min range %: ${bestDecoded.goldMinRangePct?.toFixed(3) ?? 'N/A'}`);
+    log(`  Min sweep %: ${bestDecoded.goldMinSweepPct?.toFixed(3) ?? 'N/A'}`);
+    log(`  Long bias: ${bestDecoded.goldLongBias?.toFixed(2) ?? 'N/A'}`);
+    log(`  Vol scale: ${bestDecoded.goldVolScale?.toFixed(2) ?? 'N/A'}`);
+    log(`  Target RR: ${bestDecoded.goldTargetRR?.toFixed(2) ?? 'N/A'}`);
+    log(`  Disp mult: ${bestDecoded.goldDispMult?.toFixed(2) ?? 'N/A'}`);
+    log(`  Sweep lookback: ${bestDecoded.goldSweepLookback ?? 'N/A'}`);
+    log(`  FVG window: ${bestDecoded.goldFvgWindow ?? 'N/A'}`);
+    log(`  CE tolerance: ${bestDecoded.goldCeTolerance?.toFixed(4) ?? 'N/A'}`);
+  }
 
   // Print per-symbol breakdown from final result
   if (finalResult) {
@@ -682,7 +831,7 @@ async function main() {
   // Print CLI command to reproduce
   log('');
   log('Reproduce with:');
-  const cliArgs = buildCLIArgs(bestDecoded, config.symbols, config.friction, config.suppressRegime);
+  const cliArgs = buildCLIArgs(bestDecoded, config.symbols, config.friction, config.suppressRegime, config.strategy);
   log(`  npx tsx scripts/backtest-confluence.ts ${cliArgs.filter(a => a !== '--json').join(' ')}`);
 
   // Save model
