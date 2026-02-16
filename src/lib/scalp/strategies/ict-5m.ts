@@ -6,8 +6,8 @@
  *
  * Key differences from 1H OB strategy:
  * - Multi-timeframe: 5m entries with 1H bias
- * - Kill zone emphasis: only trade London/NY sessions
- * - Scalp-tuned: tighter thresholds, shorter hold times
+ * - Kill zone emphasis: configurable session filtering
+ * - Scalp-tuned: configurable R:R, OB proximity, thresholds
  * - Higher friction: 0.05% per side (maker fees)
  *
  * Reuses all existing ICT detection modules — only the strategy wrapper is new.
@@ -25,7 +25,8 @@ import {
 } from '@/lib/ict';
 import { DEFAULT_OB_CONFIG, type OrderBlockConfig } from '@/lib/ict/order-blocks';
 import type { FVGConfig } from '@/lib/ict/fair-value-gaps';
-import type { ScalpStrategy, ScalpStrategySignal } from './types';
+import type { ScalpStrategy, ScalpStrategySignal, ICT5mConfig } from './types';
+import { DEFAULT_ICT5M_CONFIG } from './types';
 
 /** Lookback window for 5m ICT analysis */
 const LOOKBACK_5M = 100;
@@ -38,13 +39,18 @@ const LOOKBACK_1H = 100;
  *
  * Entry logic:
  * 1. Determine 1H bias from market structure (bullish/bearish)
- * 2. Only trade in kill zones (London: 02-05 UTC, NY: 08-11 UTC)
+ * 2. Kill zone filter (configurable: traditional, crypto, or all)
  * 3. On 5m: detect OBs, FVGs, structure breaks
  * 4. Only generate signals aligned with 1H bias
  * 5. Score confluence factors for quality filtering
  */
 export class ICT5mStrategy implements ScalpStrategy {
   name = 'ict_5m' as const;
+  private config: ICT5mConfig;
+
+  constructor(config?: Partial<ICT5mConfig>) {
+    this.config = { ...DEFAULT_ICT5M_CONFIG, ...config };
+  }
 
   detectEntry(
     candles5m: Candle[],
@@ -61,11 +67,8 @@ export class ICT5mStrategy implements ScalpStrategy {
     const htfBias = this.getHTFBias(candles1h, htfIndex);
     if (!htfBias) return null; // No clear bias → skip
 
-    // 2. Kill zone filter — only trade during London/NY sessions
-    const killZone = checkKillZone(current5m.timestamp);
-    if (!killZone.inKillZone) return null;
-    // Only trade London Open or NY Open (highest probability)
-    if (killZone.type !== 'london_open' && killZone.type !== 'ny_open') return null;
+    // 2. Kill zone filter
+    if (!this.isInAllowedSession(current5m.timestamp)) return null;
 
     // 3. Build 5m ICT context
     const sliceStart = Math.max(0, currentIndex - LOOKBACK_5M);
@@ -100,7 +103,6 @@ export class ICT5mStrategy implements ScalpStrategy {
     const currentPrice = current5m.close;
 
     // 4. Only trade aligned with 1H bias
-    // Check 5m structure alignment with HTF
     const fiveMinBias = structure.bias;
     if (htfBias === 'bullish' && fiveMinBias === 'bearish') return null;
     if (htfBias === 'bearish' && fiveMinBias === 'bullish') return null;
@@ -113,7 +115,6 @@ export class ICT5mStrategy implements ScalpStrategy {
       if (ob.status !== 'unmitigated') return false;
       if (direction === 'long' && ob.type !== 'bullish') return false;
       if (direction === 'short' && ob.type !== 'bearish') return false;
-      // Check freshness (within 50 bars on 5m)
       if (localIndex - ob.index > 50) return false;
       return true;
     });
@@ -132,33 +133,33 @@ export class ICT5mStrategy implements ScalpStrategy {
       }
     }
 
-    // Check proximity — price must be near the OB
+    // Check proximity — price must be near the OB (configurable)
     const obMid = (bestOB.high + bestOB.low) / 2;
     const proximityPct = Math.abs(currentPrice - obMid) / currentPrice;
-    if (proximityPct > 0.005) return null; // Must be within 0.5% of OB
+    if (proximityPct > this.config.obProximity) return null;
 
     // Check for reaction confirmation (candle body showing rejection)
     if (!this.hasReactionConfirmation(lookback5m, localIndex, direction)) return null;
 
-    // 6. Calculate SL/TP using dynamic R:R (matching 1H model)
+    // 6. Calculate SL/TP using configurable R:R
     const riskDistance = direction === 'long'
       ? currentPrice - (bestOB.low - atr * 0.5)
       : (bestOB.high + atr * 0.5) - currentPrice;
 
     if (riskDistance <= 0) return null;
 
-    const targetRR = 2.0; // Scalp R:R target
     const stopLoss = direction === 'long'
       ? currentPrice - riskDistance
       : currentPrice + riskDistance;
     const takeProfit = direction === 'long'
-      ? currentPrice + riskDistance * targetRR
-      : currentPrice - riskDistance * targetRR;
+      ? currentPrice + riskDistance * this.config.targetRR
+      : currentPrice - riskDistance * this.config.targetRR;
 
     const actualRR = Math.abs(takeProfit - currentPrice) / riskDistance;
-    if (actualRR < 1.5) return null; // Hard minimum R:R
+    if (actualRR < this.config.minRR) return null;
 
     // 7. Score confluence factors
+    const killZone = checkKillZone(current5m.timestamp);
     const confluenceFactors = this.scoreConfluence(
       direction,
       structure,
@@ -178,7 +179,7 @@ export class ICT5mStrategy implements ScalpStrategy {
       stopLoss,
       takeProfit,
       riskReward: actualRR,
-      confidence: confluenceFactors.totalScore / 10, // Normalize to 0-1
+      confidence: confluenceFactors.totalScore / 10,
       strategy: 'order_block',
       reasoning: confluenceFactors.reasons,
       orderBlock: bestOB,
@@ -201,6 +202,26 @@ export class ICT5mStrategy implements ScalpStrategy {
   // Private helpers
   // ============================================
 
+  /**
+   * Check if timestamp is in an allowed trading session based on killZoneMode.
+   */
+  private isInAllowedSession(timestampMs: number): boolean {
+    if (this.config.killZoneMode === 'all_sessions') return true;
+
+    if (this.config.killZoneMode === 'crypto') {
+      // Crypto-optimized sessions:
+      // US market hours: 13:00-17:00 UTC (peak BTC volume)
+      // London overlap: 08:00-11:00 UTC
+      const hour = new Date(timestampMs).getUTCHours();
+      return (hour >= 13 && hour < 17) || (hour >= 8 && hour < 11);
+    }
+
+    // Traditional: London Open (02-05 NY) + NY Open (08-11 NY)
+    const killZone = checkKillZone(timestampMs);
+    if (!killZone.inKillZone) return false;
+    return killZone.type === 'london_open' || killZone.type === 'ny_open';
+  }
+
   private getHTFBias(candles1h: Candle[], htfIndex: number): 'bullish' | 'bearish' | null {
     const sliceStart = Math.max(0, htfIndex - LOOKBACK_1H);
     const lookback1h = candles1h.slice(sliceStart, htfIndex + 1);
@@ -209,10 +230,9 @@ export class ICT5mStrategy implements ScalpStrategy {
 
     const structure = analyzeMarketStructure(lookback1h);
 
-    // Only trade with clear bias
     if (structure.bias === 'bullish') return 'bullish';
     if (structure.bias === 'bearish') return 'bearish';
-    return null; // Ranging → no trade
+    return null;
   }
 
   private calculateATR(candles: Candle[], period = 14): number {
@@ -263,9 +283,8 @@ export class ICT5mStrategy implements ScalpStrategy {
     if (candleRange === 0) return false;
 
     const bodyPct = bodySize / candleRange;
-    if (bodyPct < 0.4) return false; // Need convincing body
+    if (bodyPct < 0.4) return false;
 
-    // Direction check: body should close in trade direction
     if (direction === 'long' && c.close <= c.open) return false;
     if (direction === 'short' && c.close >= c.open) return false;
 
@@ -287,7 +306,7 @@ export class ICT5mStrategy implements ScalpStrategy {
     let score = 0;
     const reasons: string[] = [];
 
-    // Structure alignment (1H bias already confirmed, 5m aligned)
+    // Structure alignment
     if (
       (direction === 'long' && structure.bias === 'bullish') ||
       (direction === 'short' && structure.bias === 'bearish')
@@ -311,7 +330,7 @@ export class ICT5mStrategy implements ScalpStrategy {
       reasons.push('Recent liquidity sweep confirmed');
     }
 
-    // OB freshness (within 20 bars is fresh for 5m)
+    // OB freshness
     const obAge = currentIndex - ob.index;
     if (obAge <= 10) {
       score += 1.0;
@@ -346,16 +365,16 @@ export class ICT5mStrategy implements ScalpStrategy {
       reasons.push('Recent BOS in trade direction');
     }
 
-    // R:R quality
-    if (rr >= 3.0) {
+    // R:R quality — adjusted thresholds for lower targetRR
+    if (rr >= 2.5) {
       score += 1.0;
       reasons.push(`Excellent R:R: ${rr.toFixed(1)}`);
-    } else if (rr >= 2.0) {
+    } else if (rr >= 1.5) {
       score += 0.5;
       reasons.push(`Good R:R: ${rr.toFixed(1)}`);
     }
 
-    // OB + FVG confluence (both present near entry)
+    // OB + FVG confluence
     if (nearbyFVGs.length > 0 && obAge <= 25) {
       score += 1.0;
       reasons.push('OB + FVG confluence zone');

@@ -30,6 +30,7 @@ import {
   runWalkForward,
   calculateSharpe,
   calculateMaxDrawdown,
+  getAnnualizationFactor,
   type WalkForwardStrategyRunner,
   type TradeResult,
   type WalkForwardResult,
@@ -486,7 +487,8 @@ async function collectTradesAndSharpe(): Promise<{
   );
 
   const returns = allTrades.map((t) => t.pnlPercent);
-  const sharpe = calculateSharpe(returns);
+  const annualizationFactor = getAnnualizationFactor(GOLD_SYMBOLS);
+  const sharpe = calculateSharpe(returns, annualizationFactor);
 
   return { trades: allTrades, sharpe, passRate: wfResult.passRate, returns, wfResult };
 }
@@ -531,8 +533,11 @@ async function runDSRValidation(tradesData: {
   const skewness = calcSkewness(returns);
   const kurtosis = calcKurtosis(returns);
 
+  const annFactor = getAnnualizationFactor(GOLD_SYMBOLS);
   log(`  Trades:    ${trades.length}`);
-  log(`  Sharpe:    ${sharpe.toFixed(4)}`);
+  log(`  Sharpe:    ${sharpe.toFixed(4)} (per-trade, annualized with factor=${annFactor.toFixed(1)})`);
+  log(`  NOTE:      Per-trade Sharpe with ${trades.length} trades over ~11K bars is inflated vs per-bar Sharpe.`);
+  log(`             Focus on WR, profit factor, and pass rate for honest assessment.`);
   log(`  Skewness:  ${skewness.toFixed(4)}`);
   log(`  Kurtosis:  ${kurtosis.toFixed(4)}`);
   log('');
@@ -616,14 +621,15 @@ async function runMCValidation(
   log('');
 
   const { trades, returns } = tradesData;
-  const realSharpe = calculateSharpe(returns);
+  const annualizationFactor = getAnnualizationFactor(GOLD_SYMBOLS);
+  const realSharpe = calculateSharpe(returns, annualizationFactor);
   const realMaxDD = calculateMaxDrawdown(returns);
   const realPnl = returns.reduce((eq, r) => eq * (1 + r), 1) - 1;
   const realWinRate = returns.filter((r) => r > 0).length / returns.length;
 
   log(`Real performance:`);
   log(`  Trades: ${trades.length}`);
-  log(`  Sharpe: ${realSharpe.toFixed(3)}`);
+  log(`  Sharpe: ${realSharpe.toFixed(3)} (annualization: ${annualizationFactor.toFixed(1)}, gold trading hours)`);
   log(`  MaxDD:  ${(realMaxDD * 100).toFixed(1)}%`);
   log(`  PnL:    ${(realPnl * 100).toFixed(1)}%`);
   log(`  WinRate: ${(realWinRate * 100).toFixed(1)}%`);
@@ -631,7 +637,7 @@ async function runMCValidation(
 
   // Reshuffle test
   log('--- Reshuffle Test ---');
-  const reshuffleResult = reshuffleTrades(trades, iterations);
+  const reshuffleResult = reshuffleTrades(trades, iterations, annualizationFactor);
   const reshufflePass = reshuffleResult.finalPnl.pValue <= 0.95;
   log(`  Sharpe Z-score:     ${reshuffleResult.sharpe.zScore.toFixed(3)}`);
   log(`  PnL p-value:        ${reshuffleResult.finalPnl.pValue.toFixed(4)}`);
@@ -640,7 +646,7 @@ async function runMCValidation(
 
   // Bootstrap test
   log('--- Bootstrap Test ---');
-  const bootstrapResult = bootstrapTrades(trades, iterations);
+  const bootstrapResult = bootstrapTrades(trades, iterations, undefined, annualizationFactor);
   const bootstrapSharpePass = bootstrapResult.sharpe.p5 > 0;
   const bootstrapPnlPass = bootstrapResult.finalPnl.p5 > 0;
   log(`  Sharpe 5th pct:     ${bootstrapResult.sharpe.p5.toFixed(3)} ${bootstrapSharpePass ? '\x1b[32mPASS\x1b[0m' : '\x1b[31mFAIL\x1b[0m'}`);
@@ -652,9 +658,9 @@ async function runMCValidation(
 
   // Skip trades test
   log('--- Skip Trades Test ---');
-  const skip10 = skipTrades(trades, 0.10, iterations);
-  const skip20 = skipTrades(trades, 0.20, iterations);
-  const skip30 = skipTrades(trades, 0.30, iterations);
+  const skip10 = skipTrades(trades, 0.10, iterations, annualizationFactor);
+  const skip20 = skipTrades(trades, 0.20, iterations, annualizationFactor);
+  const skip30 = skipTrades(trades, 0.30, iterations, annualizationFactor);
   const skip20Pass = skip20.profitableFraction >= 0.80;
   log(`  Skip 10%: ${(skip10.profitableFraction * 100).toFixed(1)}% profitable, median Sharpe ${skip10.sharpe.median.toFixed(3)}`);
   log(`  Skip 20%: ${(skip20.profitableFraction * 100).toFixed(1)}% profitable, median Sharpe ${skip20.sharpe.median.toFixed(3)} ${skip20Pass ? '\x1b[32mPASS\x1b[0m' : '\x1b[31mFAIL\x1b[0m'}`);
@@ -919,6 +925,55 @@ async function main(): Promise<void> {
   );
 
   // ============================================
+  // Direction Breakdown
+  // ============================================
+  log('');
+  log('============================================================');
+  log('DIRECTION BREAKDOWN (Long vs Short)');
+  log('============================================================');
+  log('');
+
+  const longTrades = tradesData.trades.filter((t) => t.direction === 'long');
+  const shortTrades = tradesData.trades.filter((t) => t.direction === 'short');
+  const longWins = longTrades.filter((t) => t.pnlPercent > 0);
+  const shortWins = shortTrades.filter((t) => t.pnlPercent > 0);
+  const longPnl = longTrades.reduce((eq, t) => eq * (1 + t.pnlPercent), 1) - 1;
+  const shortPnl = shortTrades.reduce((eq, t) => eq * (1 + t.pnlPercent), 1) - 1;
+  const longAvgPnl = longTrades.length > 0
+    ? longTrades.reduce((s, t) => s + t.pnlPercent, 0) / longTrades.length
+    : 0;
+  const shortAvgPnl = shortTrades.length > 0
+    ? shortTrades.reduce((s, t) => s + t.pnlPercent, 0) / shortTrades.length
+    : 0;
+
+  // Profit factor: sum of wins / abs(sum of losses)
+  const longWinSum = longTrades.filter((t) => t.pnlPercent > 0).reduce((s, t) => s + t.pnlPercent, 0);
+  const longLossSum = Math.abs(longTrades.filter((t) => t.pnlPercent <= 0).reduce((s, t) => s + t.pnlPercent, 0));
+  const shortWinSum = shortTrades.filter((t) => t.pnlPercent > 0).reduce((s, t) => s + t.pnlPercent, 0);
+  const shortLossSum = Math.abs(shortTrades.filter((t) => t.pnlPercent <= 0).reduce((s, t) => s + t.pnlPercent, 0));
+  const longPF = longLossSum > 0 ? longWinSum / longLossSum : longWinSum > 0 ? Infinity : 0;
+  const shortPF = shortLossSum > 0 ? shortWinSum / shortLossSum : shortWinSum > 0 ? Infinity : 0;
+
+  log(`  Direction  | Trades | % Total | Win Rate | Avg PnL  | PF   | Compounded PnL`);
+  log(`  -----------+--------+---------+----------+----------+------+----------------`);
+  log(`  Long       | ${longTrades.length.toString().padStart(6)} | ${((longTrades.length / tradesData.trades.length) * 100).toFixed(1).padStart(6)}% | ${(longTrades.length > 0 ? (longWins.length / longTrades.length) * 100 : 0).toFixed(1).padStart(7)}% | ${(longAvgPnl * 100).toFixed(2).padStart(7)}% | ${longPF === Infinity ? ' Inf' : longPF.toFixed(2).padStart(4)} | ${(longPnl * 100).toFixed(1).padStart(13)}%`);
+  log(`  Short      | ${shortTrades.length.toString().padStart(6)} | ${((shortTrades.length / tradesData.trades.length) * 100).toFixed(1).padStart(6)}% | ${(shortTrades.length > 0 ? (shortWins.length / shortTrades.length) * 100 : 0).toFixed(1).padStart(7)}% | ${(shortAvgPnl * 100).toFixed(2).padStart(7)}% | ${shortPF === Infinity ? ' Inf' : shortPF.toFixed(2).padStart(4)} | ${(shortPnl * 100).toFixed(1).padStart(13)}%`);
+  log('');
+
+  if (longTrades.length > 0 && shortTrades.length > 0) {
+    const longBias = longTrades.length / tradesData.trades.length;
+    if (longBias > 0.70) {
+      log(`  \x1b[33mWARNING: ${(longBias * 100).toFixed(0)}% long bias. Edge may be regime-dependent (bull market).\x1b[0m`);
+    } else if (longBias < 0.30) {
+      log(`  \x1b[33mWARNING: ${((1 - longBias) * 100).toFixed(0)}% short bias.\x1b[0m`);
+    } else {
+      log(`  Direction balance: ${(longBias * 100).toFixed(0)}% long / ${((1 - longBias) * 100).toFixed(0)}% short — balanced.`);
+    }
+  } else if (shortTrades.length === 0) {
+    log(`  \x1b[31mWARNING: 100% long trades. Edge is entirely regime-dependent.\x1b[0m`);
+  }
+
+  // ============================================
   // Final Scorecard
   // ============================================
   log('');
@@ -1001,10 +1056,28 @@ async function main(): Promise<void> {
     symbols: GOLD_SYMBOLS,
     friction: GOLD_FRICTION,
     strategy: 'asian_range_gold',
+    annualizationFactor: getAnnualizationFactor(GOLD_SYMBOLS),
     walkForward: {
       passRate: tradesData.passRate,
       trades: tradesData.trades.length,
       sharpe: tradesData.sharpe,
+      sharpeNote: 'Per-trade Sharpe annualized with gold trading hours factor. May appear inflated vs per-bar Sharpe.',
+    },
+    directionBreakdown: {
+      long: {
+        trades: longTrades.length,
+        winRate: longTrades.length > 0 ? (longWins.length / longTrades.length) * 100 : 0,
+        avgPnl: longAvgPnl,
+        compoundedPnl: longPnl,
+        profitFactor: longPF === Infinity ? null : longPF,
+      },
+      short: {
+        trades: shortTrades.length,
+        winRate: shortTrades.length > 0 ? (shortWins.length / shortTrades.length) * 100 : 0,
+        avgPnl: shortAvgPnl,
+        compoundedPnl: shortPnl,
+        profitFactor: shortPF === Infinity ? null : shortPF,
+      },
     },
     pbo: pboResult,
     dsr: dsrResult,

@@ -826,6 +826,24 @@ async function main() {
     log('');
     log('Per-symbol breakdown (from final eval):');
     log(`  Total: passRate=${fmtPct(finalResult.passRate)}, trades=${finalResult.totalTrades}, PnL=${fmtPct(finalResult.pnl)}`);
+
+    // Parameter-to-trade ratio warning
+    const tradesPerParam = finalResult.totalTrades / dims;
+    log('');
+    log('--- Overfitting Risk Assessment ---');
+    log(`  Parameters optimized:     ${dims}`);
+    log(`  Total trades:             ${finalResult.totalTrades}`);
+    log(`  Trades per parameter:     ${tradesPerParam.toFixed(1)}`);
+    if (tradesPerParam < 10) {
+      log(`  \x1b[31mWARNING: trades/params ratio ${tradesPerParam.toFixed(1)} < 10x minimum.\x1b[0m`);
+      log(`  \x1b[31m  Recommended: ${dims * 10}+ trades (50x ideal = ${dims * 50}).\x1b[0m`);
+      log(`  \x1b[31m  High overfitting risk — validate carefully with PBO/MC before paper trading.\x1b[0m`);
+    } else if (tradesPerParam < 50) {
+      log(`  \x1b[33mCAUTION: trades/params ratio ${tradesPerParam.toFixed(1)} < 50x ideal.\x1b[0m`);
+      log(`  \x1b[33m  Acceptable, but more data (${dims * 50}+ trades) would reduce overfitting risk.\x1b[0m`);
+    } else {
+      log(`  \x1b[32mOK: trades/params ratio ${tradesPerParam.toFixed(1)} >= 50x.\x1b[0m`);
+    }
   }
 
   // Print CLI command to reproduce

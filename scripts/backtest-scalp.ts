@@ -8,11 +8,15 @@
  * - Higher friction (0.05% per side default)
  * - Scalp-tuned walk-forward windows (15-day train, 5-day val)
  * - Strategy selection via --strategy flag
+ * - Regime suppression via --suppress-regime flag
+ * - Configurable kill zones, R:R, OB proximity
  *
  * Usage:
  *   npx tsx scripts/backtest-scalp.ts
- *   npx tsx scripts/backtest-scalp.ts --threshold 3.5 --friction 0.0005
- *   npx tsx scripts/backtest-scalp.ts --max-bars 48 --cooldown-bars 6
+ *   npx tsx scripts/backtest-scalp.ts --target-rr 1.5 --suppress-regime "ranging+normal,ranging+high"
+ *   npx tsx scripts/backtest-scalp.ts --kill-zone-mode crypto --ob-proximity 0.003
+ *   npx tsx scripts/backtest-scalp.ts --symbols BTCUSDT,ETHUSDT,SOLUSDT
+ *   npx tsx scripts/backtest-scalp.ts --strategy mean_reversion --threshold 0
  *   npx tsx scripts/backtest-scalp.ts --partial-tp "0.5,0.85,0.05"
  *   npx tsx scripts/backtest-scalp.ts --json
  */
@@ -22,8 +26,9 @@ import path from 'path';
 import type { Candle } from '@/types';
 import { aggregate } from '../src/lib/scalp/data/aggregator';
 import { ICT5mStrategy } from '../src/lib/scalp/strategies/ict-5m';
-import type { ScalpStrategy } from '../src/lib/scalp/strategies/types';
-import { DEFAULT_SCALP_CONFIG } from '../src/lib/scalp/strategies/types';
+import type { ScalpStrategy, ScalpStrategyName, KillZoneMode, ICT5mConfig } from '../src/lib/scalp/strategies/types';
+import { DEFAULT_SCALP_CONFIG, DEFAULT_ICT5M_CONFIG } from '../src/lib/scalp/strategies/types';
+import { detectRegime, regimeLabel } from '../src/lib/ict/regime-detector';
 import {
   runWalkForward,
   calculateSharpe,
@@ -32,16 +37,6 @@ import {
   type TradeResult,
   type WalkForwardResult,
 } from './walk-forward-validate';
-
-// ============================================
-// Constants (overridable via CLI)
-// ============================================
-
-let MAX_POSITION_BARS = DEFAULT_SCALP_CONFIG.maxBars;
-let FRICTION_PER_SIDE = DEFAULT_SCALP_CONFIG.frictionPerSide;
-let COOLDOWN_BARS = DEFAULT_SCALP_CONFIG.cooldownBars;
-let THRESHOLD = DEFAULT_SCALP_CONFIG.threshold;
-let jsonOutputMode = false;
 
 // ============================================
 // Types
@@ -66,7 +61,7 @@ interface PartialTPConfig {
 interface ScalpBacktestResult {
   walkForwardResult: WalkForwardResult;
   threshold: number;
-  symbol: string;
+  symbols: string[];
   totalTrades: number;
   overallWinRate: number;
   overallPnl: number;
@@ -74,22 +69,24 @@ interface ScalpBacktestResult {
   maxDrawdown: number;
   sharpe: number;
   avgBarsHeld: number;
+  regimeSuppressed: string[];
+  strategyConfig: Record<string, unknown>;
 }
 
 // ============================================
 // Friction Helpers (same pattern as 1H backtest)
 // ============================================
 
-function applyEntryFriction(price: number, direction: 'long' | 'short'): number {
+function applyEntryFriction(price: number, direction: 'long' | 'short', friction: number): number {
   return direction === 'long'
-    ? price * (1 + FRICTION_PER_SIDE)
-    : price * (1 - FRICTION_PER_SIDE);
+    ? price * (1 + friction)
+    : price * (1 - friction);
 }
 
-function applyExitFriction(price: number, direction: 'long' | 'short'): number {
+function applyExitFriction(price: number, direction: 'long' | 'short', friction: number): number {
   return direction === 'long'
-    ? price * (1 - FRICTION_PER_SIDE)
-    : price * (1 + FRICTION_PER_SIDE);
+    ? price * (1 - friction)
+    : price * (1 + friction);
 }
 
 function calculatePnlPercent(
@@ -110,8 +107,10 @@ function simulatePositionSimple(
   position: SimulatedPosition,
   candles: Candle[],
   startIndex: number,
+  maxBars: number,
+  friction: number,
 ): TradeResult | null {
-  const adjustedEntry = applyEntryFriction(position.entryPrice, position.direction);
+  const adjustedEntry = applyEntryFriction(position.entryPrice, position.direction, friction);
 
   for (let i = startIndex; i < candles.length; i++) {
     const candle = candles[i];
@@ -119,10 +118,9 @@ function simulatePositionSimple(
 
     const barsHeld = i - position.entryIndex;
 
-    // Check SL/TP
-    const exitPrice = checkSLTPMaxBars(position, candle, barsHeld);
+    const exitPrice = checkSLTPMaxBars(position, candle, barsHeld, maxBars);
     if (exitPrice !== null) {
-      const adjustedExit = applyExitFriction(exitPrice, position.direction);
+      const adjustedExit = applyExitFriction(exitPrice, position.direction, friction);
       return {
         entryTimestamp: position.entryTimestamp,
         exitTimestamp: candle.timestamp,
@@ -135,7 +133,7 @@ function simulatePositionSimple(
     }
   }
 
-  return closeAtEnd(position, candles, adjustedEntry);
+  return closeAtEnd(position, candles, adjustedEntry, friction);
 }
 
 function simulatePositionPartialTP(
@@ -143,8 +141,10 @@ function simulatePositionPartialTP(
   candles: Candle[],
   startIndex: number,
   config: PartialTPConfig,
+  maxBars: number,
+  friction: number,
 ): TradeResult | null {
-  const adjustedEntry = applyEntryFriction(position.entryPrice, position.direction);
+  const adjustedEntry = applyEntryFriction(position.entryPrice, position.direction, friction);
   const riskDistance = position.direction === 'long'
     ? position.entryPrice - position.stopLoss
     : position.stopLoss - position.entryPrice;
@@ -164,10 +164,9 @@ function simulatePositionPartialTP(
 
     const barsHeld = i - position.entryIndex;
 
-    // Check SL first
     if (position.direction === 'long') {
       if (candle.low <= currentSL) {
-        const exitPrice = applyExitFriction(currentSL, position.direction);
+        const exitPrice = applyExitFriction(currentSL, position.direction, friction);
         const exitPnl = partialTaken
           ? calculatePnlPercent(adjustedEntry, exitPrice, position.direction) * remainingFraction + realizedPnl
           : calculatePnlPercent(adjustedEntry, exitPrice, position.direction);
@@ -182,21 +181,17 @@ function simulatePositionPartialTP(
         };
       }
 
-      // Check partial TP trigger
       if (!partialTaken && candle.high >= triggerPrice) {
         partialTaken = true;
-        const partialExit = applyExitFriction(triggerPrice, position.direction);
+        const partialExit = applyExitFriction(triggerPrice, position.direction, friction);
         realizedPnl = calculatePnlPercent(adjustedEntry, partialExit, position.direction) * config.fraction;
-
-        // Move SL to breakeven + buffer
         if (config.beBuffer >= 0) {
           currentSL = position.entryPrice + riskDistance * config.beBuffer;
         }
       }
 
-      // Check full TP
       if (candle.high >= position.takeProfit) {
-        const exitPrice = applyExitFriction(position.takeProfit, position.direction);
+        const exitPrice = applyExitFriction(position.takeProfit, position.direction, friction);
         const exitPnl = partialTaken
           ? calculatePnlPercent(adjustedEntry, exitPrice, position.direction) * remainingFraction + realizedPnl
           : calculatePnlPercent(adjustedEntry, exitPrice, position.direction);
@@ -211,9 +206,8 @@ function simulatePositionPartialTP(
         };
       }
     } else {
-      // Short
       if (candle.high >= currentSL) {
-        const exitPrice = applyExitFriction(currentSL, position.direction);
+        const exitPrice = applyExitFriction(currentSL, position.direction, friction);
         const exitPnl = partialTaken
           ? calculatePnlPercent(adjustedEntry, exitPrice, position.direction) * remainingFraction + realizedPnl
           : calculatePnlPercent(adjustedEntry, exitPrice, position.direction);
@@ -230,7 +224,7 @@ function simulatePositionPartialTP(
 
       if (!partialTaken && candle.low <= triggerPrice) {
         partialTaken = true;
-        const partialExit = applyExitFriction(triggerPrice, position.direction);
+        const partialExit = applyExitFriction(triggerPrice, position.direction, friction);
         realizedPnl = calculatePnlPercent(adjustedEntry, partialExit, position.direction) * config.fraction;
         if (config.beBuffer >= 0) {
           currentSL = position.entryPrice - riskDistance * config.beBuffer;
@@ -238,7 +232,7 @@ function simulatePositionPartialTP(
       }
 
       if (candle.low <= position.takeProfit) {
-        const exitPrice = applyExitFriction(position.takeProfit, position.direction);
+        const exitPrice = applyExitFriction(position.takeProfit, position.direction, friction);
         const exitPnl = partialTaken
           ? calculatePnlPercent(adjustedEntry, exitPrice, position.direction) * remainingFraction + realizedPnl
           : calculatePnlPercent(adjustedEntry, exitPrice, position.direction);
@@ -254,9 +248,8 @@ function simulatePositionPartialTP(
       }
     }
 
-    // Max bars
-    if (barsHeld >= MAX_POSITION_BARS) {
-      const exitPrice = applyExitFriction(candle.close, position.direction);
+    if (barsHeld >= maxBars) {
+      const exitPrice = applyExitFriction(candle.close, position.direction, friction);
       const exitPnl = partialTaken
         ? calculatePnlPercent(adjustedEntry, exitPrice, position.direction) * remainingFraction + realizedPnl
         : calculatePnlPercent(adjustedEntry, exitPrice, position.direction);
@@ -272,13 +265,14 @@ function simulatePositionPartialTP(
     }
   }
 
-  return closeAtEnd(position, candles, adjustedEntry);
+  return closeAtEnd(position, candles, adjustedEntry, friction);
 }
 
 function checkSLTPMaxBars(
   position: SimulatedPosition,
   candle: Candle,
   barsHeld: number,
+  maxBars: number,
 ): number | null {
   if (position.direction === 'long') {
     if (candle.low <= position.stopLoss) return position.stopLoss;
@@ -287,7 +281,7 @@ function checkSLTPMaxBars(
     if (candle.high >= position.stopLoss) return position.stopLoss;
     if (candle.low <= position.takeProfit) return position.takeProfit;
   }
-  if (barsHeld >= MAX_POSITION_BARS) return candle.close;
+  if (barsHeld >= maxBars) return candle.close;
   return null;
 }
 
@@ -295,10 +289,11 @@ function closeAtEnd(
   position: SimulatedPosition,
   candles: Candle[],
   adjustedEntry: number,
+  friction: number,
 ): TradeResult | null {
   const lastCandle = candles[candles.length - 1];
   if (!lastCandle) return null;
-  const adjustedExit = applyExitFriction(lastCandle.close, position.direction);
+  const adjustedExit = applyExitFriction(lastCandle.close, position.direction, friction);
   return {
     entryTimestamp: position.entryTimestamp,
     exitTimestamp: lastCandle.timestamp,
@@ -311,6 +306,19 @@ function closeAtEnd(
 }
 
 // ============================================
+// Strategy Factory
+// ============================================
+
+function createStrategy(name: ScalpStrategyName, ict5mConfig: ICT5mConfig): ScalpStrategy {
+  switch (name) {
+    case 'ict_5m':
+      return new ICT5mStrategy(ict5mConfig);
+    default:
+      throw new Error(`Unknown scalp strategy: ${name}. Available: ict_5m, mean_reversion, bb_squeeze, atr_breakout, silver_bullet, session_range`);
+  }
+}
+
+// ============================================
 // Strategy Runner Factory
 // ============================================
 
@@ -318,6 +326,10 @@ function createScalpRunner(
   strategy: ScalpStrategy,
   threshold: number,
   exitMode: 'simple' | 'partial_tp',
+  maxBars: number,
+  cooldownBars: number,
+  friction: number,
+  suppressRegimes: string[],
   partialTP?: PartialTPConfig,
 ): { runner: WalkForwardStrategyRunner; allTrades: TradeResult[] } {
   const allTrades: TradeResult[] = [];
@@ -325,16 +337,14 @@ function createScalpRunner(
   const runner: WalkForwardStrategyRunner = {
     name: `scalp-${strategy.name}`,
     async run(trainCandles5m: Candle[], valCandles5m: Candle[], _meta?: { symbol?: string }): Promise<TradeResult[]> {
-      // The WF framework passes 5m candles (we load from 1m data)
-      // We need to aggregate to 1H for bias
       const all5m = [...trainCandles5m, ...valCandles5m];
-      const all1h = aggregate(all5m, 12); // 12 × 5m = 1H
+      const all1h = aggregate(all5m, 12); // 12 x 5m = 1H
 
       const valStartIndex = trainCandles5m.length;
       const windowTrades: TradeResult[] = [];
       let currentPosition: SimulatedPosition | null = null;
       let positionExitIndex = -1;
-      let lastSignalBar = -COOLDOWN_BARS - 1; // Allow first signal
+      let lastSignalBar = -cooldownBars - 1;
 
       for (let i = valStartIndex; i < all5m.length; i++) {
         const candle = all5m[i];
@@ -345,11 +355,21 @@ function createScalpRunner(
         currentPosition = null;
 
         // Cooldown between signals
-        if (i - lastSignalBar < COOLDOWN_BARS) continue;
+        if (i - lastSignalBar < cooldownBars) continue;
+
+        // Regime suppression: check on 1H candles
+        if (suppressRegimes.length > 0) {
+          const htfIdx = findHTFIndex(all1h, candle.timestamp);
+          if (htfIdx >= 20) {
+            const regime = detectRegime(all1h, htfIdx);
+            const label = regimeLabel(regime);
+            if (suppressRegimes.includes(label)) continue;
+          }
+        }
 
         // Find corresponding 1H index
         const htfIndex = findHTFIndex(all1h, candle.timestamp);
-        if (htfIndex < 30) continue; // Need enough 1H history
+        if (htfIndex < 30) continue;
 
         // Run strategy
         const signal = strategy.detectEntry(all5m, i, all1h, htfIndex);
@@ -369,9 +389,9 @@ function createScalpRunner(
 
           let trade: TradeResult | null;
           if (exitMode === 'partial_tp' && partialTP) {
-            trade = simulatePositionPartialTP(position, all5m, i + 1, partialTP);
+            trade = simulatePositionPartialTP(position, all5m, i + 1, partialTP, maxBars, friction);
           } else {
-            trade = simulatePositionSimple(position, all5m, i + 1);
+            trade = simulatePositionSimple(position, all5m, i + 1, maxBars, friction);
           }
 
           if (trade) {
@@ -444,7 +464,10 @@ function hasFlag(name: string): boolean {
 // ============================================
 
 async function main(): Promise<void> {
-  const symbolArg = getArg('symbol') ?? 'BTCUSDT';
+  // Parse CLI args
+  const symbolArg = getArg('symbol');
+  const symbolsArg = getArg('symbols');
+  const strategyArg = getArg('strategy') as ScalpStrategyName | undefined;
   const thresholdArg = getArg('threshold');
   const frictionArg = getArg('friction');
   const maxBarsArg = getArg('max-bars');
@@ -453,13 +476,43 @@ async function main(): Promise<void> {
   const trainBarsArg = getArg('train-bars');
   const valBarsArg = getArg('val-bars');
   const slideBarsArg = getArg('slide-bars');
-  jsonOutputMode = hasFlag('json');
+  const suppressRegimeArg = getArg('suppress-regime');
+  const targetRRArg = getArg('target-rr');
+  const killZoneModeArg = getArg('kill-zone-mode') as KillZoneMode | undefined;
+  const obProximityArg = getArg('ob-proximity');
+  const jsonOutputMode = hasFlag('json');
 
-  // Parse overrides
-  if (thresholdArg) THRESHOLD = parseFloat(thresholdArg);
-  if (frictionArg) FRICTION_PER_SIDE = parseFloat(frictionArg);
-  if (maxBarsArg) MAX_POSITION_BARS = parseInt(maxBarsArg, 10);
-  if (cooldownBarsArg) COOLDOWN_BARS = parseInt(cooldownBarsArg, 10);
+  // Determine symbols
+  const symbols = symbolsArg
+    ? symbolsArg.split(',').map((s) => s.trim())
+    : [symbolArg ?? 'BTCUSDT'];
+
+  // Parse config
+  const strategyName = strategyArg ?? DEFAULT_SCALP_CONFIG.strategy;
+  const threshold = thresholdArg ? parseFloat(thresholdArg) : DEFAULT_SCALP_CONFIG.threshold;
+  const friction = frictionArg ? parseFloat(frictionArg) : DEFAULT_SCALP_CONFIG.frictionPerSide;
+  const maxBars = maxBarsArg ? parseInt(maxBarsArg, 10) : DEFAULT_SCALP_CONFIG.maxBars;
+  const cooldownBars = cooldownBarsArg ? parseInt(cooldownBarsArg, 10) : DEFAULT_SCALP_CONFIG.cooldownBars;
+  const trainBars = trainBarsArg ? parseInt(trainBarsArg, 10) : DEFAULT_SCALP_CONFIG.trainBars;
+  const valBars = valBarsArg ? parseInt(valBarsArg, 10) : DEFAULT_SCALP_CONFIG.valBars;
+  const slideBars = slideBarsArg ? parseInt(slideBarsArg, 10) : DEFAULT_SCALP_CONFIG.slideBars;
+
+  // Parse suppress-regime
+  const suppressRegimes = suppressRegimeArg
+    ? suppressRegimeArg.split(',').map((s) => s.trim())
+    : [];
+
+  // Parse ICT 5m config
+  const ict5mConfig: ICT5mConfig = {
+    ...DEFAULT_ICT5M_CONFIG,
+    ...(targetRRArg && { targetRR: parseFloat(targetRRArg) }),
+    ...(killZoneModeArg && { killZoneMode: killZoneModeArg }),
+    ...(obProximityArg && { obProximity: parseFloat(obProximityArg) }),
+  };
+  // Ensure minRR stays below targetRR
+  if (ict5mConfig.targetRR < ict5mConfig.minRR) {
+    ict5mConfig.minRR = ict5mConfig.targetRR * 0.8;
+  }
 
   // Parse partial TP
   let partialTP: PartialTPConfig | undefined;
@@ -476,50 +529,68 @@ async function main(): Promise<void> {
     }
   }
 
-  // Load 1m data
-  const dataPath = path.resolve(__dirname, '..', 'data', `${symbolArg}_1m.json`);
-  if (!fs.existsSync(dataPath)) {
-    console.error(`Error: No 1m data found at ${dataPath}`);
-    console.error('Run: npx tsx scripts/download-scalp-data.ts first');
+  // Verify data exists for all symbols
+  const tempDataDir = path.resolve(__dirname, '..', 'data', '.scalp-temp');
+  if (!fs.existsSync(tempDataDir)) fs.mkdirSync(tempDataDir, { recursive: true });
+
+  const validSymbols: string[] = [];
+  for (const sym of symbols) {
+    const dataPath = path.resolve(__dirname, '..', 'data', `${sym}_1m.json`);
+    if (!fs.existsSync(dataPath)) {
+      console.error(`Warning: No 1m data for ${sym} at ${dataPath}. Skipping.`);
+      continue;
+    }
+
+    if (!jsonOutputMode) console.log(`Loading ${sym} 1m data...`);
+    const candles1m: Candle[] = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+    if (!jsonOutputMode) console.log(`  ${candles1m.length.toLocaleString()} 1m candles loaded`);
+
+    // Aggregate to 5m
+    const candles5m = aggregate(candles1m, 5);
+    if (!jsonOutputMode) console.log(`  ${candles5m.length.toLocaleString()} 5m candles aggregated`);
+
+    // Write temp 5m data for WF framework
+    const temp5mPath = path.resolve(tempDataDir, `${sym}_5m.json`);
+    fs.writeFileSync(temp5mPath, JSON.stringify(candles5m));
+    validSymbols.push(sym);
+  }
+
+  if (validSymbols.length === 0) {
+    console.error('Error: No valid symbol data found.');
+    console.error('Run: npx tsx scripts/download-scalp-data.ts --symbol BTCUSDT');
     process.exit(1);
   }
 
-  console.log(`Loading ${symbolArg} 1m data...`);
-  const candles1m: Candle[] = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
-  console.log(`  ${candles1m.length.toLocaleString()} 1m candles loaded`);
-
-  // Aggregate to 5m
-  const candles5m = aggregate(candles1m, 5);
-  console.log(`  ${candles5m.length.toLocaleString()} 5m candles aggregated`);
-
-  const trainBars = trainBarsArg ? parseInt(trainBarsArg, 10) : DEFAULT_SCALP_CONFIG.trainBars;
-  const valBars = valBarsArg ? parseInt(valBarsArg, 10) : DEFAULT_SCALP_CONFIG.valBars;
-  const slideBars = slideBarsArg ? parseInt(slideBarsArg, 10) : DEFAULT_SCALP_CONFIG.slideBars;
-
-  console.log(`\n=== Scalp Backtest Config ===`);
-  console.log(`  Strategy: ict_5m`);
-  console.log(`  Symbol: ${symbolArg}`);
-  console.log(`  Threshold: ${THRESHOLD}`);
-  console.log(`  Friction/side: ${(FRICTION_PER_SIDE * 100).toFixed(3)}%`);
-  console.log(`  Max bars: ${MAX_POSITION_BARS} (${(MAX_POSITION_BARS * 5 / 60).toFixed(1)} hours)`);
-  console.log(`  Cooldown: ${COOLDOWN_BARS} bars (${COOLDOWN_BARS * 5} min)`);
-  console.log(`  Exit mode: ${exitMode}${partialTP ? ` (${(partialTP.fraction * 100).toFixed(0)}%@${partialTP.triggerR}R, BE buffer=${partialTP.beBuffer})` : ''}`);
-  console.log(`  WF windows: train=${trainBars} (${(trainBars * 5 / 60 / 24).toFixed(1)}d) val=${valBars} (${(valBars * 5 / 60 / 24).toFixed(1)}d) slide=${slideBars}`);
-  console.log('');
+  if (!jsonOutputMode) {
+    console.log(`\n=== Scalp Backtest Config ===`);
+    console.log(`  Strategy: ${strategyName}`);
+    console.log(`  Symbols: ${validSymbols.join(', ')}`);
+    console.log(`  Threshold: ${threshold}`);
+    console.log(`  Friction/side: ${(friction * 100).toFixed(3)}%`);
+    console.log(`  Max bars: ${maxBars} (${(maxBars * 5 / 60).toFixed(1)} hours)`);
+    console.log(`  Cooldown: ${cooldownBars} bars (${cooldownBars * 5} min)`);
+    console.log(`  Exit mode: ${exitMode}${partialTP ? ` (${(partialTP.fraction * 100).toFixed(0)}%@${partialTP.triggerR}R, BE buffer=${partialTP.beBuffer})` : ''}`);
+    console.log(`  WF windows: train=${trainBars} (${(trainBars * 5 / 60 / 24).toFixed(1)}d) val=${valBars} (${(valBars * 5 / 60 / 24).toFixed(1)}d) slide=${slideBars}`);
+    if (suppressRegimes.length > 0) {
+      console.log(`  Suppress regimes: ${suppressRegimes.join(', ')}`);
+    }
+    if (strategyName === 'ict_5m') {
+      console.log(`  Target R:R: ${ict5mConfig.targetRR} (min: ${ict5mConfig.minRR.toFixed(2)})`);
+      console.log(`  Kill zone mode: ${ict5mConfig.killZoneMode}`);
+      console.log(`  OB proximity: ${(ict5mConfig.obProximity * 100).toFixed(2)}%`);
+    }
+    console.log('');
+  }
 
   // Create strategy and runner
-  const strategy = new ICT5mStrategy();
-  const { runner, allTrades } = createScalpRunner(strategy, THRESHOLD, exitMode, partialTP);
+  const strategy = createStrategy(strategyName, ict5mConfig);
+  const { runner, allTrades } = createScalpRunner(
+    strategy, threshold, exitMode, maxBars, cooldownBars, friction, suppressRegimes, partialTP,
+  );
 
   // Run walk-forward validation on 5m candles
-  // We need to write 5m data to a temp file for the WF framework
-  const tempDataDir = path.resolve(__dirname, '..', 'data', '.scalp-temp');
-  if (!fs.existsSync(tempDataDir)) fs.mkdirSync(tempDataDir, { recursive: true });
-  const temp5mPath = path.resolve(tempDataDir, `${symbolArg}_5m.json`);
-  fs.writeFileSync(temp5mPath, JSON.stringify(candles5m));
-
   const walkForwardResult = await runWalkForward(runner, {
-    symbols: [symbolArg],
+    symbols: validSymbols,
     trainWindowBars: trainBars,
     valWindowBars: valBars,
     slideStepBars: slideBars,
@@ -529,7 +600,10 @@ async function main(): Promise<void> {
   }, { quiet: jsonOutputMode });
 
   // Clean up temp data
-  try { fs.unlinkSync(temp5mPath); fs.rmdirSync(tempDataDir); } catch { /* ignore */ }
+  for (const sym of validSymbols) {
+    try { fs.unlinkSync(path.resolve(tempDataDir, `${sym}_5m.json`)); } catch { /* ignore */ }
+  }
+  try { fs.rmdirSync(tempDataDir); } catch { /* ignore */ }
 
   // Compute summary metrics
   const wins = allTrades.filter((t) => t.pnlPercent > 0).length;
@@ -539,7 +613,7 @@ async function main(): Promise<void> {
   const sharpe = calculateSharpe(allTrades.map((t) => t.pnlPercent));
   const maxDD = calculateMaxDrawdown(allTrades.map((t) => t.pnlPercent));
 
-  // Avg bars held (approximate from timestamps)
+  // Avg bars held
   const fiveMinMs = 5 * 60_000;
   const avgBarsHeld = allTrades.length > 0
     ? allTrades.reduce((s, t) => s + (t.exitTimestamp - t.entryTimestamp) / fiveMinMs, 0) / allTrades.length
@@ -547,8 +621,8 @@ async function main(): Promise<void> {
 
   const result: ScalpBacktestResult = {
     walkForwardResult,
-    threshold: THRESHOLD,
-    symbol: symbolArg,
+    threshold,
+    symbols: validSymbols,
     totalTrades: allTrades.length,
     overallWinRate: winRate,
     overallPnl: totalPnl,
@@ -556,6 +630,8 @@ async function main(): Promise<void> {
     maxDrawdown: maxDD,
     sharpe,
     avgBarsHeld,
+    regimeSuppressed: suppressRegimes,
+    strategyConfig: strategyName === 'ict_5m' ? { ...ict5mConfig } : {},
   };
 
   if (jsonOutputMode) {
@@ -571,9 +647,8 @@ async function main(): Promise<void> {
     console.log(`  Avg bars held: ${avgBarsHeld.toFixed(1)} (${(avgBarsHeld * 5 / 60).toFixed(1)} hours)`);
     console.log(`  WF pass rate: ${(walkForwardResult.passRate * 100).toFixed(1)}%`);
 
-    // Print per-window results
-    if (walkForwardResult.symbols.length > 0) {
-      const sym = walkForwardResult.symbols[0]!;
+    // Print per-symbol per-window results
+    for (const sym of walkForwardResult.symbols) {
       console.log(`\n=== Walk-Forward Windows (${sym.symbol}) ===`);
       for (const w of sym.windows) {
         const status = w.passed ? 'PASS' : 'FAIL';
@@ -589,12 +664,21 @@ async function main(): Promise<void> {
     console.log('\n=== Reproduction Command ===');
     const cmd = [
       'npx tsx scripts/backtest-scalp.ts',
-      `--symbol ${symbolArg}`,
-      `--threshold ${THRESHOLD}`,
-      `--friction ${FRICTION_PER_SIDE}`,
-      `--max-bars ${MAX_POSITION_BARS}`,
-      `--cooldown-bars ${COOLDOWN_BARS}`,
+      `--strategy ${strategyName}`,
+      validSymbols.length > 1 ? `--symbols ${validSymbols.join(',')}` : `--symbol ${validSymbols[0]}`,
+      `--threshold ${threshold}`,
+      `--friction ${friction}`,
+      `--max-bars ${maxBars}`,
+      `--cooldown-bars ${cooldownBars}`,
     ];
+    if (suppressRegimes.length > 0) {
+      cmd.push(`--suppress-regime "${suppressRegimes.join(',')}"`);
+    }
+    if (strategyName === 'ict_5m') {
+      cmd.push(`--target-rr ${ict5mConfig.targetRR}`);
+      cmd.push(`--kill-zone-mode ${ict5mConfig.killZoneMode}`);
+      cmd.push(`--ob-proximity ${ict5mConfig.obProximity}`);
+    }
     if (partialTP) {
       cmd.push(`--partial-tp "${partialTP.fraction},${partialTP.triggerR},${partialTP.beBuffer}"`);
     }

@@ -11,8 +11,16 @@ import type { StrategySignal, StrategyExitSignal } from '@/lib/rl/strategies/ict
 export type ScalpStrategyName =
   | 'ict_5m'
   | 'mean_reversion'
-  | 'volatility_breakout'
-  | 'microstructure_proxy';
+  | 'bb_squeeze'
+  | 'atr_breakout'
+  | 'silver_bullet'
+  | 'session_range';
+
+/** Kill zone mode for crypto-specific session tuning */
+export type KillZoneMode =
+  | 'traditional'   // London Open (02-05 NY) + NY Open (08-11 NY)
+  | 'crypto'        // US hours (13:00-17:00 UTC) + London (08:00-11:00 UTC)
+  | 'all_sessions'; // No kill zone filter
 
 export interface ScalpStrategySignal extends StrategySignal {
   /** The 1H bias direction that this signal aligns with */
@@ -47,10 +55,30 @@ export interface ScalpStrategy {
   ): StrategyExitSignal;
 }
 
+/** ICT 5m strategy-specific configuration */
+export interface ICT5mConfig {
+  /** Target risk:reward ratio (default: 1.5) */
+  targetRR: number;
+  /** Minimum R:R filter — reject signals below this (default: 1.2) */
+  minRR: number;
+  /** Max distance from OB midpoint as fraction of price (default: 0.005 = 0.5%) */
+  obProximity: number;
+  /** Kill zone filtering mode (default: 'traditional') */
+  killZoneMode: KillZoneMode;
+}
+
+export const DEFAULT_ICT5M_CONFIG: ICT5mConfig = {
+  targetRR: 1.5,
+  minRR: 1.2,
+  obProximity: 0.005,
+  killZoneMode: 'traditional',
+};
+
 /** Scalp backtest configuration */
 export interface ScalpBacktestConfig {
   strategy: ScalpStrategyName;
   symbol: string;
+  symbols: string[];
   frictionPerSide: number;
   maxBars: number;
   cooldownBars: number;
@@ -64,11 +92,16 @@ export interface ScalpBacktestConfig {
     triggerR: number;
     beBuffer: number;
   };
+  /** Regimes to suppress (e.g., ["ranging+normal", "ranging+high"]) */
+  suppressRegimes: string[];
+  /** ICT 5m strategy config overrides */
+  ict5mConfig: ICT5mConfig;
 }
 
 export const DEFAULT_SCALP_CONFIG: ScalpBacktestConfig = {
   strategy: 'ict_5m',
   symbol: 'BTCUSDT',
+  symbols: ['BTCUSDT'],
   frictionPerSide: 0.0005,  // 0.05% maker fee
   maxBars: 36,               // 3 hours on 5m
   cooldownBars: 4,           // 20 min on 5m
@@ -77,4 +110,6 @@ export const DEFAULT_SCALP_CONFIG: ScalpBacktestConfig = {
   valBars: 1440,             // 5 days of 5m
   slideBars: 1440,           // 5 days slide
   exitMode: 'simple',
+  suppressRegimes: [],
+  ict5mConfig: { ...DEFAULT_ICT5M_CONFIG },
 };

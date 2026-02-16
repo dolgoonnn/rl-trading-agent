@@ -79,9 +79,9 @@ export interface PerturbationResult {
 // Core Metric Calculations
 // ============================================
 
-const ANNUALIZATION_FACTOR = Math.sqrt(365 * 24); // 24/7 crypto markets
+const DEFAULT_ANNUALIZATION_FACTOR = Math.sqrt(365 * 24); // 24/7 crypto markets
 
-function calcSharpe(returns: number[]): number {
+function calcSharpe(returns: number[], annualizationFactor: number = DEFAULT_ANNUALIZATION_FACTOR): number {
   if (returns.length < 2) {
     if (returns.length === 1 && returns[0]! > 0) return 0.01;
     return 0;
@@ -90,7 +90,7 @@ function calcSharpe(returns: number[]): number {
   const variance = returns.reduce((s, r) => s + (r - mean) ** 2, 0) / returns.length;
   const std = Math.sqrt(variance);
   if (std === 0) return 0;
-  return (mean / std) * ANNUALIZATION_FACTOR;
+  return (mean / std) * annualizationFactor;
 }
 
 function calcMaxDrawdown(returns: number[]): number {
@@ -178,10 +178,11 @@ function shuffleArray<T>(arr: T[]): T[] {
  */
 export function reshuffleTrades(
   trades: MCTradeResult[],
-  iterations: number
+  iterations: number,
+  annualizationFactor?: number
 ): ReshuffleResult {
   const realReturns = trades.map((t) => t.pnlPercent);
-  const realSharpe = calcSharpe(realReturns);
+  const realSharpe = calcSharpe(realReturns, annualizationFactor);
   const realMaxDD = calcMaxDrawdown(realReturns);
   const realPnl = calcFinalPnl(realReturns);
 
@@ -191,7 +192,7 @@ export function reshuffleTrades(
 
   for (let i = 0; i < iterations; i++) {
     const shuffled = shuffleArray(realReturns);
-    sharpes.push(calcSharpe(shuffled));
+    sharpes.push(calcSharpe(shuffled, annualizationFactor));
     maxDDs.push(calcMaxDrawdown(shuffled));
     pnls.push(calcFinalPnl(shuffled));
   }
@@ -210,7 +211,8 @@ export function reshuffleTrades(
 export function bootstrapTrades(
   trades: MCTradeResult[],
   iterations: number,
-  sampleSize?: number
+  sampleSize?: number,
+  annualizationFactor?: number
 ): BootstrapResult {
   const returns = trades.map((t) => t.pnlPercent);
   const n = sampleSize ?? returns.length;
@@ -226,7 +228,7 @@ export function bootstrapTrades(
       const idx = Math.floor(Math.random() * returns.length);
       sample.push(returns[idx]!);
     }
-    sharpes.push(calcSharpe(sample));
+    sharpes.push(calcSharpe(sample, annualizationFactor));
     maxDDs.push(calcMaxDrawdown(sample));
     pnls.push(calcFinalPnl(sample));
     winRates.push(calcWinRate(sample));
@@ -247,7 +249,8 @@ export function bootstrapTrades(
 export function skipTrades(
   trades: MCTradeResult[],
   skipRate: number,
-  iterations: number
+  iterations: number,
+  annualizationFactor?: number
 ): SkipTradesResult {
   const returns = trades.map((t) => t.pnlPercent);
   const keepRate = 1 - skipRate;
@@ -263,7 +266,7 @@ export function skipTrades(
       pnls.push(0);
       continue;
     }
-    sharpes.push(calcSharpe(kept));
+    sharpes.push(calcSharpe(kept, annualizationFactor));
     const pnl = calcFinalPnl(kept);
     pnls.push(pnl);
     if (pnl > 0) profitable++;

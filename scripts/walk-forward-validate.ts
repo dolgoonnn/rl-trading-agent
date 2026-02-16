@@ -144,6 +144,21 @@ export const CATASTROPHIC_SHARPE_THRESHOLD = -2.0;
 /** Annualization factor for hourly Sharpe: sqrt(365 days * 24 hours) for 24/7 crypto markets */
 export const ANNUALIZATION_FACTOR = Math.sqrt(365 * 24);
 
+/**
+ * Asset-class-aware annualization factor for hourly per-trade Sharpe.
+ * - Crypto: 24/7 = sqrt(365 * 24) ≈ 93.6
+ * - Gold futures: ~22.5h/day, 252 trading days = sqrt(252 * 22.5) ≈ 75.3
+ * - Forex: ~24h/day, 252 trading days = sqrt(252 * 24) ≈ 77.8
+ */
+export function getAnnualizationFactor(symbols: string[]): number {
+  const isGold = symbols.some(s => /^(GC_F|XAUUSD)/i.test(s));
+  const isForex = symbols.some(s => /^(EUR|GBP|USD|AUD|NZD|CAD|CHF|JPY)/i.test(s));
+
+  if (isGold) return Math.sqrt(252 * 22.5);  // Gold: 22.5h/day, 252 trading days
+  if (isForex) return Math.sqrt(252 * 24);     // Forex: ~24h/day, 252 trading days
+  return ANNUALIZATION_FACTOR;                  // Crypto: 24/7
+}
+
 // ============================================
 // Default Config (exported)
 // ============================================
@@ -165,21 +180,27 @@ export const DEFAULT_WF_CONFIG: WalkForwardConfig = {
 /**
  * Calculate annualized Sharpe ratio from an array of per-trade returns.
  * Returns 0 if fewer than 2 trades.
+ *
+ * NOTE: This computes per-TRADE Sharpe annualized by the given factor.
+ * For sparse trade signals this can inflate the result vs per-BAR Sharpe.
+ * Use the annualizationFactor param to pass an asset-class-appropriate
+ * value from getAnnualizationFactor().
  */
-export function calculateSharpe(returns: number[]): number {
+export function calculateSharpe(returns: number[], annualizationFactor?: number): number {
   if (returns.length < 2) {
     // 1 trade: can't compute std, but if the return is positive, treat as marginally positive Sharpe
     if (returns.length === 1 && returns[0]! > 0) return 0.01;
     return 0;
   }
 
+  const factor = annualizationFactor ?? ANNUALIZATION_FACTOR;
   const mean = returns.reduce((sum, r) => sum + r, 0) / returns.length;
   const variance =
     returns.reduce((sum, r) => sum + (r - mean) ** 2, 0) / returns.length;
   const std = Math.sqrt(variance);
 
   if (std === 0) return 0;
-  return (mean / std) * ANNUALIZATION_FACTOR;
+  return (mean / std) * factor;
 }
 
 /**
@@ -297,7 +318,8 @@ function generateWindows(
 
 async function evaluateWindow(
   runner: WalkForwardStrategyRunner,
-  window: DataWindow
+  window: DataWindow,
+  annualizationFactor: number = ANNUALIZATION_FACTOR
 ): Promise<WindowResult> {
   const trades = await runner.run(window.trainCandles, window.valCandles, { symbol: window.symbol });
   const returns = trades.map((t) => t.pnlPercent);
@@ -307,7 +329,7 @@ async function evaluateWindow(
     ? (winningTrades.length / trades.length) * 100
     : 0;
 
-  const sharpe = calculateSharpe(returns);
+  const sharpe = calculateSharpe(returns, annualizationFactor);
   const maxDrawdown = calculateMaxDrawdown(returns);
   const pnl = calculateCompoundedPnl(returns);
 
@@ -372,6 +394,9 @@ async function evaluateSymbol(
     };
   }
 
+  // Compute asset-class-appropriate annualization factor
+  const annualizationFactor = getAnnualizationFactor([symbol]);
+
   if (!quiet) {
     log(`  ${symbol}: ${allCandles.length} candles, ${windows.length} walk-forward windows`);
   }
@@ -379,7 +404,7 @@ async function evaluateSymbol(
   const windowResults: WindowResult[] = [];
 
   for (const window of windows) {
-    const result = await evaluateWindow(runner, window);
+    const result = await evaluateWindow(runner, window, annualizationFactor);
     windowResults.push(result);
 
     if (!quiet) {
@@ -622,6 +647,7 @@ function printSummary(result: WalkForwardResult): void {
   const totalEligible = result.symbols.reduce((sum, s) => sum + s.totalWindows, 0);
   const totalSkipped = totalAllWindows - totalEligible;
   log(`Overall pass rate: ${(result.passRate * 100).toFixed(1)}% of eligible windows passed (${totalSkipped} zero-trade windows skipped)`);
+  log(`NOTE: Sharpe is per-TRADE (not per-bar). With sparse signals, annualized per-trade Sharpe can appear inflated.`);
 
   // PBO report (if calculated)
   if (result.pbo) {
