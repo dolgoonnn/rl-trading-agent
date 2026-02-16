@@ -521,12 +521,13 @@ function simulatePositionPartialTP(
         const partialExit = applyExitFriction(candle.close, position.direction);
         partialPnl = calculatePnlPercent(adjustedEntry, partialExit, position.direction);
         // Move SL to breakeven + buffer (skip if beBuffer < 0)
+        // Use friction-adjusted entry so BE stop covers actual fill price
         if (partialConfig.beBuffer >= 0) {
           const buffer = riskDistance * partialConfig.beBuffer;
           if (position.direction === 'long') {
-            currentSL = Math.max(currentSL, position.entryPrice + buffer);
+            currentSL = Math.max(currentSL, adjustedEntry + buffer);
           } else {
-            currentSL = Math.min(currentSL, position.entryPrice - buffer);
+            currentSL = Math.min(currentSL, adjustedEntry - buffer);
           }
         }
       }

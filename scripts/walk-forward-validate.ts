@@ -141,8 +141,8 @@ export const MIN_POSITIVE_WINDOWS = 7;
 export const EXPECTED_TOTAL_WINDOWS = 9;
 /** Any single window below this Sharpe is a catastrophic failure */
 export const CATASTROPHIC_SHARPE_THRESHOLD = -2.0;
-/** Annualization factor for hourly Sharpe: sqrt(252 trading days * 24 hours) */
-export const ANNUALIZATION_FACTOR = Math.sqrt(252 * 24);
+/** Annualization factor for hourly Sharpe: sqrt(365 days * 24 hours) for 24/7 crypto markets */
+export const ANNUALIZATION_FACTOR = Math.sqrt(365 * 24);
 
 // ============================================
 // Default Config (exported)

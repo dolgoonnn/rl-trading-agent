@@ -776,13 +776,13 @@ class ConfluencePaperTrader {
           this.position.partialPnl = (adjustedEntry - partialExit) / adjustedEntry;
         }
 
-        // Move SL to breakeven + buffer
+        // Move SL to breakeven + buffer (use friction-adjusted entry so BE stop covers actual fill)
         if (this.partialTp.beBuffer >= 0) {
           const buffer = this.position.riskDistance * this.partialTp.beBuffer;
           if (this.position.side === 'long') {
-            this.position.stopLoss = Math.max(this.position.stopLoss, this.position.rawEntryPrice + buffer);
+            this.position.stopLoss = Math.max(this.position.stopLoss, this.position.entryPrice + buffer);
           } else {
-            this.position.stopLoss = Math.min(this.position.stopLoss, this.position.rawEntryPrice - buffer);
+            this.position.stopLoss = Math.min(this.position.stopLoss, this.position.entryPrice - buffer);
           }
         }
 

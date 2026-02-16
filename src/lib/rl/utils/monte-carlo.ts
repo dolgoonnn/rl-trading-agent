@@ -79,7 +79,7 @@ export interface PerturbationResult {
 // Core Metric Calculations
 // ============================================
 
-const ANNUALIZATION_FACTOR = Math.sqrt(252 * 24);
+const ANNUALIZATION_FACTOR = Math.sqrt(365 * 24); // 24/7 crypto markets
 
 function calcSharpe(returns: number[]): number {
   if (returns.length < 2) {
