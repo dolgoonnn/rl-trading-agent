@@ -16,13 +16,21 @@ RUN pnpm install --frozen-lockfile --ignore-scripts && \
 # Copy source
 COPY tsconfig.json ./
 COPY src/ ./src/
-COPY scripts/paper-trade-confluence.ts ./scripts/
+COPY scripts/paper-trade-confluence.ts scripts/run-gold-bot.ts ./scripts/
+
+# Copy PM2 ecosystem config
+COPY ecosystem.config.cjs ./
 
 # Copy market data (needed for --backtest mode, optional for live)
 COPY data/BTCUSDT_1h.json data/ETHUSDT_1h.json data/SOLUSDT_1h.json ./data/
 
-# Non-root user for security
-RUN addgroup --system app && adduser --system --ingroup app app
+# Ensure writable dirs (gold bot state + PM2 logs)
+RUN mkdir -p /app/logs && \
+    addgroup --system app && adduser --system --ingroup app app && \
+    chown -R app:app /app/data /app/logs
+
 USER app
 
-CMD ["npx", "tsx", "scripts/paper-trade-confluence.ts", "--symbols", "BTCUSDT,ETHUSDT,SOLUSDT,LINKUSDT,DOGEUSDT,NEARUSDT,ADAUSDT,APTUSDT,ARBUSDT,MATICUSDT"]
+# PM2-runtime keeps the process in foreground (Docker-compatible)
+# Runs both crypto-bot and gold-f2f-bot from ecosystem.config.cjs
+CMD ["npx", "pm2-runtime", "ecosystem.config.cjs"]

@@ -2,7 +2,7 @@
  * PM2 Ecosystem Configuration
  *
  * Two independent bots:
- * 1. Crypto ICT Bot — BTC/ETH/SOL, 1H candles, order_block strategy (Run 18)
+ * 1. Crypto ICT Bot — 10-symbol, 1H candles, confluence scorer (Run 18 defaults)
  * 2. Gold F2F Bot — XAUTUSDT, daily candles, forecast-to-fill strategy
  *
  * Usage:
@@ -23,7 +23,7 @@ module.exports = {
     {
       name: 'crypto-bot',
       script: 'npx',
-      args: 'tsx scripts/run-bot.ts --verbose',
+      args: 'tsx scripts/paper-trade-confluence.ts --symbols BTCUSDT,ETHUSDT,SOLUSDT,LINKUSDT,DOGEUSDT,NEARUSDT,ADAUSDT,APTUSDT,ARBUSDT,MATICUSDT',
       cwd: __dirname,
       instances: 1,
       autorestart: true,
