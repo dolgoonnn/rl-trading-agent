@@ -17,7 +17,7 @@
  *   npx tsx scripts/run-gold-bot.ts --telegram-token T --telegram-chat C
  *   npx tsx scripts/run-gold-bot.ts --verbose
  *   npx tsx scripts/run-gold-bot.ts --dry-run                    # Compute signal only, no trades
- *   npx tsx scripts/run-gold-bot.ts --params '{"lambda":0.92,"theta":0.90}'
+ *   npx tsx scripts/run-gold-bot.ts --params '{"lambda":0.95,"theta":0.91}'
  *   npx tsx scripts/run-gold-bot.ts --regime-filter zscore50      # Enable regime filter
  */
 
@@ -105,7 +105,7 @@ function parseArgs(): BotOptions {
   const args = process.argv.slice(2);
   const opts: BotOptions = {
     capital: 10000,
-    params: { lambda: 0.92, theta: 0.90 }, // Optimal from WF (Run 18 / latest)
+    params: { lambda: 0.95, theta: 0.91 }, // Optimal from WF validation (zscore50 filter)
     verbose: false,
     dryRun: false,
     friction: 0.0005,
