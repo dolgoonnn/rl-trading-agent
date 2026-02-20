@@ -24,12 +24,15 @@ COPY ecosystem.config.cjs ./
 # Copy market data (needed for --backtest mode, optional for live)
 COPY data/BTCUSDT_1h.json data/ETHUSDT_1h.json data/SOLUSDT_1h.json ./data/
 
-# Ensure writable dirs (gold bot state + PM2 logs)
-RUN mkdir -p /app/logs && \
+# Ensure writable dirs (gold bot state + PM2 home + logs)
+RUN mkdir -p /app/logs /app/.pm2 && \
     addgroup --system app && adduser --system --ingroup app app && \
-    chown -R app:app /app/data /app/logs
+    chown -R app:app /app/data /app/logs /app/.pm2
 
 USER app
+
+# PM2 needs a writable home dir for pid/config files
+ENV PM2_HOME=/app/.pm2
 
 # PM2-runtime keeps the process in foreground (Docker-compatible)
 # Runs both crypto-bot and gold-f2f-bot from ecosystem.config.cjs
