@@ -20,6 +20,7 @@
 import fs from 'fs';
 import path from 'path';
 import type { Candle } from '@/types';
+import { normalizeSymbolName } from '../src/lib/rl/config/symbols';
 import {
   ConfluenceScorer,
   type ConfluenceScorerResult,
@@ -520,12 +521,13 @@ function simulatePositionPartialTP(
         const partialExit = applyExitFriction(candle.close, position.direction);
         partialPnl = calculatePnlPercent(adjustedEntry, partialExit, position.direction);
         // Move SL to breakeven + buffer (skip if beBuffer < 0)
+        // Use friction-adjusted entry so BE stop covers actual fill price
         if (partialConfig.beBuffer >= 0) {
           const buffer = riskDistance * partialConfig.beBuffer;
           if (position.direction === 'long') {
-            currentSL = Math.max(currentSL, position.entryPrice + buffer);
+            currentSL = Math.max(currentSL, adjustedEntry + buffer);
           } else {
-            currentSL = Math.min(currentSL, position.entryPrice - buffer);
+            currentSL = Math.min(currentSL, adjustedEntry - buffer);
           }
         }
       }
@@ -1619,6 +1621,9 @@ const STRATEGY_SHORTHAND: Record<string, StrategyName> = {
   bos_continuation: 'bos_continuation',
   choch: 'choch_reversal',
   choch_reversal: 'choch_reversal',
+  'asian-range-gold': 'asian_range_gold',
+  asian_range_gold: 'asian_range_gold',
+  gold: 'asian_range_gold',
 };
 
 function parseStrategyArg(arg: string): StrategyName[] {
@@ -1683,6 +1688,21 @@ async function main(): Promise<void> {
   const fundingMaxLongArg = getArg('funding-max-long'); // --funding-max-long 0.0002
   const fundingMinShortArg = getArg('funding-min-short'); // --funding-min-short 0
   const fundingScoringArg = getArg('funding-scoring'); // --funding-scoring contrarian|aligned
+
+  // Gold-specific args
+  const goldRangeMinArg = getArg('asian-range-min'); // --asian-range-min 0.15 (min Asian range %)
+  const goldSweepMinArg = getArg('sweep-min'); // --sweep-min 0.03 (min sweep penetration %)
+  const goldLongBiasArg = getArg('long-bias'); // --long-bias 1.2 (TP multiplier for longs)
+  const goldSessionArg = getArg('session-filter'); // --session-filter london_open,ny_open
+  const goldVolScaleArg = getArg('gold-vol-scale'); // --gold-vol-scale 0.5
+  const goldSlAtrArg = getArg('gold-sl-atr'); // --gold-sl-atr 0.5 (ATR extension for SL)
+  const goldTargetRRArg = getArg('gold-target-rr'); // --gold-target-rr 2.0
+  const goldCeToleranceArg = getArg('gold-ce-tolerance'); // --gold-ce-tolerance 0.005
+  const goldDispMultArg = getArg('gold-disp-mult'); // --gold-disp-mult 1.2
+  const goldSweepLookbackArg = getArg('gold-sweep-lookback'); // --gold-sweep-lookback 20
+  const goldFvgWindowArg = getArg('gold-fvg-window'); // --gold-fvg-window 12
+  const goldAsianLookbackArg = getArg('gold-asian-lookback'); // --gold-asian-lookback 48
+  const goldEntryFvgZoneArg = getArg('gold-entry-fvg-zone'); // --gold-entry-fvg-zone true
 
   // Resolve exit mode (--exit-mode overrides --simple for backward compat)
   let exitMode: ExitMode = 'enhanced';
@@ -1925,6 +1945,24 @@ async function main(): Promise<void> {
     ...(fundingMinShortArg ? { fundingMinForShort: parseFloat(fundingMinShortArg) } : {}),
     ...(fundingScoringArg && ['contrarian', 'aligned'].includes(fundingScoringArg)
       ? { fundingScoringMode: fundingScoringArg as 'contrarian' | 'aligned' } : {}),
+    // Gold-specific config (asian-range-gold strategy)
+    ...(goldRangeMinArg || goldSweepMinArg || goldLongBiasArg || goldSessionArg || goldVolScaleArg || goldSlAtrArg || goldTargetRRArg || goldCeToleranceArg || goldDispMultArg || goldSweepLookbackArg || goldFvgWindowArg || goldAsianLookbackArg || goldEntryFvgZoneArg ? {
+      goldConfig: {
+        ...(goldRangeMinArg ? { minRangePct: parseFloat(goldRangeMinArg) } : {}),
+        ...(goldSweepMinArg ? { minSweepPct: parseFloat(goldSweepMinArg) } : {}),
+        ...(goldLongBiasArg ? { longBiasMultiplier: parseFloat(goldLongBiasArg) } : {}),
+        ...(goldSessionArg ? { allowedKillZones: goldSessionArg.split(',').map((s: string) => s.trim()) } : {}),
+        ...(goldVolScaleArg ? { goldVolScale: parseFloat(goldVolScaleArg) } : {}),
+        ...(goldSlAtrArg ? { slAtrExtension: parseFloat(goldSlAtrArg) } : {}),
+        ...(goldTargetRRArg ? { targetRR: parseFloat(goldTargetRRArg) } : {}),
+        ...(goldCeToleranceArg ? { ceTolerance: parseFloat(goldCeToleranceArg) } : {}),
+        ...(goldDispMultArg ? { displacementMultiple: parseFloat(goldDispMultArg) } : {}),
+        ...(goldSweepLookbackArg ? { sweepLookback: parseInt(goldSweepLookbackArg, 10) } : {}),
+        ...(goldFvgWindowArg ? { fvgSearchWindow: parseInt(goldFvgWindowArg, 10) } : {}),
+        ...(goldAsianLookbackArg ? { asianLookback: parseInt(goldAsianLookbackArg, 10) } : {}),
+        ...(goldEntryFvgZoneArg ? { entryInFvgZone: goldEntryFvgZoneArg === 'true' } : {}),
+      },
+    } : {}),
   };
 
   // MAX_POSITION_BARS scaling for 15m (module-level isn't const so can't reassign, but passed through config)
@@ -2003,7 +2041,7 @@ async function main(): Promise<void> {
     futuresDataMap = new Map();
     const symbols = configOverrides.symbols ?? ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'];
     for (const symbol of symbols) {
-      const futuresPath = path.join(process.cwd(), 'data', `${symbol}_futures_1h.json`);
+      const futuresPath = path.join(process.cwd(), 'data', `${normalizeSymbolName(symbol)}_futures_1h.json`);
       if (fs.existsSync(futuresPath)) {
         const snapshots: FuturesSnapshot[] = JSON.parse(fs.readFileSync(futuresPath, 'utf-8'));
         futuresDataMap.set(symbol, snapshots);

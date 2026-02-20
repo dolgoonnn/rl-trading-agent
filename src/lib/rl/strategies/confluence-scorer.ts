@@ -41,6 +41,7 @@ import {
   type StrategyConfig,
   type ICTStrategyContext,
   type StrategyName,
+  type AsianRangeGoldConfig,
 } from './ict-strategies';
 
 // ============================================
@@ -198,6 +199,8 @@ export interface ConfluenceConfig {
   fundingMinForShort: number;
   /** Funding rate alignment scoring mode: 'off', 'contrarian' (low funding = good for longs), 'aligned' (high funding = good for longs). Default: 'off' */
   fundingScoringMode: 'off' | 'contrarian' | 'aligned';
+  /** Gold-specific strategy config (for asian_range_gold strategy) */
+  goldConfig?: Partial<AsianRangeGoldConfig>;
 }
 
 export const DEFAULT_CONFLUENCE_CONFIG: ConfluenceConfig = {
@@ -255,6 +258,7 @@ export const PRODUCTION_STRATEGY_CONFIG: Partial<StrategyConfig> = {
   },
   requireLiquiditySweep: false,
   liquiditySweepBonus: 0.15,
+  slPlacementMode: 'dynamic_rr', // CMA-ES optimized: SL at OB boundary, TP = entry + risk × targetRR
 };
 
 /**
@@ -337,7 +341,7 @@ export class ConfluenceScorer {
         ...config?.mtfBias,
       },
     };
-    this.strategyManager = new ICTStrategyManager(this.config.strategyConfig);
+    this.strategyManager = new ICTStrategyManager(this.config.strategyConfig, config?.goldConfig);
   }
 
   /** Reset cooldown tracking (e.g., between walk-forward windows) */
@@ -1159,7 +1163,7 @@ export class ConfluenceScorer {
     ctx: ICTStrategyContext,
   ): number {
     const price = ctx.currentPrice;
-    const proximity = this.config.obFvgProximity;
+    const proximity = this.config.obFvgProximity * (ctx.volatilityScale ?? 1);
 
     if (signal.direction === 'long') {
       // Need bullish OB near price

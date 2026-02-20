@@ -20,11 +20,16 @@ export {
   // Functions
   strategyActionToName,
 
+  // Types (gold)
+  type AsianRangeGoldConfig,
+  type AsianRangeInfo,
+
   // Strategies
   OrderBlockStrategy,
   FVGStrategy,
   BOSContinuationStrategy,
   CHoCHReversalStrategy,
+  AsianRangeGoldStrategy,
   WaitStrategy,
 
   // Manager

@@ -7,18 +7,57 @@ import type { Candle, OrderBlock, OrderBlockType } from '@/types';
 import { isBullish, isBearish, bodySize, range } from '@/types/candle';
 
 export interface OrderBlockConfig {
-  minMovePercent: number; // Minimum % move after OB to consider valid
+  minMovePercent: number; // Minimum % move after OB (legacy fallback)
+  minMoveATR?: number; // Minimum move as ATR-14 multiple (overrides minMovePercent). Auto-scales across assets.
   maxAgeCandles: number; // Maximum age before OB expires
   bodyToRangeRatio: number; // Minimum body/range ratio for OB candle
 }
 
 export const DEFAULT_OB_CONFIG: OrderBlockConfig = {
-  minMovePercent: 1.2,   // Raised from 1.0% — reduce noise, but 1.5% killed OB count
+  minMovePercent: 1.2,   // Default: fixed 1.2% (tuned for crypto). Set minMoveATR to override.
   maxAgeCandles: 75,
   bodyToRangeRatio: 0.5, // Enforced below: reject doji/indecision candles as OBs
 };
 
 const DEFAULT_CONFIG = DEFAULT_OB_CONFIG;
+
+/**
+ * Calculate ATR (Average True Range) for move validation.
+ * Used to make OB detection volatility-adaptive across asset classes.
+ */
+function calculateATR(candles: Candle[], endIndex: number, period: number = 14): number {
+  const start = Math.max(1, endIndex - period + 1);
+  let sum = 0;
+  let count = 0;
+
+  for (let i = start; i <= endIndex; i++) {
+    const curr = candles[i];
+    const prev = candles[i - 1];
+    if (!curr || !prev) continue;
+
+    const tr = Math.max(
+      curr.high - curr.low,
+      Math.abs(curr.high - prev.close),
+      Math.abs(curr.low - prev.close),
+    );
+    sum += tr;
+    count++;
+  }
+
+  return count > 0 ? sum / count : 0;
+}
+
+/**
+ * Compute the minimum move threshold (in absolute price units) for OB validation.
+ * ATR-based if configured, otherwise falls back to percentage-based.
+ */
+function getMoveThreshold(candles: Candle[], index: number, price: number, config: OrderBlockConfig): number {
+  if (config.minMoveATR !== undefined) {
+    const atr = calculateATR(candles, index);
+    return atr * config.minMoveATR;
+  }
+  return price * config.minMovePercent / 100;
+}
 
 /**
  * Detect bullish order blocks
@@ -58,6 +97,7 @@ export function detectBullishOrderBlocks(
     if (next1 && isBearish(next1) && bodySize(next1) > bodySize(current)) continue;
 
     // Check for significant bullish move after
+    const moveThreshold = getMoveThreshold(candles, i, current.close, config);
     let totalMove = 0;
     let validMove = false;
 
@@ -69,8 +109,7 @@ export function detectBullishOrderBlocks(
         totalMove += bodySize(moveCandle);
       }
 
-      const movePercent = (totalMove / current.close) * 100;
-      if (movePercent >= config.minMovePercent) {
+      if (totalMove >= moveThreshold) {
         validMove = true;
         break;
       }
@@ -102,7 +141,7 @@ export function detectBullishOrderBlocks(
  * Quality filters:
  * - Must be the LAST bullish candle before the impulse (not any candle in a range)
  * - Body-to-range ratio must exceed threshold (reject doji/indecision candles)
- * - Impulse move must exceed minMovePercent
+ * - Impulse move must exceed threshold (ATR-based or percentage-based)
  */
 export function detectBearishOrderBlocks(
   candles: Candle[],
@@ -132,6 +171,7 @@ export function detectBearishOrderBlocks(
     if (next1 && isBullish(next1) && bodySize(next1) > bodySize(current)) continue;
 
     // Check for significant bearish move after
+    const moveThreshold = getMoveThreshold(candles, i, current.close, config);
     let totalMove = 0;
     let validMove = false;
 
@@ -143,8 +183,7 @@ export function detectBearishOrderBlocks(
         totalMove += bodySize(moveCandle);
       }
 
-      const movePercent = (totalMove / current.close) * 100;
-      if (movePercent >= config.minMovePercent) {
+      if (totalMove >= moveThreshold) {
         validMove = true;
         break;
       }

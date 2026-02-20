@@ -294,6 +294,179 @@ export const paperTrades = sqliteTable('paper_trades', {
 });
 
 // ============================================================================
+// BOT TABLES (Paper Trading & Live Trading Infrastructure)
+// ============================================================================
+
+// Bot state — single row persisted across restarts
+export const botState = sqliteTable('bot_state', {
+  id: integer('id').primaryKey().default(1),
+  equity: real('equity').notNull(),
+  peakEquity: real('peak_equity').notNull(),
+  consecutiveLosses: integer('consecutive_losses').notNull().default(0),
+  dailyPnl: real('daily_pnl').notNull().default(0),
+  weeklyPnl: real('weekly_pnl').notNull().default(0),
+  /** JSON: CircuitBreakerState[] */
+  circuitBreakers: text('circuit_breakers').notNull().default('[]'),
+  /** JSON: Record<string, number> — last processed candle timestamp per symbol */
+  lastProcessedTimestamp: text('last_processed_timestamp').notNull().default('{}'),
+  /** JSON: number[] — recent error timestamps for rate limiting */
+  recentErrors: text('recent_errors').notNull().default('[]'),
+  totalTrades: integer('total_trades').notNull().default(0),
+  startedAt: integer('started_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+});
+
+// Bot positions — open positions tracked by the bot
+export const botPositions = sqliteTable('bot_positions', {
+  id: text('id').primaryKey(),
+  symbol: text('symbol').notNull(),
+  direction: text('direction').notNull(), // 'long' | 'short'
+  status: text('status').notNull(), // 'open' | 'closed'
+
+  // Entry
+  entryPrice: real('entry_price').notNull(),
+  entryTimestamp: integer('entry_timestamp').notNull(),
+  entryBarIndex: integer('entry_bar_index').notNull(),
+
+  // Levels
+  stopLoss: real('stop_loss').notNull(),
+  takeProfit: real('take_profit').notNull(),
+  currentSL: real('current_sl').notNull(),
+
+  // Sizing
+  positionSizeUSDT: real('position_size_usdt').notNull(),
+  riskAmountUSDT: real('risk_amount_usdt').notNull(),
+
+  // Strategy metadata
+  strategy: text('strategy').notNull(),
+  confluenceScore: real('confluence_score').notNull(),
+  /** JSON: Record<string, number> */
+  factorBreakdown: text('factor_breakdown').notNull(),
+  regime: text('regime').notNull(),
+
+  // Partial TP state
+  partialTaken: integer('partial_taken', { mode: 'boolean' }).notNull().default(false),
+  partialPnlPercent: real('partial_pnl_percent').notNull().default(0),
+
+  // Exit (filled when closed)
+  exitPrice: real('exit_price'),
+  exitTimestamp: integer('exit_timestamp'),
+  exitReason: text('exit_reason'),
+  barsHeld: integer('bars_held'),
+  pnlPercent: real('pnl_percent'),
+  pnlUSDT: real('pnl_usdt'),
+
+  createdAt: integer('created_at').notNull(),
+});
+
+// Bot trade history — completed trades
+export const botTrades = sqliteTable('bot_trades', {
+  id: text('id').primaryKey(),
+  symbol: text('symbol').notNull(),
+  direction: text('direction').notNull(),
+
+  entryPrice: real('entry_price').notNull(),
+  exitPrice: real('exit_price').notNull(),
+  entryTimestamp: integer('entry_timestamp').notNull(),
+  exitTimestamp: integer('exit_timestamp').notNull(),
+
+  stopLoss: real('stop_loss').notNull(),
+  takeProfit: real('take_profit').notNull(),
+
+  positionSizeUSDT: real('position_size_usdt').notNull(),
+  riskAmountUSDT: real('risk_amount_usdt').notNull(),
+
+  strategy: text('strategy').notNull(),
+  confluenceScore: real('confluence_score').notNull(),
+  /** JSON: Record<string, number> */
+  factorBreakdown: text('factor_breakdown').notNull(),
+  regime: text('regime').notNull(),
+  exitReason: text('exit_reason').notNull(),
+
+  barsHeld: integer('bars_held').notNull(),
+  pnlPercent: real('pnl_percent').notNull(),
+  pnlUSDT: real('pnl_usdt').notNull(),
+
+  equityAfter: real('equity_after').notNull(),
+  drawdownFromPeak: real('drawdown_from_peak').notNull(),
+
+  createdAt: integer('created_at').notNull(),
+});
+
+// Bot equity snapshots — periodic equity tracking
+export const botEquitySnapshots = sqliteTable('bot_equity_snapshots', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  timestamp: integer('timestamp').notNull(),
+  equity: real('equity').notNull(),
+  peakEquity: real('peak_equity').notNull(),
+  drawdown: real('drawdown').notNull(),
+  openPositions: integer('open_positions').notNull(),
+  dailyPnl: real('daily_pnl').notNull(),
+  cumulativePnl: real('cumulative_pnl').notNull(),
+});
+
+// Funding rate snapshots — polled from exchange
+export const fundingRateSnapshots = sqliteTable('funding_rate_snapshots', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  symbol: text('symbol').notNull(),
+  fundingRate: real('funding_rate').notNull(),
+  nextFundingTime: integer('next_funding_time').notNull(),
+  markPrice: real('mark_price').notNull(),
+  indexPrice: real('index_price').notNull(),
+  bid1: real('bid1').notNull(),
+  ask1: real('ask1').notNull(),
+  spread: real('spread').notNull(),
+  polledAt: integer('polled_at').notNull(),
+});
+
+// Funding arb positions — lifecycle tracking
+export const fundingArbPositions = sqliteTable('funding_arb_positions', {
+  id: text('id').primaryKey(),
+  symbol: text('symbol').notNull(),
+  direction: text('direction').notNull(), // 'short_perp' | 'long_perp'
+  status: text('status').notNull(), // 'open' | 'closed'
+
+  // Entry
+  entryPrice: real('entry_price').notNull(),
+  entrySpread: real('entry_spread').notNull(),
+  entryFundingRate: real('entry_funding_rate').notNull(),
+  entryTimestamp: integer('entry_timestamp').notNull(),
+  positionSizeUSDT: real('position_size_usdt').notNull(),
+
+  // Funding collection
+  /** JSON: FundingPayment[] */
+  fundingPayments: text('funding_payments').notNull().default('[]'),
+  totalFundingCollected: real('total_funding_collected').notNull().default(0),
+  fundingPaymentCount: integer('funding_payment_count').notNull().default(0),
+
+  // Exit
+  exitPrice: real('exit_price'),
+  exitTimestamp: integer('exit_timestamp'),
+  exitReason: text('exit_reason'),
+  exitSpread: real('exit_spread'),
+
+  // P&L
+  spreadCost: real('spread_cost').notNull().default(0),
+  netPnlUSDT: real('net_pnl_usdt').notNull().default(0),
+  holdTimeHours: real('hold_time_hours').notNull().default(0),
+  annualizedAPY: real('annualized_apy').notNull().default(0),
+
+  createdAt: integer('created_at').notNull(),
+});
+
+// Bot candle cache — stores fetched candles for ICT analysis
+export const botCandles = sqliteTable('bot_candles', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  symbol: text('symbol').notNull(),
+  timestamp: integer('timestamp').notNull(),
+  open: real('open').notNull(),
+  high: real('high').notNull(),
+  low: real('low').notNull(),
+  close: real('close').notNull(),
+  volume: real('volume').notNull(),
+});
+
+// ============================================================================
 // TYPE EXPORTS
 // ============================================================================
 
@@ -326,3 +499,21 @@ export type PaperSessionRow = typeof paperSessions.$inferSelect;
 export type NewPaperSessionRow = typeof paperSessions.$inferInsert;
 export type PaperTradeRow = typeof paperTrades.$inferSelect;
 export type NewPaperTradeRow = typeof paperTrades.$inferInsert;
+
+// Funding arb types
+export type FundingRateSnapshotRow = typeof fundingRateSnapshots.$inferSelect;
+export type NewFundingRateSnapshotRow = typeof fundingRateSnapshots.$inferInsert;
+export type FundingArbPositionRow = typeof fundingArbPositions.$inferSelect;
+export type NewFundingArbPositionRow = typeof fundingArbPositions.$inferInsert;
+
+// Bot types
+export type BotStateRow = typeof botState.$inferSelect;
+export type NewBotStateRow = typeof botState.$inferInsert;
+export type BotPositionRow = typeof botPositions.$inferSelect;
+export type NewBotPositionRow = typeof botPositions.$inferInsert;
+export type BotTradeRow = typeof botTrades.$inferSelect;
+export type NewBotTradeRow = typeof botTrades.$inferInsert;
+export type BotEquitySnapshotRow = typeof botEquitySnapshots.$inferSelect;
+export type NewBotEquitySnapshotRow = typeof botEquitySnapshots.$inferInsert;
+export type BotCandleRow = typeof botCandles.$inferSelect;
+export type NewBotCandleRow = typeof botCandles.$inferInsert;
