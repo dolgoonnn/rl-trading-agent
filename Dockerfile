@@ -1,9 +1,7 @@
 FROM node:20-slim
 
-# Install pnpm + procps (PM2 needs `ps` command)
-RUN corepack enable && corepack prepare pnpm@latest --activate && \
-    apt-get update && apt-get install -y --no-install-recommends procps && \
-    rm -rf /var/lib/apt/lists/*
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
 
 WORKDIR /app
 
@@ -18,26 +16,21 @@ RUN pnpm install --frozen-lockfile --ignore-scripts && \
 # Copy source
 COPY tsconfig.json ./
 COPY src/ ./src/
-COPY scripts/paper-trade-confluence.ts scripts/run-gold-bot.ts ./scripts/
-
-# Copy PM2 ecosystem config
-COPY ecosystem.config.cjs ./
+COPY scripts/paper-trade-confluence.ts scripts/run-gold-bot.ts scripts/docker-entrypoint.sh ./scripts/
 
 # Copy market data (needed for --backtest mode, optional for live)
 COPY data/BTCUSDT_1h.json data/ETHUSDT_1h.json data/SOLUSDT_1h.json ./data/
 
-# Ensure writable dirs (gold bot state + PM2 home + logs)
-RUN mkdir -p /app/logs /app/.pm2 && \
-    addgroup --system app && adduser --system --ingroup app app && \
-    chown -R app:app /app/data /app/logs /app/.pm2
+# Ensure writable dirs (gold bot persists state to data/gold-bot-state.json)
+RUN addgroup --system app && adduser --system --ingroup app app && \
+    chown -R app:app /app/data && \
+    chmod +x /app/scripts/docker-entrypoint.sh
+
+# Set HOME so npx doesn't write to /nonexistent
+ENV HOME=/app
 
 USER app
 
-# PM2 needs a writable home dir for pid/config files
-ENV PM2_HOME=/app/.pm2
-# Set HOME so npm/npx don't write to /nonexistent
-ENV HOME=/app
-
-# PM2-runtime keeps the process in foreground (Docker-compatible)
-# Use direct binary path — npx misinterprets the config file as a package name
-CMD ["./node_modules/.bin/pm2-runtime", "ecosystem.config.cjs"]
+# Shell entrypoint runs both crypto + gold bots as background processes.
+# Railway restart policy handles container-level restarts on failure.
+CMD ["/app/scripts/docker-entrypoint.sh"]
