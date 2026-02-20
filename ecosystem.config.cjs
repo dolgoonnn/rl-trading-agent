@@ -22,8 +22,8 @@ module.exports = {
   apps: [
     {
       name: 'crypto-bot',
-      script: 'npx',
-      args: 'tsx scripts/paper-trade-confluence.ts --symbols BTCUSDT,ETHUSDT,SOLUSDT,LINKUSDT,DOGEUSDT,NEARUSDT,ADAUSDT,APTUSDT,ARBUSDT,MATICUSDT',
+      script: './node_modules/.bin/tsx',
+      args: 'scripts/paper-trade-confluence.ts --symbols BTCUSDT,ETHUSDT,SOLUSDT,LINKUSDT,DOGEUSDT,NEARUSDT,ADAUSDT,APTUSDT,ARBUSDT,MATICUSDT',
       cwd: __dirname,
       instances: 1,
       autorestart: true,
@@ -46,8 +46,8 @@ module.exports = {
     },
     {
       name: 'gold-f2f-bot',
-      script: 'npx',
-      args: 'tsx scripts/run-gold-bot.ts --verbose --regime-filter zscore50',
+      script: './node_modules/.bin/tsx',
+      args: 'scripts/run-gold-bot.ts --verbose --regime-filter zscore50',
       cwd: __dirname,
       instances: 1,
       autorestart: true,
