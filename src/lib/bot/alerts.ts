@@ -163,7 +163,7 @@ export class AlertManager {
   // Core Send Logic
   // ============================================
 
-  private async send(alert: BotAlert): Promise<void> {
+  async send(alert: BotAlert): Promise<void> {
     // Always log to console
     const prefix = `[${alert.level.toUpperCase()}] [${alert.event}]`;
     console.log(`${prefix} ${alert.message}`);

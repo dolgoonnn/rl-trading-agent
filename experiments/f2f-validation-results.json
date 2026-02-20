@@ -1,0 +1,80 @@
+{
+  "timestamp": "2026-02-17T10:32:08.962Z",
+  "dataRange": {
+    "start": "2005-01-02",
+    "end": "2026-02-16",
+    "bars": 6585
+  },
+  "config": {
+    "trainBars": 2520,
+    "valBars": 126,
+    "slideBars": 21,
+    "friction": 0.0005
+  },
+  "checks": [
+    {
+      "name": "Walk-Forward ≥60%",
+      "value": "51.1%",
+      "threshold": "≥60%",
+      "pass": false
+    },
+    {
+      "name": "PBO <25%",
+      "value": "16.8%",
+      "threshold": "<25%",
+      "pass": true
+    },
+    {
+      "name": "DSR >0",
+      "value": "2.00",
+      "threshold": ">0",
+      "pass": true
+    },
+    {
+      "name": "MC Bootstrap Sharpe 5th >0",
+      "value": "1.41",
+      "threshold": ">0",
+      "pass": true
+    },
+    {
+      "name": "MC Bootstrap PnL 5th >0%",
+      "value": "103.4%",
+      "threshold": ">0%",
+      "pass": true
+    },
+    {
+      "name": "MC Skip 20% ≥90% profitable",
+      "value": "100.0%",
+      "threshold": "≥90%",
+      "pass": true
+    },
+    {
+      "name": "Param Fragility <50%",
+      "value": "8%",
+      "threshold": "<50%",
+      "pass": true
+    }
+  ],
+  "passCount": 6,
+  "totalChecks": 7,
+  "details": {
+    "wfPassRate": 0.5111111111111111,
+    "oosTrades": 1097,
+    "oosSharpe": 2.077754189213033,
+    "oosPnl": 1.9965854734946706,
+    "oosWinRate": 0.39288969917958066,
+    "oosMaxDD": 0.15302346666030708,
+    "finalParams": {
+      "lambda": 0.95,
+      "theta": 0.91
+    },
+    "pbo": 0.1675,
+    "dsr": 1.995783177367211,
+    "bootstrapSharpe5": 1.4094398915211104,
+    "bootstrapPnl5": 1.0342115094232431,
+    "skip20Profitable": 1,
+    "skip30Profitable": 1,
+    "fragility": 0.08,
+    "reshuffleZScore": 1.132882408128222
+  }
+}

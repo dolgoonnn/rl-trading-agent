@@ -116,7 +116,8 @@ export type ExitReason =
   | 'max_bars'
   | 'manual'
   | 'circuit_breaker'
-  | 'shutdown';
+  | 'shutdown'
+  | 'ltf_timeout';
 
 /** A live/paper position tracked by the bot */
 export interface BotPosition {
@@ -148,6 +149,12 @@ export interface BotPosition {
   // Partial TP state
   partialTaken: boolean;
   partialPnlPercent: number;
+
+  // LTF entry metadata (optional — only set when --ltf is active)
+  ltfConfirmed?: boolean;
+  ltfEntryDelay?: number; // bars waited for 5m confirmation
+  originalHTFEntry?: number; // original 1H entry price before LTF refinement
+  originalHTFStopLoss?: number; // original 1H SL before LTF tightening
 
   // Exit (filled when closed)
   exitPrice?: number;
@@ -262,7 +269,14 @@ export type AlertEvent =
   | 'daily_summary'
   | 'error'
   | 'bot_started'
-  | 'bot_stopped';
+  | 'bot_stopped'
+  | 'ltf_setup_created'
+  | 'ltf_confirmed'
+  | 'ltf_expired'
+  | 'arb_position_opened'
+  | 'arb_position_closed'
+  | 'funding_settlement'
+  | 'arb_daily_summary';
 
 /** An alert to be sent */
 export interface BotAlert {
@@ -288,6 +302,36 @@ export interface CandleFetchResult {
 // ============================================
 // Bot State (persisted across restarts)
 // ============================================
+
+// ============================================
+// LTF Entry Timing Configuration
+// ============================================
+
+/** LTF confirmation configuration for tighter entry timing */
+export interface LTFConfig {
+  /** Whether LTF entry timing is enabled */
+  enabled: boolean;
+  /** LTF candle interval (Bybit format: '5' for 5min) */
+  ltfInterval: string;
+  /** Max 5m bars to wait for price to enter OB zone */
+  zoneTimeoutBars: number;
+  /** Max 5m bars to wait for MSS confirmation after zone entry */
+  confirmTimeoutBars: number;
+  /** Require market structure shift on 5m */
+  requireMSS: boolean;
+  /** Require CVD alignment */
+  requireCVD: boolean;
+  /** Require volume spike above threshold */
+  requireVolumeSpike: boolean;
+  /** Volume spike threshold (multiple of 20-bar average) */
+  volumeSpikeThreshold: number;
+  /** CVD slope lookback bars */
+  cvdLookback: number;
+  /** What to do on timeout: skip the trade or fall back to 1H entry */
+  onTimeout: 'skip' | 'fallback';
+  /** Swing lookback for 5m structure detection */
+  ltfSwingLookback: number;
+}
 
 /** Persistent bot state stored in DB */
 export interface BotState {

@@ -26,6 +26,11 @@ import path from 'path';
 import type { Candle } from '@/types';
 import { aggregate } from '../src/lib/scalp/data/aggregator';
 import { ICT5mStrategy } from '../src/lib/scalp/strategies/ict-5m';
+import { MeanReversionStrategy } from '../src/lib/scalp/strategies/mean-reversion';
+import { BBSqueezeStrategy } from '../src/lib/scalp/strategies/bb-squeeze';
+import { ATRBreakoutStrategy } from '../src/lib/scalp/strategies/atr-breakout';
+import { SilverBulletStrategy } from '../src/lib/scalp/strategies/silver-bullet';
+import { SessionRangeStrategy } from '../src/lib/scalp/strategies/session-range';
 import type { ScalpStrategy, ScalpStrategyName, KillZoneMode, ICT5mConfig } from '../src/lib/scalp/strategies/types';
 import { DEFAULT_SCALP_CONFIG, DEFAULT_ICT5M_CONFIG } from '../src/lib/scalp/strategies/types';
 import { detectRegime, regimeLabel } from '../src/lib/ict/regime-detector';
@@ -309,10 +314,30 @@ function closeAtEnd(
 // Strategy Factory
 // ============================================
 
-function createStrategy(name: ScalpStrategyName, ict5mConfig: ICT5mConfig): ScalpStrategy {
+interface ATRBreakoutConfig {
+  atrExpansionMultiple?: number;
+  momentumBars?: number;
+  targetRR?: number;
+}
+
+function createStrategy(
+  name: ScalpStrategyName,
+  ict5mConfig: ICT5mConfig,
+  atrConfig?: ATRBreakoutConfig,
+): ScalpStrategy {
   switch (name) {
     case 'ict_5m':
       return new ICT5mStrategy(ict5mConfig);
+    case 'mean_reversion':
+      return new MeanReversionStrategy();
+    case 'bb_squeeze':
+      return new BBSqueezeStrategy();
+    case 'atr_breakout':
+      return new ATRBreakoutStrategy(atrConfig);
+    case 'silver_bullet':
+      return new SilverBulletStrategy();
+    case 'session_range':
+      return new SessionRangeStrategy();
     default:
       throw new Error(`Unknown scalp strategy: ${name}. Available: ict_5m, mean_reversion, bb_squeeze, atr_breakout, silver_bullet, session_range`);
   }
@@ -338,7 +363,7 @@ function createScalpRunner(
     name: `scalp-${strategy.name}`,
     async run(trainCandles5m: Candle[], valCandles5m: Candle[], _meta?: { symbol?: string }): Promise<TradeResult[]> {
       const all5m = [...trainCandles5m, ...valCandles5m];
-      const all1h = aggregate(all5m, 12); // 12 x 5m = 1H
+      const all1h = aggregate(all5m, 60); // 60 minutes = 1H
 
       const valStartIndex = trainCandles5m.length;
       const windowTrades: TradeResult[] = [];
@@ -377,13 +402,29 @@ function createScalpRunner(
         if (signal && signal.confidence * 10 >= threshold) {
           lastSignalBar = i;
 
+          // Bug fix: enter at next bar's open, not signal bar's close
+          const nextBar = all5m[i + 1];
+          if (!nextBar) continue; // No next bar available
+          const actualEntry = nextBar.open;
+
+          // Recalculate SL/TP preserving same risk distance
+          const originalRisk = Math.abs(signal.entryPrice - signal.stopLoss);
+          const originalReward = Math.abs(signal.takeProfit - signal.entryPrice);
+
+          const stopLoss = signal.direction === 'long'
+            ? actualEntry - originalRisk
+            : actualEntry + originalRisk;
+          const takeProfit = signal.direction === 'long'
+            ? actualEntry + originalReward
+            : actualEntry - originalReward;
+
           const position: SimulatedPosition = {
-            entryPrice: signal.entryPrice,
-            stopLoss: signal.stopLoss,
-            takeProfit: signal.takeProfit,
+            entryPrice: actualEntry,
+            stopLoss,
+            takeProfit,
             direction: signal.direction,
-            entryIndex: i,
-            entryTimestamp: candle.timestamp,
+            entryIndex: i + 1,
+            entryTimestamp: nextBar.timestamp,
             strategy: signal.strategy,
           };
 
@@ -439,6 +480,14 @@ function findHTFIndex(candles1h: Candle[], timestamp: number): number {
     }
   }
 
+  // Use only COMPLETED 1H candles — avoid look-ahead
+  if (best >= 0) {
+    const candleEnd = candles1h[best]!.timestamp + 60 * 60_000; // 1H = 3600s
+    if (candleEnd > timestamp) {
+      best = best - 1; // Current candle not yet closed, use previous
+    }
+  }
+
   return best;
 }
 
@@ -480,6 +529,9 @@ async function main(): Promise<void> {
   const targetRRArg = getArg('target-rr');
   const killZoneModeArg = getArg('kill-zone-mode') as KillZoneMode | undefined;
   const obProximityArg = getArg('ob-proximity');
+  const atrExpansionArg = getArg('atr-expansion');
+  const momentumBarsArg = getArg('momentum-bars');
+  const atrTargetRRArg = getArg('atr-target-rr');
   const jsonOutputMode = hasFlag('json');
 
   // Determine symbols
@@ -561,6 +613,13 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  // Build ATR breakout config
+  const atrConfig: ATRBreakoutConfig = {
+    ...(atrExpansionArg && { atrExpansionMultiple: parseFloat(atrExpansionArg) }),
+    ...(momentumBarsArg && { momentumBars: parseInt(momentumBarsArg, 10) }),
+    ...(atrTargetRRArg && { targetRR: parseFloat(atrTargetRRArg) }),
+  };
+
   if (!jsonOutputMode) {
     console.log(`\n=== Scalp Backtest Config ===`);
     console.log(`  Strategy: ${strategyName}`);
@@ -579,11 +638,16 @@ async function main(): Promise<void> {
       console.log(`  Kill zone mode: ${ict5mConfig.killZoneMode}`);
       console.log(`  OB proximity: ${(ict5mConfig.obProximity * 100).toFixed(2)}%`);
     }
+    if (strategyName === 'atr_breakout') {
+      console.log(`  ATR expansion multiple: ${atrConfig.atrExpansionMultiple ?? 1.5}`);
+      console.log(`  Momentum bars: ${atrConfig.momentumBars ?? 3}`);
+      console.log(`  ATR target R:R: ${atrConfig.targetRR ?? 1.5}`);
+    }
     console.log('');
   }
 
   // Create strategy and runner
-  const strategy = createStrategy(strategyName, ict5mConfig);
+  const strategy = createStrategy(strategyName, ict5mConfig, atrConfig);
   const { runner, allTrades } = createScalpRunner(
     strategy, threshold, exitMode, maxBars, cooldownBars, friction, suppressRegimes, partialTP,
   );
@@ -678,6 +742,11 @@ async function main(): Promise<void> {
       cmd.push(`--target-rr ${ict5mConfig.targetRR}`);
       cmd.push(`--kill-zone-mode ${ict5mConfig.killZoneMode}`);
       cmd.push(`--ob-proximity ${ict5mConfig.obProximity}`);
+    }
+    if (strategyName === 'atr_breakout') {
+      if (atrConfig.atrExpansionMultiple) cmd.push(`--atr-expansion ${atrConfig.atrExpansionMultiple}`);
+      if (atrConfig.momentumBars) cmd.push(`--momentum-bars ${atrConfig.momentumBars}`);
+      if (atrConfig.targetRR) cmd.push(`--atr-target-rr ${atrConfig.targetRR}`);
     }
     if (partialTP) {
       cmd.push(`--partial-tp "${partialTP.fraction},${partialTP.triggerR},${partialTP.beBuffer}"`);

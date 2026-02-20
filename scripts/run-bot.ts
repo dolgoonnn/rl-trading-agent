@@ -8,13 +8,14 @@
  *
  * PM2-compatible: handles SIGTERM/SIGINT for graceful shutdown.
  *
- * Supports crypto (BTC/ETH/SOL with order_block strategy) and gold
- * (XAUUSDT with asian_range_gold strategy) via per-symbol config routing.
+ * Crypto-only: BTC/ETH/SOL with order_block strategy (Run 18 CMA-ES config).
  *
  * Usage:
- *   npx tsx scripts/run-bot.ts                    # Crypto only (default)
- *   npx tsx scripts/run-bot.ts --gold             # Crypto + Gold
- *   npx tsx scripts/run-bot.ts --gold-only        # Gold only
+ *   npx tsx scripts/run-bot.ts                    # Default (BTC/ETH/SOL)
+ *   npx tsx scripts/run-bot.ts --symbols BTCUSDT,ETHUSDT  # Custom symbols
+ *   npx tsx scripts/run-bot.ts --ltf              # Enable LTF entry timing (5m confirmation)
+ *   npx tsx scripts/run-bot.ts --funding-arb      # Enable funding rate arbitrage
+ *   npx tsx scripts/run-bot.ts --arb-only         # Arb only (no directional)
  *   npx tsx scripts/run-bot.ts --capital 5000
  *   npx tsx scripts/run-bot.ts --risk 0.003
  *   npx tsx scripts/run-bot.ts --telegram-token BOT_TOKEN --telegram-chat CHAT_ID
@@ -29,12 +30,15 @@ import {
   PositionTracker,
   RiskEngine,
   AlertManager,
+  FundingArbBot,
   DEFAULT_BOT_CONFIG,
   RUN18_STRATEGY_CONFIG,
   DEFAULT_CIRCUIT_BREAKERS,
-  isGoldSymbol,
+  DEFAULT_LTF_CONFIG,
+  DEFAULT_FUNDING_ARB_CONFIG,
 } from '../src/lib/bot';
-import type { BotConfig, BotSymbol, BotPosition } from '../src/types/bot';
+import { LTFConfirmation } from '../src/lib/bot/ltf-confirmation';
+import type { BotConfig, BotSymbol, BotPosition, LTFConfig } from '../src/types/bot';
 
 // ============================================
 // Parse CLI arguments
@@ -43,12 +47,16 @@ import type { BotConfig, BotSymbol, BotPosition } from '../src/types/bot';
 function parseArgs(): {
   config: BotConfig;
   resume: boolean;
+  ltfEnabled: boolean;
+  fundingArbEnabled: boolean;
+  arbOnly: boolean;
 } {
   const args = process.argv.slice(2);
   const config = { ...DEFAULT_BOT_CONFIG };
   let resume = false;
-  let includeGold = false;
-  let goldOnly = false;
+  let ltfEnabled = false;
+  let fundingArbEnabled = false;
+  let arbOnly = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -82,25 +90,20 @@ function parseArgs(): {
       case '--poll-delay':
         config.pollDelaySeconds = parseInt(args[++i]!, 10);
         break;
-      case '--gold':
-        includeGold = true;
+      case '--ltf':
+        ltfEnabled = true;
         break;
-      case '--gold-only':
-        goldOnly = true;
+      case '--funding-arb':
+        fundingArbEnabled = true;
+        break;
+      case '--arb-only':
+        arbOnly = true;
+        fundingArbEnabled = true;
         break;
     }
   }
 
-  // Handle gold flags (only if --symbols wasn't explicitly set)
-  if (goldOnly && !args.includes('--symbols')) {
-    config.symbols = ['XAUUSDT'];
-    config.maxPositions = 1;
-  } else if (includeGold && !args.includes('--symbols')) {
-    config.symbols = [...config.symbols, 'XAUUSDT'];
-    config.maxPositions = config.symbols.length;
-  }
-
-  return { config, resume };
+  return { config, resume, ltfEnabled, fundingArbEnabled, arbOnly };
 }
 
 // ============================================
@@ -119,8 +122,23 @@ class TradingBot {
   private tickInterval: ReturnType<typeof setInterval> | null = null;
   private dailyResetInterval: ReturnType<typeof setInterval> | null = null;
 
-  constructor(config: BotConfig, resume: boolean) {
+  // LTF entry timing
+  private ltfConfirmation: LTFConfirmation | null = null;
+  private ltfConfig: LTFConfig;
+
+  // Funding rate arbitrage
+  private fundingArbBot: FundingArbBot | null = null;
+  private arbOnly: boolean;
+
+  constructor(
+    config: BotConfig,
+    resume: boolean,
+    ltfEnabled: boolean,
+    fundingArbEnabled: boolean,
+    arbOnly: boolean,
+  ) {
     this.config = config;
+    this.arbOnly = arbOnly;
 
     // Initialize components
     this.dataFeed = new DataFeed();
@@ -133,6 +151,21 @@ class TradingBot {
     this.tracker = new PositionTracker(config.initialCapital);
     this.riskEngine = new RiskEngine(DEFAULT_CIRCUIT_BREAKERS, config.maxPositions);
     this.alerts = new AlertManager(config.telegramBotToken, config.telegramChatId);
+
+    // LTF entry timing (only for crypto, opt-in)
+    this.ltfConfig = { ...DEFAULT_LTF_CONFIG, enabled: ltfEnabled };
+    if (ltfEnabled) {
+      this.ltfConfirmation = new LTFConfirmation(this.ltfConfig, this.dataFeed);
+    }
+
+    // Funding rate arbitrage
+    if (fundingArbEnabled) {
+      this.fundingArbBot = new FundingArbBot(
+        DEFAULT_FUNDING_ARB_CONFIG,
+        this.alerts,
+        config.verbose,
+      );
+    }
 
     // Attempt to resume from saved state
     if (resume) {
@@ -148,33 +181,44 @@ class TradingBot {
   async start(): Promise<void> {
     this.running = true;
 
-    // Categorize symbols
-    const cryptoSymbols = this.config.symbols.filter(s => !isGoldSymbol(s));
-    const goldSymbols = this.config.symbols.filter(s => isGoldSymbol(s));
-
     console.log('='.repeat(60));
     console.log('ICT Paper Trading Bot');
     console.log('='.repeat(60));
     console.log(`Mode: ${this.config.mode}`);
+    console.log(`Strategy: order_block (Run 18 CMA-ES)`);
     console.log(`Symbols: ${this.config.symbols.join(', ')}`);
-    if (cryptoSymbols.length > 0) {
-      console.log(`  Crypto (order_block): ${cryptoSymbols.join(', ')}`);
-    }
-    if (goldSymbols.length > 0) {
-      console.log(`  Gold (asian_range_gold): ${goldSymbols.join(', ')}`);
-    }
     console.log(`Capital: $${this.config.initialCapital}`);
     console.log(`Risk/trade: ${(this.config.riskPerTrade * 100).toFixed(2)}%`);
     console.log(`Max positions: ${this.config.maxPositions}`);
     console.log(`Poll delay: ${this.config.pollDelaySeconds}s after hour close`);
+    if (this.ltfConfirmation) {
+      console.log(`LTF entry timing: ENABLED (5m confirmation)`);
+    }
+    if (this.fundingArbBot) {
+      console.log(`Funding arb: ENABLED`);
+    }
+    if (this.arbOnly) {
+      console.log(`Mode: ARB ONLY (no directional trading)`);
+    }
     console.log('='.repeat(60));
+
+    // Start funding arb bot (runs independently)
+    if (this.fundingArbBot) {
+      await this.fundingArbBot.start();
+    }
+
+    // If arb-only, skip directional setup
+    if (this.arbOnly) {
+      await this.alerts.botStarted();
+      console.log('\nArb-only mode. Press Ctrl+C to stop.\n');
+      return;
+    }
 
     // Backfill candle history
     console.log('\nBackfilling candle history...');
     for (const symbol of this.config.symbols) {
-      const strategy = isGoldSymbol(symbol) ? 'asian_range_gold' : 'order_block';
       const count = await this.dataFeed.backfill(symbol);
-      console.log(`  ${symbol} [${strategy}]: ${count} candles cached`);
+      console.log(`  ${symbol}: ${count} candles cached`);
     }
 
     // Save initial state
@@ -203,6 +247,11 @@ class TradingBot {
     if (this.dailyResetInterval) {
       clearInterval(this.dailyResetInterval);
       this.dailyResetInterval = null;
+    }
+
+    // Stop funding arb bot
+    if (this.fundingArbBot) {
+      await this.fundingArbBot.stop();
     }
 
     // Close all open positions on shutdown
@@ -254,6 +303,12 @@ class TradingBot {
   }
 
   private async processSymbol(symbol: BotSymbol): Promise<void> {
+    // Process pending LTF setups first (polls 5m candles independently)
+    if (this.ltfConfirmation && this.ltfConfirmation.hasPendingSetup(symbol)) {
+      await this.processLTFSetup(symbol);
+      return;
+    }
+
     // Check for new candle
     const { allCandles, latestCandle, isNew } = await this.dataFeed.processNewCandle(symbol);
 
@@ -263,10 +318,8 @@ class TradingBot {
     const lastProcessed = this.tracker.getLastProcessedTimestamp(symbol);
     if (latestCandle.timestamp <= lastProcessed) return;
 
-    const strategy = isGoldSymbol(symbol) ? 'asian_range_gold' : 'order_block';
-
     if (this.config.verbose) {
-      console.log(`[${new Date().toISOString()}] ${symbol} [${strategy}]: new candle at ${new Date(latestCandle.timestamp).toISOString()}, close=$${latestCandle.close}`);
+      console.log(`[${new Date().toISOString()}] ${symbol}: new candle at ${new Date(latestCandle.timestamp).toISOString()}, close=$${latestCandle.close}`);
     }
 
     // Mark as processed
@@ -275,7 +328,7 @@ class TradingBot {
     // 1. Check existing open position for this symbol
     const openPos = this.tracker.getOpenPosition(symbol);
     if (openPos) {
-      await this.manageOpenPosition(openPos, latestCandle, allCandles.length - 1);
+      await this.manageOpenPosition(openPos, latestCandle);
       return; // Don't open new position while one is open for this symbol
     }
 
@@ -300,7 +353,25 @@ class TradingBot {
       return;
     }
 
-    // 4. Open position (OrderManager auto-routes to correct config per symbol)
+    // 4. LTF entry timing — if enabled, create LTF setup instead of immediate entry
+    if (this.ltfConfirmation) {
+      this.ltfConfirmation.createSetup(symbol, result.signal, allCandles);
+      console.log(`  ${symbol}: LTF setup created — waiting for 5m confirmation`);
+
+      await this.alerts.send({
+        level: 'info',
+        event: 'ltf_setup_created',
+        message: [
+          `LTF Setup: ${symbol} ${result.signal.signal.direction.toUpperCase()}`,
+          `Score: ${result.signal.totalScore.toFixed(2)}`,
+          `Waiting for 5m zone entry + MSS confirmation`,
+        ].join('\n'),
+        timestamp: Date.now(),
+      });
+      return;
+    }
+
+    // 5. Open position immediately
     const position = this.orderManager.openPosition(
       result.signal,
       symbol,
@@ -331,14 +402,86 @@ class TradingBot {
     console.log(`  ${symbol}: OPENED ${position.direction.toUpperCase()} @ $${position.entryPrice.toFixed(2)} (score: ${position.confluenceScore.toFixed(2)}, regime: ${position.regime}, strategy: ${position.strategy})`);
   }
 
+  /**
+   * Process a pending LTF setup — polls 5m candles and checks for confirmation.
+   */
+  private async processLTFSetup(symbol: BotSymbol): Promise<void> {
+    if (!this.ltfConfirmation) return;
+
+    const result = await this.ltfConfirmation.processSetup(symbol);
+    if (!result) return;
+
+    if (result.status === 'confirmed') {
+      // Open position with LTF-tightened entry/SL
+      const position = this.orderManager.openLTFPosition(
+        result.signal,
+        symbol,
+        this.tracker.getEquity(),
+        this.config.riskPerTrade,
+        0, // barIndex not meaningful for LTF
+        result.ltfEntry,
+        result.ltfStopLoss,
+      );
+
+      if (position) {
+        // Set LTF metadata
+        position.ltfConfirmed = true;
+        position.ltfEntryDelay = result.barsWaited;
+        position.originalHTFEntry = result.signal.signal.entryPrice;
+        position.originalHTFStopLoss = result.signal.signal.stopLoss;
+        position.regime = '';
+
+        this.tracker.addPosition(position);
+        await this.alerts.positionOpened(position);
+        await this.alerts.send({
+          level: 'info',
+          event: 'ltf_confirmed',
+          message: [
+            `LTF Confirmed: ${symbol} ${position.direction.toUpperCase()}`,
+            `Entry: $${position.entryPrice.toFixed(2)} (1H was $${result.signal.signal.entryPrice.toFixed(2)})`,
+            `SL: $${position.stopLoss.toFixed(2)} (1H was $${result.signal.signal.stopLoss.toFixed(2)})`,
+            `Waited: ${result.barsWaited} bars (5m)`,
+          ].join('\n'),
+          timestamp: Date.now(),
+        });
+
+        console.log(`  ${symbol}: LTF CONFIRMED — OPENED ${position.direction.toUpperCase()} @ $${position.entryPrice.toFixed(2)} (5m SL: $${position.stopLoss.toFixed(2)})`);
+      }
+    } else if (result.status === 'expired') {
+      if (this.ltfConfig.onTimeout === 'fallback') {
+        // Fall back to 1H entry
+        const position = this.orderManager.openPosition(
+          result.signal,
+          symbol,
+          this.tracker.getEquity(),
+          this.config.riskPerTrade,
+          0,
+        );
+        if (position) {
+          this.tracker.addPosition(position);
+          await this.alerts.positionOpened(position);
+          console.log(`  ${symbol}: LTF expired — FALLBACK to 1H entry @ $${position.entryPrice.toFixed(2)}`);
+        }
+      } else {
+        console.log(`  ${symbol}: LTF expired — skipped`);
+      }
+
+      await this.alerts.send({
+        level: 'info',
+        event: 'ltf_expired',
+        message: `LTF Expired: ${symbol} — ${this.ltfConfig.onTimeout === 'fallback' ? 'fell back to 1H entry' : 'skipped'}`,
+        timestamp: Date.now(),
+      });
+    }
+  }
+
   private async manageOpenPosition(
     position: BotPosition,
     candle: { timestamp: number; open: number; high: number; low: number; close: number; volume: number },
-    barIndex: number,
   ): Promise<void> {
     const wasPT = position.partialTaken;
 
-    const exitResult = this.orderManager.checkPositionExit(position, candle, barIndex);
+    const exitResult = this.orderManager.checkPositionExit(position, candle);
 
     // Check if partial TP was taken (position still open but state changed)
     if (!wasPT && position.partialTaken) {
@@ -403,8 +546,8 @@ const HOUR_MS = 3_600_000;
 // ============================================
 
 async function main(): Promise<void> {
-  const { config, resume } = parseArgs();
-  const bot = new TradingBot(config, resume);
+  const { config, resume, ltfEnabled, fundingArbEnabled, arbOnly } = parseArgs();
+  const bot = new TradingBot(config, resume, ltfEnabled, fundingArbEnabled, arbOnly);
 
   // Graceful shutdown handlers (PM2 compatible)
   const shutdown = async (signal: string) => {

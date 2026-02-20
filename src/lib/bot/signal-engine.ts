@@ -4,21 +4,19 @@
  * Takes candle arrays and produces scored trade signals using the
  * same ConfluenceScorer and ICT detectors used in backtesting.
  * Ensures zero simulation mismatch between backtest and live.
- *
- * Supports per-symbol strategy selection: crypto symbols use order_block,
- * gold symbols use asian_range_gold with Run 12 config.
  */
 
 import type { Candle } from '@/types/candle';
 import type { BotSymbol, StrategyConfig } from '@/types/bot';
 import {
   ConfluenceScorer,
+  type ConfluenceWeights,
   type ConfluenceScorerResult,
   type ScoredSignal,
   PRODUCTION_STRATEGY_CONFIG,
 } from '@/lib/rl/strategies/confluence-scorer';
 import { regimeLabel } from '@/lib/ict/regime-detector';
-import { getStrategyConfigForSymbol, isGoldSymbol } from './config';
+import { RUN18_STRATEGY_CONFIG } from './config';
 
 export interface SignalResult {
   /** Whether a trade signal was produced */
@@ -35,18 +33,15 @@ export interface SignalResult {
 
 export class SignalEngine {
   private scorers: Map<string, ConfluenceScorer> = new Map();
-  /** Per-symbol strategy config override. If not set, uses getStrategyConfigForSymbol(). */
+  /** Per-symbol strategy config override. */
   private configOverrides: Map<string, StrategyConfig> = new Map();
 
   /**
    * Create a signal engine.
-   * @param defaultConfig Default strategy config (used for symbols without overrides)
+   * @param defaultConfig Default strategy config (defaults to RUN18_STRATEGY_CONFIG)
    */
   constructor(defaultConfig?: StrategyConfig) {
-    // If a default config is provided, it's used for non-gold symbols
-    // Gold symbols always use GOLD_RUN12_STRATEGY_CONFIG via getStrategyConfigForSymbol()
     if (defaultConfig) {
-      // Store as a fallback — but getStrategyConfigForSymbol handles routing
       this.configOverrides.set('__default__', defaultConfig);
     }
   }
@@ -102,47 +97,27 @@ export class SignalEngine {
 
   /**
    * Get or create a ConfluenceScorer for a symbol.
-   * Each symbol gets its own scorer with the appropriate strategy config.
-   * Gold symbols get gold-specific config; crypto symbols get Run 18 config.
+   * Each symbol gets its own scorer instance with shared config.
    */
   private getOrCreateScorer(symbol: BotSymbol): ConfluenceScorer {
     let scorer = this.scorers.get(symbol);
     if (!scorer) {
       const config = this.configOverrides.get(symbol)
         ?? this.configOverrides.get('__default__')
-        ?? getStrategyConfigForSymbol(symbol);
-
-      // For gold symbols, always use the gold strategy config regardless of overrides
-      const effectiveConfig = isGoldSymbol(symbol)
-        ? getStrategyConfigForSymbol(symbol)
-        : config;
+        ?? RUN18_STRATEGY_CONFIG;
 
       scorer = new ConfluenceScorer({
-        weights: { ...effectiveConfig.weights },
-        minThreshold: effectiveConfig.baseThreshold,
-        activeStrategies: effectiveConfig.activeStrategies,
-        suppressedRegimes: effectiveConfig.suppressedRegimes,
-        obFreshnessHalfLife: effectiveConfig.obHalfLife,
-        atrExtensionBands: effectiveConfig.atrExtensionBands,
-        cooldownBars: effectiveConfig.cooldownBars,
-        regimeThresholdOverrides: effectiveConfig.regimeThresholds,
+        weights: config.weights as unknown as ConfluenceWeights,
+        minThreshold: config.baseThreshold,
+        activeStrategies: config.activeStrategies,
+        suppressedRegimes: config.suppressedRegimes,
+        obFreshnessHalfLife: config.obHalfLife,
+        atrExtensionBands: config.atrExtensionBands,
+        cooldownBars: config.cooldownBars,
+        regimeThresholdOverrides: config.regimeThresholds,
         strategyConfig: {
           ...PRODUCTION_STRATEGY_CONFIG,
         },
-        // Pass gold config if this is a gold symbol
-        ...(effectiveConfig.goldConfig ? {
-          goldConfig: {
-            minRangePct: effectiveConfig.goldConfig.minRangePct,
-            minSweepPct: effectiveConfig.goldConfig.minSweepPct,
-            longBiasMultiplier: effectiveConfig.goldConfig.longBiasMultiplier,
-            goldVolScale: effectiveConfig.goldConfig.goldVolScale,
-            targetRR: effectiveConfig.goldConfig.targetRR,
-            displacementMultiple: effectiveConfig.goldConfig.displacementMultiple,
-            sweepLookback: effectiveConfig.goldConfig.sweepLookback,
-            fvgSearchWindow: effectiveConfig.goldConfig.fvgSearchWindow,
-            ceTolerance: effectiveConfig.goldConfig.ceTolerance,
-          },
-        } : {}),
       });
       this.scorers.set(symbol, scorer);
     }

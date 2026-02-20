@@ -19,7 +19,7 @@ import type {
 } from '@/types/bot';
 import type { ScoredSignal } from '@/lib/rl/strategies/confluence-scorer';
 import type { StrategyConfig } from '@/types/bot';
-import { SYMBOL_ALLOCATION, getStrategyConfigForSymbol } from './config';
+import { SYMBOL_ALLOCATION } from './config';
 
 // ============================================
 // Position Manager
@@ -40,9 +40,9 @@ export class OrderManager {
     this.paperSlippage = paperSlippage;
   }
 
-  /** Get the appropriate strategy config for a symbol */
-  private getConfig(symbol: string): StrategyConfig {
-    return getStrategyConfigForSymbol(symbol) ?? this.defaultConfig;
+  /** Get the strategy config (single config path for crypto-only) */
+  private getConfig(_symbol: string): StrategyConfig {
+    return this.defaultConfig;
   }
 
   /**
@@ -112,6 +112,68 @@ export class OrderManager {
   }
 
   /**
+   * Create a position with LTF-refined entry and stop loss.
+   * Uses the 5m-confirmed entry price and tighter 5m swing SL.
+   * TP remains the same as the original 1H signal.
+   */
+  openLTFPosition(
+    signal: ScoredSignal,
+    symbol: BotSymbol,
+    equity: number,
+    riskPerTrade: number,
+    barIndex: number,
+    ltfEntry: number,
+    ltfStopLoss: number,
+  ): BotPosition | null {
+    const { takeProfit, direction, strategy } = signal.signal;
+    const config = this.getConfig(symbol);
+
+    // Apply entry friction to LTF entry
+    const adjustedEntry = this.applyEntrySlippage(ltfEntry, direction, config);
+
+    // Calculate risk distance from LTF levels (tighter SL)
+    const riskDistance = direction === 'long'
+      ? adjustedEntry - ltfStopLoss
+      : ltfStopLoss - adjustedEntry;
+
+    if (riskDistance <= 0) return null;
+
+    // Position sizing: same risk-based approach
+    const symbolAlloc = SYMBOL_ALLOCATION[symbol] ?? 0.33;
+    const riskAmount = equity * riskPerTrade * symbolAlloc;
+    const positionSize = riskAmount / riskDistance;
+    const positionSizeUSDT = positionSize * adjustedEntry;
+
+    const position: BotPosition = {
+      id: uuidv4(),
+      symbol,
+      direction,
+      status: 'open',
+
+      entryPrice: adjustedEntry,
+      entryTimestamp: Date.now(),
+      entryBarIndex: barIndex,
+
+      stopLoss: ltfStopLoss,
+      takeProfit,
+      currentSL: ltfStopLoss,
+
+      positionSizeUSDT,
+      riskAmountUSDT: riskAmount,
+
+      strategy,
+      confluenceScore: signal.totalScore,
+      factorBreakdown: signal.factorBreakdown,
+      regime: '',
+
+      partialTaken: false,
+      partialPnlPercent: 0,
+    };
+
+    return position;
+  }
+
+  /**
    * Check if a position should be exited on the current candle.
    * Mirrors the backtest partial TP logic exactly.
    *
@@ -120,10 +182,10 @@ export class OrderManager {
   checkPositionExit(
     position: BotPosition,
     candle: Candle,
-    currentBarIndex: number,
   ): { position: BotPosition; exitReason: ExitReason } | null {
     const config = this.getConfig(position.symbol);
-    const barsHeld = currentBarIndex - position.entryBarIndex;
+    // Compute barsHeld from timestamps — robust to sliding windows and restarts
+    const barsHeld = Math.round((candle.timestamp - position.entryTimestamp) / (60 * 60 * 1000));
     const direction = position.direction;
     const currentSL = position.currentSL;
 

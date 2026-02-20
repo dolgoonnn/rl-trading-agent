@@ -214,6 +214,48 @@ export class DataFeed {
   }
 
   /**
+   * Fetch LTF candles (e.g., 5m) from Bybit for LTF entry timing.
+   * Returns candles in chronological order.
+   *
+   * @param symbol Symbol to fetch
+   * @param interval Bybit interval (e.g., '5' for 5min, '15' for 15min)
+   * @param limit Number of candles to fetch (max 200)
+   */
+  async fetchLTFCandles(
+    symbol: BotSymbol,
+    interval: string,
+    limit = 100,
+  ): Promise<Candle[]> {
+    const response = await this.client.getKline({
+      category: BYBIT_CATEGORY,
+      symbol,
+      interval: interval as '1' | '3' | '5' | '15' | '30' | '60',
+      limit,
+    });
+
+    if (response.retCode !== 0) {
+      throw new Error(`Bybit API error (LTF): ${response.retMsg} (code: ${response.retCode})`);
+    }
+
+    const rawCandles = response.result.list;
+    if (!rawCandles || rawCandles.length === 0) {
+      return [];
+    }
+
+    // Bybit returns newest first, reverse to chronological order
+    return rawCandles
+      .map((row) => ({
+        timestamp: parseInt(row[0], 10),
+        open: parseFloat(row[1]),
+        high: parseFloat(row[2]),
+        low: parseFloat(row[3]),
+        close: parseFloat(row[4]),
+        volume: parseFloat(row[5]),
+      }))
+      .reverse();
+  }
+
+  /**
    * Get latest price for a symbol (from last candle close).
    */
   async getLatestPrice(symbol: BotSymbol): Promise<number> {

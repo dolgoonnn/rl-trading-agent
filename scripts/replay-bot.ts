@@ -9,9 +9,8 @@
  * in the bot DB tables.
  *
  * Usage:
- *   npx tsx scripts/replay-bot.ts                          # Crypto only, max speed
- *   npx tsx scripts/replay-bot.ts --gold                   # Crypto + Gold
- *   npx tsx scripts/replay-bot.ts --gold-only              # Gold only
+ *   npx tsx scripts/replay-bot.ts                          # Default (BTC/ETH/SOL), max speed
+ *   npx tsx scripts/replay-bot.ts --symbols BTCUSDT,ETHUSDT  # Custom symbols
  *   npx tsx scripts/replay-bot.ts --delay 1000             # 1 candle per second
  *   npx tsx scripts/replay-bot.ts --delay 0 --verbose      # Max speed + logs
  *   npx tsx scripts/replay-bot.ts --start-date 2024-06-01  # Start from a date
@@ -29,7 +28,6 @@ import {
   RiskEngine,
   RUN18_STRATEGY_CONFIG,
   DEFAULT_CIRCUIT_BREAKERS,
-  isGoldSymbol,
 } from '../src/lib/bot';
 import { db } from '../src/lib/data/db';
 import { botState, botPositions, botTrades, botEquitySnapshots, botCandles } from '../src/lib/data/schema';
@@ -40,11 +38,7 @@ import { botState, botPositions, botTrades, botEquitySnapshots, botCandles } fro
 
 /** Map bot symbol to candle data file path */
 function getDataFilePath(symbol: BotSymbol): string {
-  const fileMap: Record<string, string> = {
-    XAUUSDT: 'GC_F_1h.json', // Gold model trained on GC_F data
-  };
-  const filename = fileMap[symbol] ?? `${symbol}_1h.json`;
-  return path.join(process.cwd(), 'data', filename);
+  return path.join(process.cwd(), 'data', `${symbol}_1h.json`);
 }
 
 function loadCandles(symbol: BotSymbol): Candle[] {
@@ -85,18 +79,9 @@ function parseArgs(): ReplayConfig {
     fresh: false,
   };
 
-  let includeGold = false;
-  let goldOnly = false;
-
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     switch (arg) {
-      case '--gold':
-        includeGold = true;
-        break;
-      case '--gold-only':
-        goldOnly = true;
-        break;
       case '--delay':
         config.delayMs = parseInt(args[++i]!, 10);
         break;
@@ -120,12 +105,6 @@ function parseArgs(): ReplayConfig {
         config.fresh = true;
         break;
     }
-  }
-
-  if (goldOnly && !args.includes('--symbols')) {
-    config.symbols = ['XAUUSDT'];
-  } else if (includeGold && !args.includes('--symbols')) {
-    config.symbols = [...config.symbols, 'XAUUSDT'];
   }
 
   return config;
@@ -186,8 +165,7 @@ async function runReplay(config: ReplayConfig): Promise<void> {
   for (const symbol of config.symbols) {
     const candles = loadCandles(symbol);
     symbolData.set(symbol, candles);
-    const strategy = isGoldSymbol(symbol) ? 'asian_range_gold' : 'order_block';
-    console.log(`  ${symbol} [${strategy}]: ${candles.length} candles (${new Date(candles[0]!.timestamp).toISOString().slice(0, 10)} → ${new Date(candles[candles.length - 1]!.timestamp).toISOString().slice(0, 10)})`);
+    console.log(`  ${symbol}: ${candles.length} candles (${new Date(candles[0]!.timestamp).toISOString().slice(0, 10)} → ${new Date(candles[candles.length - 1]!.timestamp).toISOString().slice(0, 10)})`);
   }
 
   // Merge all timestamps and sort chronologically
@@ -276,7 +254,7 @@ async function runReplay(config: ReplayConfig): Promise<void> {
     const openPos = tracker.getOpenPositions().find((p) => p.symbol === symbol);
     if (openPos) {
       const wasPT = openPos.partialTaken;
-      const exitResult = orderManager.checkPositionExit(openPos, candle, barIndex);
+      const exitResult = orderManager.checkPositionExit(openPos, candle);
 
       if (!wasPT && openPos.partialTaken) {
         tracker.updatePosition(openPos);
@@ -332,6 +310,7 @@ async function runReplay(config: ReplayConfig): Promise<void> {
 
           if (position) {
             position.regime = result.regime;
+            position.entryTimestamp = candle.timestamp; // Use candle time for replay (not Date.now())
             tracker.addPosition(position);
 
             if (config.verbose) {
@@ -403,11 +382,10 @@ async function runReplay(config: ReplayConfig): Promise<void> {
 
   for (const symbol of config.symbols) {
     const stat = stats.get(symbol)!;
-    const strategy = isGoldSymbol(symbol) ? 'asian_range_gold' : 'order_block';
     const wr = stat.trades > 0 ? ((stat.wins / stat.trades) * 100).toFixed(1) : '0.0';
     const pnlStr = stat.pnlUSDT >= 0 ? '+' : '';
     console.log(
-      `${symbol.padEnd(12)}| ${strategy.padEnd(18)}| ${String(stat.trades).padEnd(7)}| ${stat.wins}W/${stat.losses}L${' '.repeat(Math.max(0, 4 - String(stat.losses).length))}| ${wr.padStart(5)}%| ${pnlStr}${(stat.pnlPercent * 100).toFixed(2).padStart(7)}%| ${pnlStr}$${stat.pnlUSDT.toFixed(2)}`
+      `${symbol.padEnd(12)}| ${'order_block'.padEnd(18)}| ${String(stat.trades).padEnd(7)}| ${stat.wins}W/${stat.losses}L${' '.repeat(Math.max(0, 4 - String(stat.losses).length))}| ${wr.padStart(5)}%| ${pnlStr}${(stat.pnlPercent * 100).toFixed(2).padStart(7)}%| ${pnlStr}$${stat.pnlUSDT.toFixed(2)}`
     );
     totalTrades += stat.trades;
     totalWins += stat.wins;
@@ -444,12 +422,8 @@ async function main(): Promise<void> {
   console.log('ICT Replay Bot — Fast-Forward Paper Trading');
   console.log('='.repeat(70));
 
-  const cryptoSymbols = config.symbols.filter((s) => !isGoldSymbol(s));
-  const goldSymbols = config.symbols.filter((s) => isGoldSymbol(s));
-
+  console.log(`Strategy: order_block (Run 18 CMA-ES)`);
   console.log(`Symbols: ${config.symbols.join(', ')}`);
-  if (cryptoSymbols.length > 0) console.log(`  Crypto (order_block): ${cryptoSymbols.join(', ')}`);
-  if (goldSymbols.length > 0) console.log(`  Gold (asian_range_gold): ${goldSymbols.join(', ')}`);
   console.log(`Capital: $${config.capital}`);
   console.log(`Risk/trade: ${(config.riskPerTrade * 100).toFixed(2)}%`);
   console.log(`Delay: ${config.delayMs === 0 ? 'none (max speed)' : `${config.delayMs}ms per candle`}`);

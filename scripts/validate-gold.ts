@@ -48,56 +48,56 @@ import {
 } from '../src/lib/rl/utils/monte-carlo';
 
 // ============================================
-// Gold Production Config (CMA-ES Run 12)
+// Gold Production Config (CMA-ES Expanded Run 1 — 11yr data)
 // ============================================
 
 const GOLD_SYMBOLS = ['GC_F'];
 const GOLD_FRICTION = 0.0002;
-const GOLD_MODEL_PATH = 'models/gold_run12.json';
+const GOLD_MODEL_PATH = 'models/gold_expanded_run1.json';
 
 /** Final weights = DEFAULT_WEIGHTS[key] * multiplier from bestParams */
 const GOLD_WEIGHTS: Partial<ConfluenceWeights> = {
-  structureAlignment: 0.1852,
-  killZoneActive: 1.2343,
-  liquiditySweep: 3.4433,
-  obProximity: 0.2743,
-  fvgAtCE: 1.5677,
-  recentBOS: 1.7855,
-  rrRatio: 3.9097,
-  oteZone: 0.2108,
-  obFvgConfluence: 1.3583,
+  structureAlignment: 2.4770,
+  killZoneActive: 1.5000,
+  liquiditySweep: 2.9897,
+  obProximity: 0.6314,
+  fvgAtCE: 3.0000,
+  recentBOS: 2.3975,
+  rrRatio: 3.3438,
+  oteZone: 0.0398,
+  obFvgConfluence: 0.7460,
   momentumConfirmation: 0,
 };
 
 const GOLD_REGIME_THRESHOLDS: Record<string, number> = {
-  'uptrend+high': 4.39,
-  'uptrend+normal': 5.31,
-  'uptrend+low': 5.16,
-  'downtrend+normal': 2.76,
-  'downtrend+low': 4.94,
+  'uptrend+high': 3.99,
+  'uptrend+normal': 6.43,
+  'uptrend+low': 4.84,
+  'downtrend+normal': 4.52,
+  'downtrend+low': 6.46,
 };
 
-const GOLD_SUPPRESS: string[] = [];  // No regime suppression for gold
-const GOLD_THRESHOLD = 3.177;
-const GOLD_ATR_EXT = 2.92;
-const GOLD_HALF_LIFE = 10;
-const GOLD_COOLDOWN = 5;
-const GOLD_MAX_BARS = 93;
-const GOLD_PARTIAL_FRACTION = 0.20;
-const GOLD_PARTIAL_TRIGGER_R = 0.70;
-const GOLD_PARTIAL_BE_BUFFER = 0.02;
+const GOLD_SUPPRESS: string[] = ['ranging+normal', 'ranging+high', 'downtrend+high'];
+const GOLD_THRESHOLD = 4.409;
+const GOLD_ATR_EXT = 4.99;
+const GOLD_HALF_LIFE = 17;
+const GOLD_COOLDOWN = 2;
+const GOLD_MAX_BARS = 132;
+const GOLD_PARTIAL_FRACTION = 0.32;
+const GOLD_PARTIAL_TRIGGER_R = 0.50;
+const GOLD_PARTIAL_BE_BUFFER = 0.01;
 
-/** Gold-specific Asian range strategy config from Run 12 */
+/** Gold-specific Asian range strategy config from Expanded Run 1 */
 const GOLD_CONFIG: Partial<AsianRangeGoldConfig> = {
-  minRangePct: 0.160,
-  minSweepPct: 0.073,
-  longBiasMultiplier: 1.30,
-  goldVolScale: 0.81,
-  targetRR: 1.36,
-  displacementMultiple: 1.00,
+  minRangePct: 0.319,
+  minSweepPct: 0.100,
+  longBiasMultiplier: 1.22,
+  goldVolScale: 0.66,
+  targetRR: 1.00,
+  displacementMultiple: 1.26,
   sweepLookback: 29,
-  fvgSearchWindow: 18,
-  ceTolerance: 0.0028,
+  fvgSearchWindow: 11,
+  ceTolerance: 0.0034,
 };
 
 // ============================================
@@ -110,16 +110,17 @@ const GOLD_CONFIG: Partial<AsianRangeGoldConfig> = {
  * - 18 CMA-ES 3-sym crypto runs
  * - 4 CMA-ES broad crypto runs
  * - 4 CMA-ES forex runs (dropped but tried)
- * - 20 CMA-ES gold runs (this campaign)
- * Total: 236 independent trials
+ * - 20 CMA-ES gold runs (2yr campaign)
+ * - 1 CMA-ES gold expanded run (11yr campaign)
+ * Total: 237 independent trials
  */
 const TRIAL_COUNTS = {
   singleParamExperiments: 190,
   cmaes3SymRuns: 18,
   cmaesBroadRuns: 4,
   cmaesForexRuns: 4,
-  cmaesGoldRuns: 20,
-  totalIndependent: 236,
+  cmaesGoldRuns: 21,
+  totalIndependent: 237,
 } as const;
 
 // ============================================
@@ -164,13 +165,13 @@ function prodVariant(id: string, overrides: Partial<ConfigVariant> = {}): Config
 /** 8 variants spanning the parameter space around gold production */
 const PBO_VARIANTS: ConfigVariant[] = [
   prodVariant('prod'),
-  prodVariant('thresh-2.7', { threshold: 2.7 }),
-  prodVariant('thresh-3.7', { threshold: 3.7 }),
-  prodVariant('atr-2.2', { atrExtension: 2.2 }),
-  prodVariant('atr-3.6', { atrExtension: 3.6 }),
+  prodVariant('thresh-3.9', { threshold: 3.9 }),
+  prodVariant('thresh-5.0', { threshold: 5.0 }),
+  prodVariant('atr-3.5', { atrExtension: 3.5 }),
+  prodVariant('atr-6.0', { atrExtension: 6.0 }),
   prodVariant('no-regime-thresh', { regimeThresholds: {} }),
-  prodVariant('halflife-6', { halfLife: 6 }),
-  prodVariant('halflife-16', { halfLife: 16 }),
+  prodVariant('halflife-10', { halfLife: 10 }),
+  prodVariant('halflife-24', { halfLife: 24 }),
 ];
 
 // ============================================
@@ -298,7 +299,7 @@ function createRunner(variant: ConfigVariant): WalkForwardStrategyRunner {
     async run(trainCandles: Candle[], valCandles: Candle[]): Promise<TradeResult[]> {
       const scorerConfig: Partial<ConfluenceConfig> = {
         minThreshold: variant.threshold,
-        minSignalRR: 1.0,  // Gold uses lower RR than crypto/forex (targetRR ~1.36)
+        minSignalRR: 1.5,  // Match backtest-confluence.ts default
         strategyConfig: { slPlacementMode: 'dynamic_rr' as SLPlacementMode },
         activeStrategies: ['asian_range_gold'] as StrategyName[],
         suppressedRegimes: variant.suppressedRegimes,
@@ -897,7 +898,7 @@ async function main(): Promise<void> {
   const perturbIters = hasFlag('skip-perturbation') ? 0 : parseInt(getArg('perturbation-iters') ?? '100', 10);
 
   log('============================================================');
-  log('GOLD MODEL VALIDATION — CMA-ES Run 12');
+  log('GOLD MODEL VALIDATION — CMA-ES Expanded Run 1 (11yr)');
   log('============================================================');
   log(`Symbols: ${GOLD_SYMBOLS.join(', ')}`);
   log(`Friction: ${GOLD_FRICTION} per side`);

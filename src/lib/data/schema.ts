@@ -405,6 +405,55 @@ export const botEquitySnapshots = sqliteTable('bot_equity_snapshots', {
   cumulativePnl: real('cumulative_pnl').notNull(),
 });
 
+// Funding rate snapshots — polled from exchange
+export const fundingRateSnapshots = sqliteTable('funding_rate_snapshots', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  symbol: text('symbol').notNull(),
+  fundingRate: real('funding_rate').notNull(),
+  nextFundingTime: integer('next_funding_time').notNull(),
+  markPrice: real('mark_price').notNull(),
+  indexPrice: real('index_price').notNull(),
+  bid1: real('bid1').notNull(),
+  ask1: real('ask1').notNull(),
+  spread: real('spread').notNull(),
+  polledAt: integer('polled_at').notNull(),
+});
+
+// Funding arb positions — lifecycle tracking
+export const fundingArbPositions = sqliteTable('funding_arb_positions', {
+  id: text('id').primaryKey(),
+  symbol: text('symbol').notNull(),
+  direction: text('direction').notNull(), // 'short_perp' | 'long_perp'
+  status: text('status').notNull(), // 'open' | 'closed'
+
+  // Entry
+  entryPrice: real('entry_price').notNull(),
+  entrySpread: real('entry_spread').notNull(),
+  entryFundingRate: real('entry_funding_rate').notNull(),
+  entryTimestamp: integer('entry_timestamp').notNull(),
+  positionSizeUSDT: real('position_size_usdt').notNull(),
+
+  // Funding collection
+  /** JSON: FundingPayment[] */
+  fundingPayments: text('funding_payments').notNull().default('[]'),
+  totalFundingCollected: real('total_funding_collected').notNull().default(0),
+  fundingPaymentCount: integer('funding_payment_count').notNull().default(0),
+
+  // Exit
+  exitPrice: real('exit_price'),
+  exitTimestamp: integer('exit_timestamp'),
+  exitReason: text('exit_reason'),
+  exitSpread: real('exit_spread'),
+
+  // P&L
+  spreadCost: real('spread_cost').notNull().default(0),
+  netPnlUSDT: real('net_pnl_usdt').notNull().default(0),
+  holdTimeHours: real('hold_time_hours').notNull().default(0),
+  annualizedAPY: real('annualized_apy').notNull().default(0),
+
+  createdAt: integer('created_at').notNull(),
+});
+
 // Bot candle cache — stores fetched candles for ICT analysis
 export const botCandles = sqliteTable('bot_candles', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -450,6 +499,12 @@ export type PaperSessionRow = typeof paperSessions.$inferSelect;
 export type NewPaperSessionRow = typeof paperSessions.$inferInsert;
 export type PaperTradeRow = typeof paperTrades.$inferSelect;
 export type NewPaperTradeRow = typeof paperTrades.$inferInsert;
+
+// Funding arb types
+export type FundingRateSnapshotRow = typeof fundingRateSnapshots.$inferSelect;
+export type NewFundingRateSnapshotRow = typeof fundingRateSnapshots.$inferInsert;
+export type FundingArbPositionRow = typeof fundingArbPositions.$inferSelect;
+export type NewFundingArbPositionRow = typeof fundingArbPositions.$inferInsert;
 
 // Bot types
 export type BotStateRow = typeof botState.$inferSelect;
