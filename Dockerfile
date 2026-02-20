@@ -1,7 +1,9 @@
 FROM node:20-slim
 
-# Install pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# Install pnpm + procps (PM2 needs `ps` command)
+RUN corepack enable && corepack prepare pnpm@latest --activate && \
+    apt-get update && apt-get install -y --no-install-recommends procps && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -33,7 +35,9 @@ USER app
 
 # PM2 needs a writable home dir for pid/config files
 ENV PM2_HOME=/app/.pm2
+# Set HOME so npm/npx don't write to /nonexistent
+ENV HOME=/app
 
 # PM2-runtime keeps the process in foreground (Docker-compatible)
-# Runs both crypto-bot and gold-f2f-bot from ecosystem.config.cjs
-CMD ["npx", "pm2-runtime", "ecosystem.config.cjs"]
+# Use direct binary path — npx misinterprets the config file as a package name
+CMD ["./node_modules/.bin/pm2-runtime", "ecosystem.config.cjs"]
