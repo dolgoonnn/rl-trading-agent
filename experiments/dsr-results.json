@@ -1,43 +1,45 @@
 {
   "trialCounting": {
     "singleParamExperiments": 190,
-    "cmaes3SymRuns": 18,
+    "cmaes3SymRuns": 20,
     "cmaesBroadRuns": 4,
-    "totalIndependent": 212
+    "forexRuns": 4,
+    "goldRuns": 20,
+    "totalIndependent": 238
   },
-  "numTrialsUsed": 212,
+  "numTrialsUsed": 238,
   "results": [
     {
-      "config": "3sym (Run 18)",
-      "originalSharpe": 7.6645013278319665,
-      "deflatedSharpe": 6.768616873797131,
-      "haircut": 0.8958844540348354,
-      "numTrials": 212,
-      "numTrades": 701,
-      "skewness": 0.1931753084166227,
-      "kurtosis": 2.608712616462612,
+      "config": "3sym (Run 20)",
+      "originalSharpe": 8.772073619351088,
+      "deflatedSharpe": 7.577978644925395,
+      "haircut": 1.1940949744256935,
+      "numTrials": 238,
+      "numTrades": 555,
+      "skewness": 0.611826495858526,
+      "kurtosis": 2.9856276851319072,
       "isSignificant": true,
       "minBacktestLength": 6,
-      "actualObservations": 701,
+      "actualObservations": 555,
       "mblPass": true,
-      "minSignificantSharpe": 0.13661859547680905,
-      "passRate": 0.7684210526315789
+      "minSignificantSharpe": 0.15540007994644275,
+      "passRate": 0.6565656565656566
     },
     {
       "config": "7sym (Broad Run 4)",
-      "originalSharpe": 3.7303356014960856,
-      "deflatedSharpe": 3.4078780100059927,
-      "haircut": 0.3224575914900927,
-      "numTrials": 212,
-      "numTrades": 1687,
-      "skewness": 0.5706303146350179,
-      "kurtosis": 4.031019789179989,
+      "originalSharpe": 2.420547139285336,
+      "deflatedSharpe": 2.2091150317706902,
+      "haircut": 0.21143210751464583,
+      "numTrials": 238,
+      "numTrades": 1699,
+      "skewness": 0.5819014447059219,
+      "kurtosis": 4.016631554260007,
       "isSignificant": true,
-      "minBacktestLength": 7,
-      "actualObservations": 1687,
+      "minBacktestLength": 8,
+      "actualObservations": 1699,
       "mblPass": true,
-      "minSignificantSharpe": 0.09297591370468078,
-      "passRate": 0.6517857142857143
+      "minSignificantSharpe": 0.09364207748199818,
+      "passRate": 0.49130434782608695
     }
   ],
   "allPass": true

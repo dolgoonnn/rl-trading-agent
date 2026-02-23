@@ -52,9 +52,11 @@ import {
  */
 const TRIAL_COUNTS = {
   singleParamExperiments: 190,  // ~190 documented single-parameter experiments
-  cmaes3SymRuns: 18,             // Runs 1-18 (each run = 1 trial)
+  cmaes3SymRuns: 20,             // Runs 1-20 (each run = 1 trial)
   cmaesBroadRuns: 4,             // Broad Runs 1-4
-  totalIndependent: 212,         // Sum of above
+  forexRuns: 4,                  // Forex Runs 1-4
+  goldRuns: 20,                  // Gold runs
+  totalIndependent: 238,         // Sum of above (190+20+4+4+20)
 } as const;
 
 // ============================================
@@ -62,34 +64,34 @@ const TRIAL_COUNTS = {
 // ============================================
 
 const CONFIG_3SYM = {
-  name: '3sym (Run 18)',
+  name: '3sym (Run 20)',
   symbols: ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'] as string[],
-  threshold: 4.672,
-  atrExtension: 4.10,
-  halfLife: 18,
-  cooldown: 8,
-  maxBars: 108,
-  partialFraction: 0.55,
-  partialTriggerR: 0.84,
-  partialBeBuffer: 0.05,
+  threshold: 4.048,
+  atrExtension: 5.79,
+  halfLife: 12,
+  cooldown: 7,
+  maxBars: 160,
+  partialFraction: 0.50,
+  partialTriggerR: 1.41,
+  partialBeBuffer: 0.20,
   suppress: ['ranging+normal', 'ranging+high', 'downtrend+high'] as string[],
   regimeThresholds: {
-    'uptrend+high': 2.86,
-    'uptrend+normal': 6.17,
-    'uptrend+low': 3.13,
-    'downtrend+normal': 4.33,
-    'downtrend+low': 4.48,
+    'uptrend+high': 3.14,
+    'uptrend+normal': 5.74,
+    'uptrend+low': 5.49,
+    'downtrend+normal': 4.38,
+    'downtrend+low': 6.50,
   } as Record<string, number>,
   weights: {
-    structureAlignment: 2.660,
-    killZoneActive: 0.814,
-    liquiditySweep: 1.733,
-    obProximity: 1.103,
-    fvgAtCE: 1.554,
-    recentBOS: 1.255,
-    rrRatio: 0.627,
-    oteZone: 0.787,
-    obFvgConfluence: 1.352,
+    structureAlignment: 0.1928,
+    killZoneActive: 1.2658,
+    liquiditySweep: 1.4896,
+    obProximity: 2.7262,
+    fvgAtCE: 2.3162,
+    recentBOS: 2.2229,
+    rrRatio: 0.5567,
+    oteZone: 1.0621,
+    obFvgConfluence: 1.0892,
     momentumConfirmation: 0,
   } as Partial<ConfluenceWeights>,
 };

@@ -16,7 +16,7 @@ import {
   PRODUCTION_STRATEGY_CONFIG,
 } from '@/lib/rl/strategies/confluence-scorer';
 import { regimeLabel } from '@/lib/ict/regime-detector';
-import { RUN18_STRATEGY_CONFIG } from './config';
+import { RUN20_STRATEGY_CONFIG } from './config';
 
 export interface SignalResult {
   /** Whether a trade signal was produced */
@@ -38,7 +38,7 @@ export class SignalEngine {
 
   /**
    * Create a signal engine.
-   * @param defaultConfig Default strategy config (defaults to RUN18_STRATEGY_CONFIG)
+   * @param defaultConfig Default strategy config (defaults to RUN20_STRATEGY_CONFIG)
    */
   constructor(defaultConfig?: StrategyConfig) {
     if (defaultConfig) {
@@ -104,7 +104,7 @@ export class SignalEngine {
     if (!scorer) {
       const config = this.configOverrides.get(symbol)
         ?? this.configOverrides.get('__default__')
-        ?? RUN18_STRATEGY_CONFIG;
+        ?? RUN20_STRATEGY_CONFIG;
 
       scorer = new ConfluenceScorer({
         weights: config.weights as unknown as ConfluenceWeights,

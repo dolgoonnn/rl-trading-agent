@@ -13,7 +13,7 @@ export { LimitOrderExecutor, DEFAULT_LIMIT_ORDER_CONFIG } from './limit-order-ex
 export type { PendingLimitOrder, LimitOrderConfig } from './limit-order-executor';
 export {
   DEFAULT_BOT_CONFIG,
-  RUN18_STRATEGY_CONFIG,
+  RUN20_STRATEGY_CONFIG,
   DEFAULT_CIRCUIT_BREAKERS,
   DEFAULT_RISK_CONFIG,
   DEFAULT_LTF_CONFIG,

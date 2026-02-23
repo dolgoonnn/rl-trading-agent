@@ -95,20 +95,20 @@ function buildParamSpecs(strategy: string = 'ob'): ParamSpec[] {
     type: 'hyperparameter',
   });
 
-  // OB freshness half-life [5, 30]
+  // OB freshness half-life [2, 30]
   specs.push({
     name: 'obFreshnessHalfLife',
-    min: 5,
+    min: 2,
     max: 30,
     initial: 15,
     type: 'hyperparameter',
   });
 
-  // ATR extension bands [1.5, 5.0]
+  // ATR extension bands [1.5, 7.0]
   specs.push({
     name: 'atrExtensionBands',
     min: 1.5,
-    max: 5.0,
+    max: 7.0,
     initial: 3.0,
     type: 'hyperparameter',
   });
@@ -140,11 +140,11 @@ function buildParamSpecs(strategy: string = 'ob'): ParamSpec[] {
     type: 'hyperparameter',
   });
 
-  // Max position holding bars [50, 150]
+  // Max position holding bars [50, 250]
   specs.push({
     name: 'maxBars',
     min: 50,
-    max: 150,
+    max: 250,
     initial: 100,
     type: 'hyperparameter',
   });

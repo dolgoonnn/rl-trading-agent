@@ -1,0 +1,22 @@
+{
+  "symbols": [
+    "BTCUSDT",
+    "ETHUSDT",
+    "SOLUSDT"
+  ],
+  "variants": [
+    "prod",
+    "thresh-3.5",
+    "thresh-4.5",
+    "atr-4.5",
+    "atr-6.5",
+    "no-regime-thresh",
+    "no-suppress",
+    "2-suppress"
+  ],
+  "pbo": 0.21,
+  "numCombinations": 2000,
+  "numOverfit": 420,
+  "avgLogitOOS": -2.106317716497586,
+  "passes": true
+}

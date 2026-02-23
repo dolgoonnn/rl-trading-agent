@@ -247,8 +247,8 @@ function scan1HSignals(candles1h: Candle[]): Array<{
 
   // Use the SignalEngine from the bot
   const { SignalEngine } = require('../src/lib/bot/signal-engine');
-  const { RUN18_STRATEGY_CONFIG } = require('../src/lib/bot/config');
-  const engine = new SignalEngine(RUN18_STRATEGY_CONFIG);
+  const { RUN20_STRATEGY_CONFIG } = require('../src/lib/bot/config');
+  const engine = new SignalEngine(RUN20_STRATEGY_CONFIG);
 
   const minHistory = 200;
   for (let i = minHistory; i < candles1h.length; i++) {
