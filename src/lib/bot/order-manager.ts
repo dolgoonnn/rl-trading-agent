@@ -28,16 +28,13 @@ import { SYMBOL_ALLOCATION } from './config';
 export class OrderManager {
   private mode: BotMode;
   private defaultConfig: StrategyConfig;
-  private paperSlippage: number;
 
   constructor(
     mode: BotMode,
     defaultConfig: StrategyConfig,
-    paperSlippage = 0.001,
   ) {
     this.mode = mode;
     this.defaultConfig = defaultConfig;
-    this.paperSlippage = paperSlippage;
   }
 
   /** Get the strategy config (single config path for crypto-only) */
@@ -89,6 +86,7 @@ export class OrderManager {
       status: 'open',
 
       entryPrice: adjustedEntry,
+      rawEntryPrice: entryPrice, // Pre-friction price for riskDistance/unrealizedR (matches backtest)
       entryTimestamp: Date.now(),
       entryBarIndex: barIndex,
 
@@ -151,6 +149,7 @@ export class OrderManager {
       status: 'open',
 
       entryPrice: adjustedEntry,
+      rawEntryPrice: ltfEntry, // Pre-friction LTF price for riskDistance/unrealizedR (matches backtest)
       entryTimestamp: Date.now(),
       entryBarIndex: barIndex,
 
@@ -177,15 +176,19 @@ export class OrderManager {
    * Check if a position should be exited on the current candle.
    * Mirrors the backtest partial TP logic exactly.
    *
+   * @param position The open position to check
+   * @param candle Current candle data
+   * @param currentBarIndex Current index into the candle array (matches backtest index-based counting)
    * @returns Updated position (with exit info) or null if still open
    */
   checkPositionExit(
     position: BotPosition,
     candle: Candle,
+    currentBarIndex: number,
   ): { position: BotPosition; exitReason: ExitReason } | null {
     const config = this.getConfig(position.symbol);
-    // Compute barsHeld from timestamps — robust to sliding windows and restarts
-    const barsHeld = Math.round((candle.timestamp - position.entryTimestamp) / (60 * 60 * 1000));
+    // Index-based barsHeld — matches backtest exactly (i - position.entryIndex)
+    const barsHeld = currentBarIndex - position.entryBarIndex;
     const direction = position.direction;
     const currentSL = position.currentSL;
 
@@ -207,14 +210,17 @@ export class OrderManager {
 
     // 3. Partial TP check (if configured and not yet taken)
     if (config.exitMode === 'partial_tp' && !position.partialTaken) {
+      // Use rawEntryPrice for riskDistance/unrealizedR — matches backtest which uses
+      // position.entryPrice (raw signal price) not adjustedEntry for these calculations
+      const rawEntry = position.rawEntryPrice;
       const riskDistance = direction === 'long'
-        ? position.entryPrice - position.stopLoss
-        : position.stopLoss - position.entryPrice;
+        ? rawEntry - position.stopLoss
+        : position.stopLoss - rawEntry;
 
       if (riskDistance > 0) {
         const unrealizedR = direction === 'long'
-          ? (candle.close - position.entryPrice) / riskDistance
-          : (position.entryPrice - candle.close) / riskDistance;
+          ? (candle.close - rawEntry) / riskDistance
+          : (rawEntry - candle.close) / riskDistance;
 
         if (unrealizedR >= config.partialTP.triggerR) {
           // Take partial — simulate exit for the fraction

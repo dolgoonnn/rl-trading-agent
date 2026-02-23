@@ -11,6 +11,8 @@ import type {
   BotConfig,
   StrategyConfig,
   CircuitBreakerConfig,
+  DrawdownTier,
+  RiskConfig,
   LTFConfig,
 } from '@/types/bot';
 import type { FundingArbConfig } from '@/types/funding-arb';
@@ -28,8 +30,6 @@ export const DEFAULT_BOT_CONFIG: BotConfig = {
   riskPerTrade: 0.003, // 0.3% risk per trade (MC-informed)
   maxPositions: 3, // One per symbol
   pollDelaySeconds: 5, // 5s after hour close
-  paperSlippage: 0.001, // 0.1% slippage simulation
-  commissionPerSide: 0.00055, // Bybit taker: 0.055%
   verbose: false,
 };
 
@@ -86,6 +86,41 @@ export const DEFAULT_CIRCUIT_BREAKERS: CircuitBreakerConfig = {
   maxDrawdown: 0.15, // -15% from peak (at target sizing)
   maxConsecutiveLosses: 5,
   maxSystemErrorsPerHour: 3,
+};
+
+// ============================================
+// Drawdown Tiers — Graduated Position Sizing
+// ============================================
+
+export const DEFAULT_DRAWDOWN_TIERS: DrawdownTier[] = [
+  { maxDrawdown: 0.10, sizeMultiplier: 1.0,  label: 'normal' },
+  { maxDrawdown: 0.20, sizeMultiplier: 0.50, label: 'caution' },
+  { maxDrawdown: 0.30, sizeMultiplier: 0.25, label: 'defensive' },
+  { maxDrawdown: Infinity, sizeMultiplier: 0, label: 'halt' },
+];
+
+// ============================================
+// Regime-Aware Position Size Multipliers
+// ============================================
+
+export const DEFAULT_REGIME_SIZE_MULTIPLIERS: Record<string, number> = {
+  'uptrend+normal': 1.0,
+  'uptrend+low': 0.8,
+  'uptrend+high': 0.6,
+  'downtrend+normal': 0.5,
+  'downtrend+low': 0.5,
+  // Ranging and downtrend+high already suppressed (0 trades)
+};
+
+// ============================================
+// Combined Risk Config
+// ============================================
+
+export const DEFAULT_RISK_CONFIG: RiskConfig = {
+  circuitBreakers: DEFAULT_CIRCUIT_BREAKERS,
+  drawdownTiers: DEFAULT_DRAWDOWN_TIERS,
+  maxPositions: 3,
+  regimeSizeMultipliers: DEFAULT_REGIME_SIZE_MULTIPLIERS,
 };
 
 // ============================================

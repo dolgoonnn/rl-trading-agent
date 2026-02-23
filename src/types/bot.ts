@@ -38,10 +38,6 @@ export interface BotConfig {
   maxPositions: number;
   /** Polling delay after hour close in seconds */
   pollDelaySeconds: number;
-  /** Paper trading slippage simulation (fraction, e.g. 0.001 = 0.1%) */
-  paperSlippage: number;
-  /** Commission per side as fraction (e.g. 0.00055 for taker) */
-  commissionPerSide: number;
   /** Telegram bot token (optional) */
   telegramBotToken?: string;
   /** Telegram chat ID for alerts (optional) */
@@ -127,7 +123,8 @@ export interface BotPosition {
   status: PositionStatus;
 
   // Entry
-  entryPrice: number;
+  entryPrice: number; // Friction-adjusted entry price (used for PnL, BE buffer)
+  rawEntryPrice: number; // Raw signal price before friction (used for riskDistance, unrealizedR)
   entryTimestamp: number;
   entryBarIndex: number;
 
@@ -248,6 +245,28 @@ export interface CircuitBreakerState {
   triggeredAt: number;
   resumeAt: number;
   reason: string;
+}
+
+/** Drawdown tier — graduated position sizing based on drawdown depth */
+export interface DrawdownTier {
+  /** Drawdown threshold (fraction, e.g. 0.10 = 10%) */
+  maxDrawdown: number;
+  /** Position size multiplier (1.0 = full, 0.5 = half, 0 = halt) */
+  sizeMultiplier: number;
+  /** Human-readable label */
+  label: string;
+}
+
+/** Risk management configuration */
+export interface RiskConfig {
+  /** Circuit breaker config */
+  circuitBreakers: CircuitBreakerConfig;
+  /** Drawdown tiers (must be sorted ascending by maxDrawdown) */
+  drawdownTiers: DrawdownTier[];
+  /** Max concurrent positions */
+  maxPositions: number;
+  /** Regime-based position size multipliers */
+  regimeSizeMultipliers: Record<string, number>;
 }
 
 // ============================================

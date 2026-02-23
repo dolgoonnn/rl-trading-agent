@@ -15,6 +15,7 @@
  *   npx tsx scripts/replay-bot.ts --delay 0 --verbose      # Max speed + logs
  *   npx tsx scripts/replay-bot.ts --start-date 2024-06-01  # Start from a date
  *   npx tsx scripts/replay-bot.ts --fresh                  # Reset bot DB tables first
+ *   npx tsx scripts/replay-bot.ts --compare                # Compare bot vs backtest sim bar-by-bar
  */
 
 import fs from 'fs';
@@ -65,6 +66,7 @@ interface ReplayConfig {
   verbose: boolean;
   startDate: number | null; // epoch ms
   fresh: boolean;
+  compare: boolean; // Run backtest sim in parallel and compare divergences
 }
 
 function parseArgs(): ReplayConfig {
@@ -77,6 +79,7 @@ function parseArgs(): ReplayConfig {
     verbose: false,
     startDate: null,
     fresh: false,
+    compare: false,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -103,6 +106,9 @@ function parseArgs(): ReplayConfig {
       }
       case '--fresh':
         config.fresh = true;
+        break;
+      case '--compare':
+        config.compare = true;
         break;
     }
   }
@@ -131,6 +137,154 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// ============================================
+// Backtest Simulation (for --compare mode)
+// ============================================
+
+/** Mirrors backtest-confluence.ts friction functions exactly */
+function btApplyEntryFriction(price: number, direction: 'long' | 'short'): number {
+  const friction = RUN18_STRATEGY_CONFIG.frictionPerSide;
+  return direction === 'long' ? price * (1 + friction) : price * (1 - friction);
+}
+
+function btApplyExitFriction(price: number, direction: 'long' | 'short'): number {
+  const friction = RUN18_STRATEGY_CONFIG.frictionPerSide;
+  return direction === 'long' ? price * (1 - friction) : price * (1 + friction);
+}
+
+function btCalcPnl(adjustedEntry: number, adjustedExit: number, direction: 'long' | 'short'): number {
+  return direction === 'long'
+    ? (adjustedExit - adjustedEntry) / adjustedEntry
+    : (adjustedEntry - adjustedExit) / adjustedEntry;
+}
+
+interface BacktestTradeResult {
+  exitBarIndex: number;
+  exitReason: string;
+  pnlPercent: number;
+  partialTriggerBar: number | null;
+}
+
+/**
+ * Run the backtest's simulatePositionPartialTP logic inline.
+ * Uses position.entryPrice (raw signal price) for riskDistance/unrealizedR,
+ * and adjustedEntry for PnL and BE buffer — exactly matching the backtest.
+ */
+function simulateBacktestPartialTP(
+  rawEntry: number,
+  stopLoss: number,
+  takeProfit: number,
+  direction: 'long' | 'short',
+  entryIndex: number,
+  candles: Candle[],
+  maxBars: number,
+): BacktestTradeResult {
+  const adjustedEntry = btApplyEntryFriction(rawEntry, direction);
+  let currentSL = stopLoss;
+  const partialConfig = RUN18_STRATEGY_CONFIG.partialTP;
+
+  const riskDistance = direction === 'long'
+    ? rawEntry - stopLoss
+    : stopLoss - rawEntry;
+  let partialTaken = false;
+  let partialPnl = 0;
+  let partialTriggerBar: number | null = null;
+
+  for (let i = entryIndex + 1; i < candles.length; i++) {
+    const candle = candles[i]!;
+    const barsHeld = i - entryIndex;
+
+    // Check SL
+    if (direction === 'long' && candle.low <= currentSL) {
+      const adjustedExit = btApplyExitFriction(currentSL, direction);
+      const exitPnl = btCalcPnl(adjustedEntry, adjustedExit, direction);
+      const finalPnl = partialTaken
+        ? partialConfig.fraction * partialPnl + (1 - partialConfig.fraction) * exitPnl
+        : exitPnl;
+      return { exitBarIndex: i, exitReason: 'stop_loss', pnlPercent: finalPnl, partialTriggerBar };
+    }
+    if (direction === 'short' && candle.high >= currentSL) {
+      const adjustedExit = btApplyExitFriction(currentSL, direction);
+      const exitPnl = btCalcPnl(adjustedEntry, adjustedExit, direction);
+      const finalPnl = partialTaken
+        ? partialConfig.fraction * partialPnl + (1 - partialConfig.fraction) * exitPnl
+        : exitPnl;
+      return { exitBarIndex: i, exitReason: 'stop_loss', pnlPercent: finalPnl, partialTriggerBar };
+    }
+
+    // Check TP
+    if (direction === 'long' && candle.high >= takeProfit) {
+      const adjustedExit = btApplyExitFriction(takeProfit, direction);
+      const exitPnl = btCalcPnl(adjustedEntry, adjustedExit, direction);
+      const finalPnl = partialTaken
+        ? partialConfig.fraction * partialPnl + (1 - partialConfig.fraction) * exitPnl
+        : exitPnl;
+      return { exitBarIndex: i, exitReason: 'take_profit', pnlPercent: finalPnl, partialTriggerBar };
+    }
+    if (direction === 'short' && candle.low <= takeProfit) {
+      const adjustedExit = btApplyExitFriction(takeProfit, direction);
+      const exitPnl = btCalcPnl(adjustedEntry, adjustedExit, direction);
+      const finalPnl = partialTaken
+        ? partialConfig.fraction * partialPnl + (1 - partialConfig.fraction) * exitPnl
+        : exitPnl;
+      return { exitBarIndex: i, exitReason: 'take_profit', pnlPercent: finalPnl, partialTriggerBar };
+    }
+
+    // Partial TP check
+    if (!partialTaken && riskDistance > 0) {
+      const unrealizedR = direction === 'long'
+        ? (candle.close - rawEntry) / riskDistance
+        : (rawEntry - candle.close) / riskDistance;
+
+      if (unrealizedR >= partialConfig.triggerR) {
+        partialTaken = true;
+        partialTriggerBar = i;
+        const partialExit = btApplyExitFriction(candle.close, direction);
+        partialPnl = btCalcPnl(adjustedEntry, partialExit, direction);
+
+        if (partialConfig.beBuffer >= 0) {
+          const buffer = riskDistance * partialConfig.beBuffer;
+          if (direction === 'long') {
+            currentSL = Math.max(currentSL, adjustedEntry + buffer);
+          } else {
+            currentSL = Math.min(currentSL, adjustedEntry - buffer);
+          }
+        }
+      }
+    }
+
+    // Max bars
+    if (barsHeld >= maxBars) {
+      const adjustedExit = btApplyExitFriction(candle.close, direction);
+      const exitPnl = btCalcPnl(adjustedEntry, adjustedExit, direction);
+      const finalPnl = partialTaken
+        ? partialConfig.fraction * partialPnl + (1 - partialConfig.fraction) * exitPnl
+        : exitPnl;
+      return { exitBarIndex: i, exitReason: 'max_bars', pnlPercent: finalPnl, partialTriggerBar };
+    }
+  }
+
+  // End of data — close at last candle
+  const lastIdx = candles.length - 1;
+  const lastCandle = candles[lastIdx]!;
+  const adjustedExit = btApplyExitFriction(lastCandle.close, direction);
+  const exitPnl = btCalcPnl(adjustedEntry, adjustedExit, direction);
+  const finalPnl = partialTaken
+    ? partialConfig.fraction * partialPnl + (1 - partialConfig.fraction) * exitPnl
+    : exitPnl;
+  return { exitBarIndex: lastIdx, exitReason: 'end_of_data', pnlPercent: finalPnl, partialTriggerBar };
+}
+
+/** A single divergence record between bot and backtest */
+interface Divergence {
+  tradeNum: number;
+  symbol: string;
+  entryBar: number;
+  field: string;
+  botValue: string;
+  backtestValue: string;
+}
+
 interface ReplayStats {
   symbol: string;
   totalCandles: number;
@@ -146,17 +300,19 @@ interface ReplayStats {
 async function runReplay(config: ReplayConfig): Promise<void> {
   // Initialize bot components
   const signalEngine = new SignalEngine(RUN18_STRATEGY_CONFIG);
-  const orderManager = new OrderManager('paper', RUN18_STRATEGY_CONFIG, 0.001);
+  const orderManager = new OrderManager('paper', RUN18_STRATEGY_CONFIG);
   const tracker = new PositionTracker(config.capital);
   // Circuit breakers are DISABLED in replay mode. They use Date.now() for
   // time-based expiry which is wall-clock time — in fast-forward mode, a
   // 48-hour consecutive-loss breaker would never expire (the replay finishes
   // in seconds). The backtest also has no circuit breakers, so disabling
   // them here ensures replay ↔ backtest parity.
-  const riskEngine = new RiskEngine(
-    { dailyLossLimit: 1, weeklyLossLimit: 1, maxDrawdown: 1, maxConsecutiveLosses: 999, maxSystemErrorsPerHour: 999 },
-    config.symbols.length,
-  );
+  const riskEngine = new RiskEngine({
+    circuitBreakers: { dailyLossLimit: 1, weeklyLossLimit: 1, maxDrawdown: 1, maxConsecutiveLosses: 999, maxSystemErrorsPerHour: 999 },
+    drawdownTiers: [{ maxDrawdown: Infinity, sizeMultiplier: 1.0, label: 'disabled' }],
+    maxPositions: config.symbols.length,
+    regimeSizeMultipliers: {},
+  });
   // AlertManager omitted in replay — all output goes to console directly
 
   // Load all candle data upfront
@@ -235,7 +391,18 @@ async function runReplay(config: ReplayConfig): Promise<void> {
   } else {
     console.log('  Speed: MAX (no delay)');
   }
+  if (config.compare) {
+    console.log('  Mode: COMPARE (bot vs backtest simulation)');
+  }
   console.log('');
+
+  // --compare tracking
+  const pendingBTResults = new Map<string, BacktestTradeResult>(); // positionId → expected result
+  const pendingBTMeta = new Map<string, { symbol: string; entryBar: number; direction: string }>(); // positionId → metadata
+  const divergences: Divergence[] = [];
+  let tradeNum = 0;
+  // Track bot partial TP bar per position
+  const botPartialTriggerBars = new Map<string, number>(); // positionId → bar index
 
   // Main replay loop
   for (const event of processableEvents) {
@@ -254,10 +421,14 @@ async function runReplay(config: ReplayConfig): Promise<void> {
     const openPos = tracker.getOpenPositions().find((p) => p.symbol === symbol);
     if (openPos) {
       const wasPT = openPos.partialTaken;
-      const exitResult = orderManager.checkPositionExit(openPos, candle);
+      const exitResult = orderManager.checkPositionExit(openPos, candle, barIndex);
 
       if (!wasPT && openPos.partialTaken) {
         tracker.updatePosition(openPos);
+        // Track partial TP bar for comparison
+        if (config.compare) {
+          botPartialTriggerBars.set(openPos.id, barIndex);
+        }
         if (config.verbose) {
           console.log(`  ${symbol}: Partial TP taken, SL → $${openPos.currentSL.toFixed(2)}`);
         }
@@ -283,6 +454,61 @@ async function runReplay(config: ReplayConfig): Promise<void> {
         const pnlStr = pnlUSDT >= 0 ? '+' : '';
         if (config.verbose) {
           console.log(`  ${closedPos.symbol}: CLOSED ${closedPos.direction.toUpperCase()} — ${closedPos.exitReason} — PnL: ${pnlStr}$${pnlUSDT.toFixed(2)} (${pnlStr}${(pnl * 100).toFixed(2)}%) [${new Date(candle.timestamp).toISOString().slice(0, 16)}]`);
+        }
+
+        // --compare: check against backtest result
+        if (config.compare && pendingBTResults.has(closedPos.id)) {
+          tradeNum++;
+          const bt = pendingBTResults.get(closedPos.id)!;
+          const meta = pendingBTMeta.get(closedPos.id)!;
+          const botPTBar = botPartialTriggerBars.get(closedPos.id) ?? null;
+
+          // Compare exit bar
+          const botExitBar = barIndex;
+          if (botExitBar !== bt.exitBarIndex) {
+            divergences.push({
+              tradeNum, symbol: meta.symbol, entryBar: meta.entryBar,
+              field: 'exitBar',
+              botValue: String(botExitBar),
+              backtestValue: String(bt.exitBarIndex),
+            });
+          }
+
+          // Compare exit reason
+          const botReason = closedPos.exitReason ?? 'unknown';
+          if (botReason !== bt.exitReason) {
+            divergences.push({
+              tradeNum, symbol: meta.symbol, entryBar: meta.entryBar,
+              field: 'exitReason',
+              botValue: botReason,
+              backtestValue: bt.exitReason,
+            });
+          }
+
+          // Compare PnL (within 0.001% tolerance for float precision)
+          const pnlDiff = Math.abs(pnl - bt.pnlPercent);
+          if (pnlDiff > 0.00001) {
+            divergences.push({
+              tradeNum, symbol: meta.symbol, entryBar: meta.entryBar,
+              field: 'pnlPercent',
+              botValue: (pnl * 100).toFixed(4) + '%',
+              backtestValue: (bt.pnlPercent * 100).toFixed(4) + '%',
+            });
+          }
+
+          // Compare partial TP trigger bar
+          if (botPTBar !== bt.partialTriggerBar) {
+            divergences.push({
+              tradeNum, symbol: meta.symbol, entryBar: meta.entryBar,
+              field: 'partialTriggerBar',
+              botValue: String(botPTBar),
+              backtestValue: String(bt.partialTriggerBar),
+            });
+          }
+
+          pendingBTResults.delete(closedPos.id);
+          pendingBTMeta.delete(closedPos.id);
+          botPartialTriggerBars.delete(closedPos.id);
         }
 
         // Evaluate circuit breakers
@@ -312,6 +538,22 @@ async function runReplay(config: ReplayConfig): Promise<void> {
             position.regime = result.regime;
             position.entryTimestamp = candle.timestamp; // Use candle time for replay (not Date.now())
             tracker.addPosition(position);
+
+            // --compare: run backtest simulation for this trade
+            if (config.compare) {
+              const sig = result.signal.signal;
+              const btResult = simulateBacktestPartialTP(
+                sig.entryPrice,  // Raw signal price (pre-friction)
+                sig.stopLoss,
+                sig.takeProfit,
+                sig.direction,
+                barIndex,
+                candles,
+                RUN18_STRATEGY_CONFIG.maxBars,
+              );
+              pendingBTResults.set(position.id, btResult);
+              pendingBTMeta.set(position.id, { symbol, entryBar: barIndex, direction: sig.direction });
+            }
 
             if (config.verbose) {
               console.log(`  ${symbol}: OPENED ${position.direction.toUpperCase()} @ $${position.entryPrice.toFixed(2)} (score: ${position.confluenceScore.toFixed(2)}, regime: ${position.regime}, strategy: ${position.strategy}) [${new Date(candle.timestamp).toISOString().slice(0, 16)}]`);
@@ -409,6 +651,37 @@ async function runReplay(config: ReplayConfig): Promise<void> {
   }
 
   console.log('\nTrades persisted to bot DB tables. Use `pnpm db:studio` to inspect.');
+
+  // --compare: Print divergence report
+  if (config.compare) {
+    console.log('\n' + '='.repeat(70));
+    console.log('DIVERGENCE REPORT (Bot vs Backtest Simulation)');
+    console.log('='.repeat(70));
+
+    if (divergences.length === 0) {
+      console.log('PERFECT MATCH — Zero divergences across all trades.');
+    } else {
+      console.log(`Found ${divergences.length} divergence(s) across ${tradeNum} trades:\n`);
+      console.log('Trade | Symbol     | Entry Bar | Field             | Bot Value        | Backtest Value');
+      console.log('-'.repeat(95));
+      for (const d of divergences) {
+        console.log(
+          `${String(d.tradeNum).padStart(5)} | ${d.symbol.padEnd(10)} | ${String(d.entryBar).padStart(9)} | ${d.field.padEnd(17)} | ${d.botValue.padEnd(16)} | ${d.backtestValue}`
+        );
+      }
+
+      // Summary by field
+      const fieldCounts = new Map<string, number>();
+      for (const d of divergences) {
+        fieldCounts.set(d.field, (fieldCounts.get(d.field) ?? 0) + 1);
+      }
+      console.log('\nDivergence Summary:');
+      for (const [field, count] of fieldCounts) {
+        console.log(`  ${field}: ${count} divergence(s)`);
+      }
+    }
+    console.log('');
+  }
 }
 
 // ============================================
@@ -429,6 +702,9 @@ async function main(): Promise<void> {
   console.log(`Delay: ${config.delayMs === 0 ? 'none (max speed)' : `${config.delayMs}ms per candle`}`);
   if (config.startDate) {
     console.log(`Start date: ${new Date(config.startDate).toISOString().slice(0, 10)}`);
+  }
+  if (config.compare) {
+    console.log('Compare: ENABLED (bot vs backtest divergence check)');
   }
 
   if (config.fresh) {

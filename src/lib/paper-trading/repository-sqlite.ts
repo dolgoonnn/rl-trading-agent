@@ -5,7 +5,7 @@
  */
 
 import { db, schema } from '@/lib/data/db';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import type {
   PaperTradingRepository,
   SessionRow,
@@ -89,6 +89,14 @@ export class SqliteRepository implements PaperTradingRepository {
       .select()
       .from(schema.paperTrades)
       .where(eq(schema.paperTrades.sessionId, sessionId));
+    return rows as TradeRow[];
+  }
+
+  async getOpenTradesBySymbol(symbol: string): Promise<TradeRow[]> {
+    const rows = await db
+      .select()
+      .from(schema.paperTrades)
+      .where(and(eq(schema.paperTrades.symbol, symbol), eq(schema.paperTrades.status, 'open')));
     return rows as TradeRow[];
   }
 

@@ -1655,7 +1655,8 @@ async function main(): Promise<void> {
   const minEffArg = getArg('min-efficiency');
   const minTrendArg = getArg('min-trend-strength');
   const suppressRegimeArg = getArg('suppress-regime'); // --suppress-regime ranging+normal,ranging+low
-  const useMTF = hasFlag('mtf');            // --mtf to enable multi-timeframe bias
+  const mtfMultipleArg = getArg('mtf-multiple'); // --mtf-multiple 8 (timeframe multiple for MTF bias)
+  const useMTF = mtfMultipleArg !== undefined || hasFlag('mtf'); // --mtf or --mtf-multiple N
   const frictionArg = getArg('friction');   // --friction 0.0007 for maker mode
   const slModeArg = getArg('sl-mode');     // --sl-mode entry_based|dynamic_rr|ob_based
   const timeframeArg = getArg('timeframe'); // --timeframe 15m|1h (default: 1h)
@@ -1849,8 +1850,9 @@ async function main(): Promise<void> {
     : [];
 
   // Build MTF bias config
+  const mtfMultiple = mtfMultipleArg ? parseInt(mtfMultipleArg, 10) : 4;
   const mtfBias: MTFBiasConfig | undefined = useMTF
-    ? { ...DEFAULT_MTF_BIAS, enabled: true }
+    ? { ...DEFAULT_MTF_BIAS, enabled: true, timeframeMultiple: mtfMultiple }
     : undefined;
 
   // Parse circuit breaker config
@@ -1990,7 +1992,7 @@ async function main(): Promise<void> {
       log(`  Min trend:   ${regimeFilter.minTrendStrength}`);
     }
     log(`Suppress regime: ${suppressedRegimes.length > 0 ? suppressedRegimes.join(', ') : 'none'}`);
-    log(`MTF bias:      ${useMTF ? 'ENABLED (4H)' : 'disabled'}`);
+    log(`MTF bias:      ${useMTF ? `ENABLED (${mtfMultiple}x → ${mtfMultiple}H)` : 'disabled'}`);
     log(`SL mode:       ${slPlacementMode}`);
     log(`Timeframe:     ${timeframe}`);
     log(`Friction:      ${(FRICTION_PER_SIDE * 100).toFixed(3)}% per side (${(FRICTION_PER_SIDE * 2 * 100).toFixed(3)}% RT)`);

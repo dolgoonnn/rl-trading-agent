@@ -25,6 +25,7 @@
  *   --ob-half-life 18                (default: 18)
  *   --max-bars 108                   (default: 108, max position hold)
  *   --cooldown-bars 8                (default: 8, min bars between signals)
+ *   --mtf-multiple 8                (8H multi-timeframe bias filter, default: disabled)
  *   --weights "key:val,key:val"      (override confluence weights)
  *   --regime-threshold "uptrend+high:2.86,uptrend+normal:6.17,..."
  *   --backtest <bars>                 (run on last N bars of saved data)
@@ -62,6 +63,9 @@ import type { LiveCandle } from '../src/lib/paper-trading/types';
 
 /** Default combined friction per side (0.07% = 0.0007) matching production */
 const DEFAULT_FRICTION = 0.0007;
+
+/** 1-hour timeframe in milliseconds (for timestamp-based barsHeld) */
+const TIMEFRAME_MS = 3_600_000;
 
 /** Metrics log interval (every N candles) */
 const METRICS_LOG_INTERVAL = 10;
@@ -143,6 +147,7 @@ interface CLIArgs {
   weights: Record<string, number>;
   regimeThresholds: Record<string, number>;
   noRiskManager: boolean;
+  mtfMultiple: number | null;
 }
 
 // ============================================
@@ -172,6 +177,7 @@ function parseArgs(): CLIArgs {
     weights: { ...PRODUCTION_WEIGHTS },
     regimeThresholds: { ...PRODUCTION_REGIME_THRESHOLDS },
     noRiskManager: false,
+    mtfMultiple: null,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -270,6 +276,9 @@ function parseArgs(): CLIArgs {
         }
         break;
       }
+      case '--mtf-multiple':
+        result.mtfMultiple = parseInt(args[++i] ?? '8', 10);
+        break;
     }
   }
 
@@ -345,6 +354,9 @@ class ConfluencePaperTrader {
       ...(Object.keys(args.weights).length > 0 ? {
         weights: { ...DEFAULT_WEIGHTS, ...args.weights },
       } : {}),
+      ...(args.mtfMultiple ? {
+        mtfBias: { enabled: true, timeframeMultiple: args.mtfMultiple, minHigherTFCandles: 50 },
+      } : {}),
     };
     this.scorer = new ConfluenceScorer(scorerConfig);
 
@@ -413,6 +425,9 @@ class ConfluencePaperTrader {
     await candleManager.initialize();
     console.log(`  [${this.symbol}] Candle buffer: ${candleManager.size()} candles loaded`);
 
+    // Restore open position from DB (survives container restarts)
+    await this.restoreOpenPosition(candleManager);
+
     const ws = new BinanceWebSocket({ symbol: this.symbol, timeframe: '1h' });
 
     ws.on('candleClosed', (liveCandle: LiveCandle) => {
@@ -436,6 +451,85 @@ class ConfluencePaperTrader {
     console.log(`  [${this.symbol}] Connected to Binance WebSocket`);
 
     return { candleManager, ws };
+  }
+
+  // ------------------------------------------
+  // Position Restore (live mode restart recovery)
+  // ------------------------------------------
+
+  private async restoreOpenPosition(candleManager: CandleManager): Promise<void> {
+    const openTrades = await this.repo.getOpenTradesBySymbol(this.symbol);
+    if (openTrades.length === 0) return;
+
+    // Take the most recent open trade
+    const trade = openTrades[openTrades.length - 1]!;
+    const side = trade.side as 'long' | 'short';
+
+    // Reverse friction to get raw entry price
+    const rawEntryPrice = side === 'long'
+      ? trade.entryPrice / (1 + this.friction)
+      : trade.entryPrice / (1 - this.friction);
+
+    // Recompute position size from current equity (conservative base size)
+    const equity = this.perfMonitor.getCurrentEquity();
+    const stopDistance = Math.abs(trade.entryPrice - trade.stopLoss);
+    const sizeResult = this.positionSizer.calculate({
+      equity,
+      atr: stopDistance,
+      price: trade.entryPrice,
+      winRate: 0.5,
+      avgRiskReward: 2.0,
+      currentDrawdown: 0,
+      confidence: trade.entryConfluence ?? 5.0,
+      stopLossDistance: stopDistance,
+    });
+
+    const entryTimestamp = trade.entryTime instanceof Date
+      ? trade.entryTime.getTime()
+      : typeof trade.entryTime === 'string'
+        ? new Date(trade.entryTime).getTime()
+        : trade.entryTime as number;
+
+    const riskDistance = side === 'long'
+      ? trade.entryPrice - trade.stopLoss
+      : trade.stopLoss - trade.entryPrice;
+
+    // Find entryIndex in candle buffer (fallback to 0, only used for display now)
+    const candles = candleManager.getCandles();
+    let entryIndex = 0;
+    for (let i = 0; i < candles.length; i++) {
+      if (candles[i]!.timestamp === entryTimestamp) {
+        entryIndex = i;
+        break;
+      }
+    }
+
+    const barsHeld = Math.floor((Date.now() - entryTimestamp) / TIMEFRAME_MS);
+
+    this.position = {
+      side,
+      entryPrice: trade.entryPrice,
+      rawEntryPrice,
+      stopLoss: trade.stopLoss,
+      takeProfit: trade.takeProfit,
+      size: sizeResult.positionValue,
+      units: sizeResult.units,
+      entryIndex,
+      entryTimestamp,
+      barsHeld,
+      confluenceScore: trade.entryConfluence ?? 0,
+      reasoning: [],
+      tradeId: trade.tradeId,
+      partialTaken: false,
+      partialPnl: 0,
+      originalSL: trade.stopLoss,
+      riskDistance,
+    };
+
+    // Adopt the existing trade ID into this session's counter
+    this.tradeCounter = Math.max(this.tradeCounter, 1);
+
+    console.log(`  [${this.symbol}] RESTORED open ${side.toUpperCase()} @ ${trade.entryPrice.toFixed(2)} (held ${barsHeld}h, SL: ${trade.stopLoss.toFixed(2)}, TP: ${trade.takeProfit.toFixed(2)})`);
   }
 
   // ------------------------------------------
@@ -634,6 +728,12 @@ class ConfluencePaperTrader {
       return;
     }
 
+    // Regime diagnostic logging (MTF bias filter inside scorer replaces direction-aware regime filter)
+    if (result.regime && this.verbose) {
+      const signalDir = result.selectedSignal!.signal.direction;
+      console.log(`  [${this.symbol}] [Regime] ${result.regime.trend}+${result.regime.volatility} | Signal: ${signalDir} | eff=${result.regime.efficiency.toFixed(3)} trendStr=${result.regime.trendStrength.toFixed(3)}`);
+    }
+
     const scored = result.selectedSignal!;
     const signal = scored.signal;
     const candle = candles[currentIndex]!;
@@ -653,6 +753,10 @@ class ConfluencePaperTrader {
       confidence: signal.confidence,
       stopLossDistance: stopDistance,
     });
+
+    if (this.verbose) {
+      console.log(`      Equity: $${equity.toFixed(0)} | SizeFrac: ${(sizeResult.sizeFraction * 100).toFixed(1)}% | NotionalPos: $${sizeResult.positionValue.toFixed(0)} | DollarRisk: $${sizeResult.dollarRisk.toFixed(0)}`);
+    }
 
     // Apply entry friction
     const adjustedEntry = applyEntryFriction(signal.entryPrice, signal.direction, this.friction);
@@ -735,7 +839,9 @@ class ConfluencePaperTrader {
   private checkPositionExit(candle: Candle, currentIndex: number): boolean {
     if (!this.position) return false;
 
-    this.position.barsHeld = currentIndex - this.position.entryIndex;
+    this.position.barsHeld = Math.floor(
+      (candle.timestamp - this.position.entryTimestamp) / TIMEFRAME_MS,
+    );
 
     // Check SL hit (uses current SL, which may have been moved to BE)
     if (this.position.side === 'long') {
@@ -763,6 +869,10 @@ class ConfluencePaperTrader {
       const unrealizedR = this.position.side === 'long'
         ? (candle.close - this.position.rawEntryPrice) / this.position.riskDistance
         : (this.position.rawEntryPrice - candle.close) / this.position.riskDistance;
+
+      if (this.verbose && unrealizedR > 0.5) {
+        console.log(`  [${this.symbol}] Approaching partial TP: ${unrealizedR.toFixed(2)}R (trigger: ${this.partialTp.triggerR}R)`);
+      }
 
       if (unrealizedR >= this.partialTp.triggerR) {
         this.position.partialTaken = true;
@@ -830,7 +940,7 @@ class ConfluencePaperTrader {
     }
 
     const pnlDollar = pnl * pos.size;
-    const barsHeld = exitIndex - pos.entryIndex;
+    const barsHeld = Math.floor((exitTimestamp - pos.entryTimestamp) / TIMEFRAME_MS);
 
     const pnlSign = pnlDollar >= 0 ? '+' : '';
     const emoji = pnlDollar >= 0 ? 'WIN' : 'LOSS';
@@ -934,6 +1044,7 @@ function printHeader(args: CLIArgs, mode: 'LIVE' | 'BACKTEST' | 'SIMULATE', back
   console.log(`  Regime thresholds: ${regimeStr || 'none (use base threshold)'}`);
   console.log(`  Max hold:   ${args.maxBars} bars`);
   console.log(`  Cooldown:   ${args.cooldownBars} bars between signals`);
+  console.log(`  MTF bias:   ${args.mtfMultiple ? `ENABLED (${args.mtfMultiple}x → ${args.mtfMultiple}H)` : 'disabled'}`);
   if (args.noRiskManager) {
     console.log(`  Risk mgmt:  DISABLED (--no-risk-manager)`);
   }

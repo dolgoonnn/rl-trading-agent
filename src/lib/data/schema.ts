@@ -325,6 +325,7 @@ export const botPositions = sqliteTable('bot_positions', {
 
   // Entry
   entryPrice: real('entry_price').notNull(),
+  rawEntryPrice: real('raw_entry_price'), // Pre-friction signal price (nullable for backward compat)
   entryTimestamp: integer('entry_timestamp').notNull(),
   entryBarIndex: integer('entry_bar_index').notNull(),
 

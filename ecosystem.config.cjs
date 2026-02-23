@@ -23,7 +23,7 @@ module.exports = {
     {
       name: 'crypto-bot',
       script: './node_modules/.bin/tsx',
-      args: 'scripts/paper-trade-confluence.ts --symbols BTCUSDT,ETHUSDT,SOLUSDT,LINKUSDT,DOGEUSDT,NEARUSDT,ADAUSDT,APTUSDT,ARBUSDT,MATICUSDT',
+      args: 'scripts/run-bot.ts --symbols BTCUSDT,ETHUSDT,SOLUSDT --resume --verbose',
       cwd: __dirname,
       instances: 1,
       autorestart: true,

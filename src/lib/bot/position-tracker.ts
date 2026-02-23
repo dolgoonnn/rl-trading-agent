@@ -6,7 +6,7 @@
  * via Drizzle ORM for crash recovery.
  */
 
-import { eq } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 import type {
   BotPosition,
   BotTradeRecord,
@@ -114,6 +114,7 @@ export class PositionTracker {
       direction: position.direction,
       status: 'open',
       entryPrice: position.entryPrice,
+      rawEntryPrice: position.rawEntryPrice,
       entryTimestamp: position.entryTimestamp,
       entryBarIndex: position.entryBarIndex,
       stopLoss: position.stopLoss,
@@ -355,8 +356,113 @@ export class PositionTracker {
   }
 
   // ============================================
+  // Kelly Sizing
+  // ============================================
+
+  /**
+   * Compute quarter-Kelly fraction from the last N trades.
+   * Kelly = WR * (avg_win / avg_loss) - (1 - WR)
+   * Returns null if insufficient trades for a meaningful estimate.
+   *
+   * @param windowSize Number of recent trades to use (default 30)
+   * @param kellyFraction Kelly divisor (default 0.25 for quarter-Kelly)
+   * @param floor Minimum risk fraction (default 0.001 = 0.1%)
+   * @param ceiling Maximum risk fraction (default 0.005 = 0.5%)
+   */
+  getKellyRisk(
+    windowSize = 30,
+    kellyFraction = 0.25,
+    floor = 0.001,
+    ceiling = 0.005,
+  ): number | null {
+    const trades = this.getRecentTradePnls(windowSize);
+    if (trades.length < 10) return null; // Need minimum 10 trades for any signal
+
+    const wins = trades.filter((t) => t > 0);
+    const losses = trades.filter((t) => t < 0);
+
+    if (wins.length === 0 || losses.length === 0) return null;
+
+    const winRate = wins.length / trades.length;
+    const avgWin = wins.reduce((s, v) => s + v, 0) / wins.length;
+    const avgLoss = Math.abs(losses.reduce((s, v) => s + v, 0) / losses.length);
+
+    if (avgLoss === 0) return ceiling;
+
+    const kelly = winRate * (avgWin / avgLoss) - (1 - winRate);
+    const quarterKelly = kelly * kellyFraction;
+
+    // Clamp to floor/ceiling
+    return Math.max(floor, Math.min(ceiling, quarterKelly));
+  }
+
+  // ============================================
+  // Rolling Sharpe
+  // ============================================
+
+  /**
+   * Compute rolling Sharpe ratio from equity snapshots.
+   * Uses daily equity returns over the last N days.
+   *
+   * @param windowDays Number of days for rolling window (default 30)
+   * @returns Annualized Sharpe ratio, or null if insufficient data
+   */
+  getRollingSharpe(windowDays = 30): number | null {
+    const cutoff = Date.now() - windowDays * 24 * 3_600_000;
+
+    const snapshots = db.select()
+      .from(botEquitySnapshots)
+      .orderBy(botEquitySnapshots.timestamp)
+      .all()
+      .filter((s) => s.timestamp >= cutoff);
+
+    if (snapshots.length < 7) return null; // Need at least a week of data
+
+    // Compute daily returns from equity snapshots
+    const returns: number[] = [];
+    for (let i = 1; i < snapshots.length; i++) {
+      const prev = snapshots[i - 1]!.equity;
+      const curr = snapshots[i]!.equity;
+      if (prev > 0) {
+        returns.push((curr - prev) / prev);
+      }
+    }
+
+    if (returns.length < 5) return null;
+
+    const mean = returns.reduce((s, r) => s + r, 0) / returns.length;
+    const variance = returns.reduce((s, r) => s + (r - mean) ** 2, 0) / returns.length;
+    const stdDev = Math.sqrt(variance);
+
+    if (stdDev === 0) return mean > 0 ? Infinity : 0;
+
+    // Annualize: assume ~1 snapshot per hour, ~24 per day
+    // Sharpe = mean / stdDev * sqrt(periods_per_year)
+    // With hourly snapshots: sqrt(24 * 365) ≈ sqrt(8760) ≈ 93.6
+    // But if snapshots are daily: sqrt(365) ≈ 19.1
+    // Detect frequency from actual data
+    const avgIntervalMs = (snapshots[snapshots.length - 1]!.timestamp - snapshots[0]!.timestamp) / (snapshots.length - 1);
+    const periodsPerYear = (365 * 24 * 3_600_000) / avgIntervalMs;
+
+    return (mean / stdDev) * Math.sqrt(periodsPerYear);
+  }
+
+  // ============================================
   // Private
   // ============================================
+
+  /**
+   * Get PnL percentages from recent trades (newest first from DB, returned chronological).
+   */
+  private getRecentTradePnls(count: number): number[] {
+    const rows = db.select({ pnlPercent: botTrades.pnlPercent })
+      .from(botTrades)
+      .orderBy(desc(botTrades.createdAt))
+      .limit(count)
+      .all();
+
+    return rows.reverse().map((r) => r.pnlPercent);
+  }
 
   private getInitialCapital(): number {
     // Derived from first equity snapshot or from state start
@@ -376,6 +482,7 @@ export class PositionTracker {
       direction: row.direction as BotPosition['direction'],
       status: row.status as BotPosition['status'],
       entryPrice: row.entryPrice,
+      rawEntryPrice: row.rawEntryPrice ?? row.entryPrice, // Fallback for old rows without rawEntryPrice
       entryTimestamp: row.entryTimestamp,
       entryBarIndex: row.entryBarIndex,
       stopLoss: row.stopLoss,
