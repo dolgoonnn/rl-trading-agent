@@ -7,7 +7,7 @@
 
 import pg from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { pgPaperSessions, pgPaperTrades, CREATE_SESSIONS_SQL, CREATE_TRADES_SQL } from './pg-schema';
 import type {
   PaperTradingRepository,
@@ -120,6 +120,14 @@ export class PgRepository implements PaperTradingRepository {
       .select()
       .from(pgPaperTrades)
       .where(eq(pgPaperTrades.sessionId, sessionId));
+    return rows as TradeRow[];
+  }
+
+  async getOpenTradesBySymbol(symbol: string): Promise<TradeRow[]> {
+    const rows = await this.db
+      .select()
+      .from(pgPaperTrades)
+      .where(and(eq(pgPaperTrades.symbol, symbol), eq(pgPaperTrades.status, 'open')));
     return rows as TradeRow[];
   }
 

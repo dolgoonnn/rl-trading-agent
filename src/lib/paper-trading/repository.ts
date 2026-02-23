@@ -134,6 +134,7 @@ export interface PaperTradingRepository {
   insertTrade(trade: InsertTrade): Promise<void>;
   updateTradeByTradeId(tradeId: string, data: UpdateTrade): Promise<void>;
   getTradesBySessionId(sessionId: string): Promise<TradeRow[]>;
+  getOpenTradesBySymbol(symbol: string): Promise<TradeRow[]>;
 
   close(): Promise<void>;
 }

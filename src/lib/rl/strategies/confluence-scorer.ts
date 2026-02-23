@@ -684,6 +684,7 @@ export class ConfluenceScorer {
         allScored,
         action: 'trade',
         reasoning,
+        regime: this.lastRegime ?? undefined,
       };
     }
 
@@ -697,6 +698,7 @@ export class ConfluenceScorer {
       allScored,
       action: 'wait',
       reasoning,
+      regime: this.lastRegime ?? undefined,
     };
   }
 

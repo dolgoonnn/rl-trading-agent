@@ -31,14 +31,16 @@ import {
   RiskEngine,
   AlertManager,
   FundingArbBot,
+  LimitOrderExecutor,
   DEFAULT_BOT_CONFIG,
   RUN18_STRATEGY_CONFIG,
-  DEFAULT_CIRCUIT_BREAKERS,
+  DEFAULT_RISK_CONFIG,
   DEFAULT_LTF_CONFIG,
   DEFAULT_FUNDING_ARB_CONFIG,
 } from '../src/lib/bot';
 import { LTFConfirmation } from '../src/lib/bot/ltf-confirmation';
 import type { BotConfig, BotSymbol, BotPosition, LTFConfig } from '../src/types/bot';
+import type { Candle } from '../src/types/candle';
 
 // ============================================
 // Parse CLI arguments
@@ -50,6 +52,7 @@ function parseArgs(): {
   ltfEnabled: boolean;
   fundingArbEnabled: boolean;
   arbOnly: boolean;
+  limitOrdersEnabled: boolean;
 } {
   const args = process.argv.slice(2);
   const config = { ...DEFAULT_BOT_CONFIG };
@@ -57,6 +60,7 @@ function parseArgs(): {
   let ltfEnabled = false;
   let fundingArbEnabled = false;
   let arbOnly = false;
+  let limitOrdersEnabled = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -100,10 +104,13 @@ function parseArgs(): {
         arbOnly = true;
         fundingArbEnabled = true;
         break;
+      case '--limit-orders':
+        limitOrdersEnabled = true;
+        break;
     }
   }
 
-  return { config, resume, ltfEnabled, fundingArbEnabled, arbOnly };
+  return { config, resume, ltfEnabled, fundingArbEnabled, arbOnly, limitOrdersEnabled };
 }
 
 // ============================================
@@ -130,12 +137,16 @@ class TradingBot {
   private fundingArbBot: FundingArbBot | null = null;
   private arbOnly: boolean;
 
+  // Limit order execution
+  private limitOrderExecutor: LimitOrderExecutor | null = null;
+
   constructor(
     config: BotConfig,
     resume: boolean,
     ltfEnabled: boolean,
     fundingArbEnabled: boolean,
     arbOnly: boolean,
+    limitOrdersEnabled = false,
   ) {
     this.config = config;
     this.arbOnly = arbOnly;
@@ -146,10 +157,12 @@ class TradingBot {
     this.orderManager = new OrderManager(
       config.mode,
       RUN18_STRATEGY_CONFIG,
-      config.paperSlippage,
     );
     this.tracker = new PositionTracker(config.initialCapital);
-    this.riskEngine = new RiskEngine(DEFAULT_CIRCUIT_BREAKERS, config.maxPositions);
+    this.riskEngine = new RiskEngine({
+      ...DEFAULT_RISK_CONFIG,
+      maxPositions: config.maxPositions,
+    });
     this.alerts = new AlertManager(config.telegramBotToken, config.telegramChatId);
 
     // LTF entry timing (only for crypto, opt-in)
@@ -165,6 +178,22 @@ class TradingBot {
         this.alerts,
         config.verbose,
       );
+    }
+
+    // Limit order execution (requires API keys)
+    if (limitOrdersEnabled) {
+      const apiKey = process.env.BYBIT_API_KEY;
+      const apiSecret = process.env.BYBIT_API_SECRET;
+      if (apiKey && apiSecret) {
+        this.limitOrderExecutor = new LimitOrderExecutor(apiKey, apiSecret, {
+          maxWaitBars: 2,
+          postOnly: true,
+          enabled: true,
+        });
+        console.log('Limit order execution: ENABLED (maker fills)');
+      } else {
+        console.warn('--limit-orders requires BYBIT_API_KEY and BYBIT_API_SECRET env vars');
+      }
     }
 
     // Attempt to resume from saved state
@@ -254,6 +283,11 @@ class TradingBot {
       await this.fundingArbBot.stop();
     }
 
+    // Cancel pending limit orders
+    if (this.limitOrderExecutor) {
+      await this.limitOrderExecutor.cancelAll();
+    }
+
     // Close all open positions on shutdown
     const openPositions = this.tracker.getOpenPositions();
     for (const position of openPositions) {
@@ -303,6 +337,12 @@ class TradingBot {
   }
 
   private async processSymbol(symbol: BotSymbol): Promise<void> {
+    // Process pending limit orders first
+    if (this.limitOrderExecutor?.hasPendingOrder(symbol)) {
+      await this.processLimitOrder(symbol);
+      return;
+    }
+
     // Process pending LTF setups first (polls 5m candles independently)
     if (this.ltfConfirmation && this.ltfConfirmation.hasPendingSetup(symbol)) {
       await this.processLTFSetup(symbol);
@@ -328,7 +368,8 @@ class TradingBot {
     // 1. Check existing open position for this symbol
     const openPos = this.tracker.getOpenPosition(symbol);
     if (openPos) {
-      await this.manageOpenPosition(openPos, latestCandle);
+      // Use candle array length - 1 as currentBarIndex (matches backtest index)
+      await this.manageOpenPosition(openPos, latestCandle, allCandles.length - 1);
       return; // Don't open new position while one is open for this symbol
     }
 
@@ -371,12 +412,65 @@ class TradingBot {
       return;
     }
 
-    // 5. Open position immediately
+    // 5. Apply risk-adjusted position sizing (drawdown tiers + regime + Sharpe)
+    const { multiplier, breakdown } = this.riskEngine.getPositionSizeMultiplier(
+      this.tracker,
+      result.regime,
+    );
+
+    if (multiplier === 0) {
+      if (this.config.verbose) {
+        console.log(`  ${symbol}: signal detected but sizing multiplier is 0 (dd=${breakdown.drawdown}, regime=${breakdown.regime}, sharpe=${breakdown.sharpe})`);
+      }
+      return;
+    }
+
+    // 5b. Correlation-aware exposure scaling
+    const openSymbols = this.tracker.getOpenPositions().map((p) => p.symbol);
+    const candlesBySymbol = new Map<BotSymbol, Candle[]>();
+    candlesBySymbol.set(symbol, allCandles);
+    for (const openSym of openSymbols) {
+      const cached = await this.dataFeed.getCachedCandles(openSym);
+      candlesBySymbol.set(openSym, cached);
+    }
+    const corrMultiplier = this.riskEngine.getCorrelationMultiplier(
+      openSymbols, symbol, candlesBySymbol,
+    );
+
+    // Apply quarter-Kelly if enough trade history, otherwise use base risk
+    const baseRisk = this.riskEngine.getKellyAdjustedRisk(this.tracker, this.config.riskPerTrade);
+    const adjustedRisk = baseRisk * multiplier * corrMultiplier;
+
+    // 6. Open position (limit order or immediate paper fill)
+    if (this.limitOrderExecutor?.isEnabled) {
+      // Place a post-only limit order at candle close price
+      const entryPrice = result.signal.signal.entryPrice;
+      const riskDistance = result.signal.signal.direction === 'long'
+        ? entryPrice - result.signal.signal.stopLoss
+        : result.signal.signal.stopLoss - entryPrice;
+      if (riskDistance <= 0) return;
+
+      const symbolAlloc = 0.33; // Will be refined later
+      const riskAmount = this.tracker.getEquity() * adjustedRisk * symbolAlloc;
+      const qty = (riskAmount / riskDistance).toFixed(4);
+
+      const pending = await this.limitOrderExecutor.placeOrder(
+        result.signal, symbol, qty, entryPrice,
+        result.regime, allCandles.length - 1, adjustedRisk,
+      );
+
+      if (pending) {
+        console.log(`  ${symbol}: LIMIT ORDER placed — ${result.signal.signal.direction.toUpperCase()} @ $${entryPrice.toFixed(2)} (waiting for fill)`);
+      }
+      return;
+    }
+
+    // Paper mode: immediate fill
     const position = this.orderManager.openPosition(
       result.signal,
       symbol,
       this.tracker.getEquity(),
-      this.config.riskPerTrade,
+      adjustedRisk,
       allCandles.length - 1,
     );
 
@@ -399,7 +493,9 @@ class TradingBot {
     );
     await this.alerts.positionOpened(position);
 
-    console.log(`  ${symbol}: OPENED ${position.direction.toUpperCase()} @ $${position.entryPrice.toFixed(2)} (score: ${position.confluenceScore.toFixed(2)}, regime: ${position.regime}, strategy: ${position.strategy})`);
+    const totalMult = multiplier * corrMultiplier;
+    const sizeInfo = totalMult < 1.0 ? ` [size: ${(totalMult * 100).toFixed(0)}%]` : '';
+    console.log(`  ${symbol}: OPENED ${position.direction.toUpperCase()} @ $${position.entryPrice.toFixed(2)} (score: ${position.confluenceScore.toFixed(2)}, regime: ${position.regime}, strategy: ${position.strategy})${sizeInfo}`);
   }
 
   /**
@@ -478,10 +574,11 @@ class TradingBot {
   private async manageOpenPosition(
     position: BotPosition,
     candle: { timestamp: number; open: number; high: number; low: number; close: number; volume: number },
+    currentBarIndex: number,
   ): Promise<void> {
     const wasPT = position.partialTaken;
 
-    const exitResult = this.orderManager.checkPositionExit(position, candle);
+    const exitResult = this.orderManager.checkPositionExit(position, candle, currentBarIndex);
 
     // Check if partial TP was taken (position still open but state changed)
     if (!wasPT && position.partialTaken) {
@@ -507,9 +604,94 @@ class TradingBot {
       console.log(`  CIRCUIT BREAKER: ${cb.type} — ${cb.reason}`);
     }
 
+    // Log rolling performance after each trade
+    if (this.config.verbose) {
+      const sharpe = this.tracker.getRollingSharpe();
+      const kelly = this.tracker.getKellyRisk();
+      const ddTier = this.riskEngine.getDrawdownTier(this.tracker.getDrawdown());
+      const parts: string[] = [];
+      if (sharpe !== null) parts.push(`Sharpe: ${sharpe.toFixed(2)}`);
+      if (kelly !== null) parts.push(`Kelly: ${(kelly * 100).toFixed(2)}%`);
+      parts.push(`DD tier: ${ddTier.label} (${(ddTier.sizeMultiplier * 100).toFixed(0)}%)`);
+      console.log(`  Performance: ${parts.join(', ')}`);
+    }
+
     // Save state after trade close
     this.tracker.saveState();
     this.tracker.recordSnapshot();
+  }
+
+  // ============================================
+  // Limit Order Processing
+  // ============================================
+
+  /**
+   * Check status of a pending limit order and create position if filled.
+   */
+  private async processLimitOrder(symbol: BotSymbol): Promise<void> {
+    if (!this.limitOrderExecutor) return;
+
+    const { allCandles } = await this.dataFeed.processNewCandle(symbol);
+    const currentBarIndex = allCandles.length - 1;
+
+    const result = await this.limitOrderExecutor.checkOrder(symbol, currentBarIndex);
+
+    if (result.status === 'filled' && result.fillPrice) {
+      // Create position from the filled order
+      const position = this.orderManager.openPosition(
+        result.order.signal,
+        symbol,
+        this.tracker.getEquity(),
+        result.order.riskPerTrade,
+        currentBarIndex,
+      );
+
+      if (position) {
+        position.regime = result.order.regime;
+        this.tracker.addPosition(position);
+        await this.alerts.positionOpened(position);
+        console.log(`  ${symbol}: LIMIT FILLED — ${position.direction.toUpperCase()} @ $${result.fillPrice.toFixed(2)} (maker)`);
+      }
+    } else if (result.status === 'expired') {
+      console.log(`  ${symbol}: LIMIT EXPIRED — order cancelled (not filled in ${2} bars)`);
+    }
+    // 'pending' — still waiting, do nothing
+  }
+
+  // ============================================
+  // Performance Monitoring
+  // ============================================
+
+  /**
+   * Check rolling Sharpe ratio and alert if below thresholds.
+   * Called daily at midnight UTC.
+   */
+  private async checkRollingSharpe(): Promise<void> {
+    const sharpe = this.tracker.getRollingSharpe();
+    if (sharpe === null) return; // Not enough data
+
+    const kelly = this.tracker.getKellyRisk();
+    const kellyStr = kelly !== null ? `, Kelly risk: ${(kelly * 100).toFixed(2)}%` : '';
+
+    if (sharpe < 0) {
+      await this.alerts.send({
+        level: 'critical',
+        event: 'circuit_breaker_triggered',
+        message: `Rolling 30d Sharpe is NEGATIVE (${sharpe.toFixed(2)}) — new entries halted${kellyStr}`,
+        timestamp: Date.now(),
+      });
+      console.log(`  SHARPE ALERT: Rolling 30d Sharpe ${sharpe.toFixed(2)} < 0 — entries halted`);
+    } else if (sharpe < 0.5) {
+      await this.alerts.send({
+        level: 'warning',
+        event: 'circuit_breaker_triggered',
+        message: `Rolling 30d Sharpe is LOW (${sharpe.toFixed(2)}) — position sizing reduced 50%${kellyStr}`,
+        timestamp: Date.now(),
+      });
+      console.log(`  SHARPE WARNING: Rolling 30d Sharpe ${sharpe.toFixed(2)} < 0.5 — sizing reduced`);
+    } else if (this.config.verbose) {
+      console.log(`  Rolling 30d Sharpe: ${sharpe.toFixed(2)}${kellyStr}`);
+    }
   }
 
   // ============================================
@@ -534,6 +716,9 @@ class TradingBot {
         if (utcDay === 1) {
           this.tracker.resetWeeklyPnl();
         }
+
+        // Rolling Sharpe check (daily)
+        this.checkRollingSharpe().catch(console.error);
       }
     }, HOUR_MS);
   }
@@ -546,8 +731,8 @@ const HOUR_MS = 3_600_000;
 // ============================================
 
 async function main(): Promise<void> {
-  const { config, resume, ltfEnabled, fundingArbEnabled, arbOnly } = parseArgs();
-  const bot = new TradingBot(config, resume, ltfEnabled, fundingArbEnabled, arbOnly);
+  const { config, resume, ltfEnabled, fundingArbEnabled, arbOnly, limitOrdersEnabled } = parseArgs();
+  const bot = new TradingBot(config, resume, ltfEnabled, fundingArbEnabled, arbOnly, limitOrdersEnabled);
 
   // Graceful shutdown handlers (PM2 compatible)
   const shutdown = async (signal: string) => {

@@ -9,10 +9,13 @@ export { FundingArbEngine } from './funding-arb-engine';
 export { FundingArbTracker } from './funding-arb-tracker';
 export { FundingArbBot } from './funding-arb-bot';
 export { LTFConfirmation } from './ltf-confirmation';
+export { LimitOrderExecutor, DEFAULT_LIMIT_ORDER_CONFIG } from './limit-order-executor';
+export type { PendingLimitOrder, LimitOrderConfig } from './limit-order-executor';
 export {
   DEFAULT_BOT_CONFIG,
   RUN18_STRATEGY_CONFIG,
   DEFAULT_CIRCUIT_BREAKERS,
+  DEFAULT_RISK_CONFIG,
   DEFAULT_LTF_CONFIG,
   DEFAULT_FUNDING_ARB_CONFIG,
   SYMBOL_ALLOCATION,

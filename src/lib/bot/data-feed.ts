@@ -14,8 +14,14 @@ import { db } from '@/lib/data/db';
 import { botCandles } from '@/lib/data/schema';
 import { BYBIT_CATEGORY, BYBIT_INTERVAL } from './config';
 
-/** Minimum candles needed for ICT analysis (structure, regime, etc.) */
-const MIN_CANDLES_FOR_ANALYSIS = 200;
+/**
+ * Minimum candles needed for ICT analysis (structure, regime, etc.).
+ * Regime detector uses atrRollingWindow=500 for ATR percentile.
+ * We need 2500+ bars so the ATR percentile distribution matches the
+ * backtest's deep history (26K candles), giving stable volatility
+ * classification instead of recent-only data skew.
+ */
+const MIN_CANDLES_FOR_ANALYSIS = 2500;
 
 /** Max candles per Bybit API request */
 const BYBIT_MAX_LIMIT = 200;
@@ -86,6 +92,7 @@ export class DataFeed {
   /**
    * Backfill candles for a symbol into the bot candle cache.
    * Fetches enough history for ICT analysis on first start.
+   * Makes multiple API requests if needed (Bybit max 200 per request).
    */
   async backfill(symbol: BotSymbol, targetCandles = MIN_CANDLES_FOR_ANALYSIS): Promise<number> {
     // Check existing candles in DB
@@ -96,12 +103,59 @@ export class DataFeed {
       return existing.length;
     }
 
-    // Fetch from Bybit
-    const { candles } = await this.fetchCandles(symbol, targetCandles);
+    // Fetch from Bybit in pages (max 200 per request)
+    const allFetched: Candle[] = [];
+    let endTime: number | undefined;
+
+    while (allFetched.length < targetCandles) {
+      const remaining = targetCandles - allFetched.length;
+      const limit = Math.min(remaining, BYBIT_MAX_LIMIT);
+
+      const response = await this.client.getKline({
+        category: BYBIT_CATEGORY,
+        symbol,
+        interval: BYBIT_INTERVAL,
+        limit,
+        ...(endTime ? { end: endTime } : {}),
+      });
+
+      if (response.retCode !== 0) {
+        throw new Error(`Bybit API error: ${response.retMsg} (code: ${response.retCode})`);
+      }
+
+      const rawCandles = response.result.list;
+      if (!rawCandles || rawCandles.length === 0) break;
+
+      // Bybit returns newest first
+      const batch: Candle[] = rawCandles.map((row) => ({
+        timestamp: parseInt(row[0], 10),
+        open: parseFloat(row[1]),
+        high: parseFloat(row[2]),
+        low: parseFloat(row[3]),
+        close: parseFloat(row[4]),
+        volume: parseFloat(row[5]),
+      }));
+
+      allFetched.push(...batch);
+
+      // Set endTime to the oldest candle's timestamp for next page
+      const oldest = batch[batch.length - 1]!;
+      endTime = oldest.timestamp - 1;
+
+      if (batch.length < limit) break; // No more data available
+    }
+
+    // Reverse to chronological order and deduplicate
+    const candles = allFetched.reverse();
+    const seen = new Set<number>();
+    const uniqueCandles = candles.filter((c) => {
+      if (seen.has(c.timestamp)) return false;
+      seen.add(c.timestamp);
+      return true;
+    });
 
     // Upsert into cache
-    let inserted = 0;
-    for (const candle of candles) {
+    for (const candle of uniqueCandles) {
       const existingRow = db.select()
         .from(botCandles)
         .where(
@@ -122,22 +176,28 @@ export class DataFeed {
           close: candle.close,
           volume: candle.volume,
         }).run();
-        inserted++;
       }
     }
 
-    return candles.length;
+    if (uniqueCandles.length > 0) {
+      this.lastTimestamps.set(symbol, uniqueCandles[uniqueCandles.length - 1]!.timestamp);
+    }
+
+    return uniqueCandles.length;
   }
 
   /**
-   * Process a new candle: fetch latest, cache it, return full history for analysis.
+   * Process a new candle: fetch latest, cache it, return full DB history for analysis.
+   *
+   * Returns the FULL cached candle history (not just the 200-candle API response),
+   * so regime detection has enough bars for ATR percentile (needs ~500 bars).
    */
   async processNewCandle(symbol: BotSymbol): Promise<{
     allCandles: Candle[];
     latestCandle: Candle | null;
     isNew: boolean;
   }> {
-    const { candles, newCandles } = await this.fetchCandles(symbol);
+    const { newCandles } = await this.fetchCandles(symbol);
 
     // Cache new candles
     for (const candle of newCandles) {
@@ -164,10 +224,14 @@ export class DataFeed {
       }
     }
 
-    const latestCandle = candles.length > 0 ? candles[candles.length - 1]! : null;
     const isNew = newCandles.length > 0;
 
-    return { allCandles: candles, latestCandle, isNew };
+    // Return full DB cache for regime detection (needs ~500 bars for ATR percentile).
+    // The Bybit API only returns 200 candles per request, but the DB accumulates over time.
+    const allCandles = await this.getCachedCandles(symbol);
+    const latestCandle = allCandles.length > 0 ? allCandles[allCandles.length - 1]! : null;
+
+    return { allCandles, latestCandle, isNew };
   }
 
   /**
