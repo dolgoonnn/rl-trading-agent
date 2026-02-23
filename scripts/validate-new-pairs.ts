@@ -3,7 +3,7 @@
  * Batch Pair Validation Script
  *
  * Fetches 1H data and runs walk-forward validation for candidate crypto pairs
- * using the CMA-ES Run 18 production config. Generates a report of which pairs
+ * using the CMA-ES Run 20 production config. Generates a report of which pairs
  * pass the minimum WF pass rate threshold.
  *
  * Usage:
@@ -21,23 +21,23 @@ import path from 'path';
 import { getCryptoSymbols } from '../src/lib/rl/config/symbols';
 
 // ============================================
-// Run 18 Production Config (CMA-ES optimized)
+// Run 20 Production Config (CMA-ES optimized)
 // ============================================
 
-const RUN18_ARGS = [
+const RUN20_ARGS = [
   '--strategy', 'ob',
   '--sl-mode', 'dynamic_rr',
   '--friction', '0.0007',
   '--suppress-regime', 'ranging+normal,ranging+high,downtrend+high',
-  '--threshold', '4.672',
+  '--threshold', '4.048',
   '--exit-mode', 'simple',
-  '--partial-tp', '0.55,0.84,0.05',
-  '--atr-extension', '4.10',
-  '--ob-half-life', '18',
-  '--max-bars', '108',
-  '--cooldown-bars', '8',
-  '--regime-threshold', 'uptrend+high:2.86,uptrend+normal:6.17,uptrend+low:3.13,downtrend+normal:4.33,downtrend+low:4.48',
-  '--weights', 'structureAlignment:2.660,killZoneActive:0.814,liquiditySweep:1.733,obProximity:1.103,fvgAtCE:1.554,recentBOS:1.255,rrRatio:0.627,oteZone:0.787,obFvgConfluence:1.352',
+  '--partial-tp', '0.50,1.41,0.20',
+  '--atr-extension', '5.79',
+  '--ob-half-life', '12',
+  '--max-bars', '160',
+  '--cooldown-bars', '7',
+  '--regime-threshold', 'uptrend+high:3.14,uptrend+normal:5.74,uptrend+low:5.49,downtrend+normal:4.38,downtrend+low:6.50',
+  '--weights', 'structureAlignment:0.1928,killZoneActive:1.2658,liquiditySweep:1.4896,obProximity:2.7262,fvgAtCE:2.3162,recentBOS:2.2229,rrRatio:0.5567,oteZone:1.0621,obFvgConfluence:1.0892',
 ];
 
 // Original 3 pairs (excluded by default to avoid re-testing known goods)
@@ -117,7 +117,7 @@ function fetchDataForSymbol(symbol: string): boolean {
 
 function validateSymbol(symbol: string): PairResult {
   const args = [
-    ...RUN18_ARGS,
+    ...RUN20_ARGS,
     '--symbols', symbol,
     '--json',
   ];
@@ -200,7 +200,7 @@ function generateReport(results: PairResult[], minPassRate: number): string {
   md += `- **Candidates tested:** ${results.length}\n`;
   md += `- **Passed (>= ${(minPassRate * 100).toFixed(0)}% WF pass rate):** ${passed.length}\n`;
   md += `- **Failed:** ${failed.length}\n`;
-  md += `- **Config:** CMA-ES Run 18 (threshold=${RUN18_ARGS[RUN18_ARGS.indexOf('--threshold') + 1]})\n\n`;
+  md += `- **Config:** CMA-ES Run 20 (threshold=${RUN20_ARGS[RUN20_ARGS.indexOf('--threshold') + 1]})\n\n`;
 
   md += `## Results (sorted by pass rate)\n\n`;
   md += `| Pair | WF Pass Rate | Windows | Trades | Win Rate | Avg Sharpe | Total PnL | Verdict |\n`;
@@ -261,7 +261,7 @@ async function main(): Promise<void> {
   console.log(`Candidates: ${candidates.length} pairs`);
   console.log(`Min pass rate: ${(minPassRate * 100).toFixed(0)}%`);
   console.log(`Skip fetch: ${skipFetch}`);
-  console.log(`Config: CMA-ES Run 18 production`);
+  console.log(`Config: CMA-ES Run 20 production`);
   console.log('');
 
   // Step 1: Fetch data
@@ -318,7 +318,7 @@ async function main(): Promise<void> {
   console.log(`Report: ${mdPath}`);
 
   const jsonPath = path.join(expDir, 'pair-validation-results.json');
-  fs.writeFileSync(jsonPath, JSON.stringify({ date: new Date().toISOString(), minPassRate, config: 'cmaes-run18', results }, null, 2));
+  fs.writeFileSync(jsonPath, JSON.stringify({ date: new Date().toISOString(), minPassRate, config: 'cmaes-run20', results }, null, 2));
   console.log(`JSON:   ${jsonPath}`);
 
   // Summary

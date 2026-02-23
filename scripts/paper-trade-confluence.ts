@@ -3,8 +3,8 @@
  * Paper Trade — Confluence Scorer (Production Config)
  *
  * Connects the rule-based confluence scorer to Binance live data via WebSocket
- * for paper trading. Defaults match the CMA-ES Run 18 production config that
- * achieved 78.1% walk-forward pass rate (fitness=1071.7).
+ * for paper trading. Defaults match the CMA-ES Run 20 production config that
+ * achieved 69.7% walk-forward pass rate (fitness=967.9).
  *
  * Modes:
  *   Live:       npx tsx scripts/paper-trade-confluence.ts
@@ -14,17 +14,17 @@
  * Options:
  *   --symbols BTCUSDT,ETHUSDT,SOLUSDT  (default: all three)
  *   --symbol BTCUSDT                   (alias: single symbol)
- *   --threshold 4.672                  (default: 4.672)
+ *   --threshold 4.048                  (default: 4.048)
  *   --capital 10000                    (default: 10000)
  *   --sl-mode dynamic_rr              (default: dynamic_rr)
  *   --suppress-regime "ranging+normal,ranging+high,downtrend+high"
  *   --friction 0.0007                 (default: 0.0007)
- *   --partial-tp "0.55,0.84,0.05"     (fraction,triggerR,beBuffer — default: 0.55,0.84,0.05)
+ *   --partial-tp "0.50,1.41,0.20"     (fraction,triggerR,beBuffer — default: 0.50,1.41,0.20)
  *   --no-partial-tp                   (disable partial TP)
- *   --atr-extension 4.10             (default: 4.10)
- *   --ob-half-life 18                (default: 18)
- *   --max-bars 108                   (default: 108, max position hold)
- *   --cooldown-bars 8                (default: 8, min bars between signals)
+ *   --atr-extension 5.79             (default: 5.79)
+ *   --ob-half-life 12                (default: 12)
+ *   --max-bars 160                   (default: 160, max position hold)
+ *   --cooldown-bars 7                (default: 7, min bars between signals)
  *   --mtf-multiple 8                (8H multi-timeframe bias filter, default: disabled)
  *   --weights "key:val,key:val"      (override confluence weights)
  *   --regime-threshold "uptrend+high:2.86,uptrend+normal:6.17,..."
@@ -70,26 +70,26 @@ const TIMEFRAME_MS = 3_600_000;
 /** Metrics log interval (every N candles) */
 const METRICS_LOG_INTERVAL = 10;
 
-/** Default regime threshold overrides — CMA-ES Run 18 production config */
+/** Default regime threshold overrides — CMA-ES Run 20 production config */
 const PRODUCTION_REGIME_THRESHOLDS: Record<string, number> = {
-  'uptrend+high': 2.86,
-  'uptrend+normal': 6.17,
-  'uptrend+low': 3.13,
-  'downtrend+normal': 4.33,
-  'downtrend+low': 4.48,
+  'uptrend+high': 3.14,
+  'uptrend+normal': 5.74,
+  'uptrend+low': 5.49,
+  'downtrend+normal': 4.38,
+  'downtrend+low': 6.50,
 };
 
-/** CMA-ES Run 18 optimized weights */
+/** CMA-ES Run 20 optimized weights */
 const PRODUCTION_WEIGHTS: Record<string, number> = {
-  structureAlignment: 2.660,
-  killZoneActive: 0.814,
-  liquiditySweep: 1.733,
-  obProximity: 1.103,
-  fvgAtCE: 1.554,
-  recentBOS: 1.255,
-  rrRatio: 0.627,
-  oteZone: 0.787,
-  obFvgConfluence: 1.352,
+  structureAlignment: 0.1928,
+  killZoneActive: 1.2658,
+  liquiditySweep: 1.4896,
+  obProximity: 2.7262,
+  fvgAtCE: 2.3162,
+  recentBOS: 2.2229,
+  rrRatio: 0.5567,
+  oteZone: 1.0621,
+  obFvgConfluence: 1.0892,
 };
 
 // ============================================
@@ -158,7 +158,7 @@ function parseArgs(): CLIArgs {
   const args = process.argv.slice(2);
   const result: CLIArgs = {
     symbols: ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'],
-    threshold: 4.672,
+    threshold: 4.048,
     capital: 10000,
     backtest: null,
     simulate: false,
@@ -169,11 +169,11 @@ function parseArgs(): CLIArgs {
     suppressRegime: ['ranging+normal', 'ranging+high', 'downtrend+high'],
     slMode: 'dynamic_rr',
     friction: DEFAULT_FRICTION,
-    partialTp: { fraction: 0.55, triggerR: 0.84, beBuffer: 0.05 },
-    atrExtension: 4.10,
-    obHalfLife: 18,
-    maxBars: 108,
-    cooldownBars: 8,
+    partialTp: { fraction: 0.50, triggerR: 1.41, beBuffer: 0.20 },
+    atrExtension: 5.79,
+    obHalfLife: 12,
+    maxBars: 160,
+    cooldownBars: 7,
     weights: { ...PRODUCTION_WEIGHTS },
     regimeThresholds: { ...PRODUCTION_REGIME_THRESHOLDS },
     noRiskManager: false,
@@ -190,7 +190,7 @@ function parseArgs(): CLIArgs {
         result.symbols = (args[++i] ?? 'BTCUSDT,ETHUSDT,SOLUSDT').split(',').map((s) => s.trim()).filter(Boolean);
         break;
       case '--threshold':
-        result.threshold = parseFloat(args[++i] ?? '4.672');
+        result.threshold = parseFloat(args[++i] ?? '4.048');
         break;
       case '--capital':
         result.capital = parseFloat(args[++i] ?? '10000');
@@ -227,11 +227,11 @@ function parseArgs(): CLIArgs {
         result.friction = parseFloat(args[++i] ?? String(DEFAULT_FRICTION));
         break;
       case '--partial-tp': {
-        const parts = (args[++i] ?? '0.55,0.84,0.05').split(',');
+        const parts = (args[++i] ?? '0.50,1.41,0.20').split(',');
         result.partialTp = {
-          fraction: parseFloat(parts[0] ?? '0.55'),
-          triggerR: parseFloat(parts[1] ?? '0.84'),
-          beBuffer: parseFloat(parts[2] ?? '0.05'),
+          fraction: parseFloat(parts[0] ?? '0.50'),
+          triggerR: parseFloat(parts[1] ?? '1.41'),
+          beBuffer: parseFloat(parts[2] ?? '0.20'),
         };
         break;
       }
@@ -242,16 +242,16 @@ function parseArgs(): CLIArgs {
         result.noRiskManager = true;
         break;
       case '--atr-extension':
-        result.atrExtension = parseFloat(args[++i] ?? '4.10');
+        result.atrExtension = parseFloat(args[++i] ?? '5.79');
         break;
       case '--ob-half-life':
-        result.obHalfLife = parseFloat(args[++i] ?? '18');
+        result.obHalfLife = parseFloat(args[++i] ?? '12');
         break;
       case '--max-bars':
-        result.maxBars = parseInt(args[++i] ?? '108', 10);
+        result.maxBars = parseInt(args[++i] ?? '160', 10);
         break;
       case '--cooldown-bars':
-        result.cooldownBars = parseInt(args[++i] ?? '8', 10);
+        result.cooldownBars = parseInt(args[++i] ?? '7', 10);
         break;
       case '--weights': {
         const weightPairs = (args[++i] ?? '').split(',');
@@ -491,8 +491,8 @@ class ConfluencePaperTrader {
         : trade.entryTime as number;
 
     const riskDistance = side === 'long'
-      ? trade.entryPrice - trade.stopLoss
-      : trade.stopLoss - trade.entryPrice;
+      ? rawEntryPrice - trade.stopLoss
+      : trade.stopLoss - rawEntryPrice;
 
     // Find entryIndex in candle buffer (fallback to 0, only used for display now)
     const candles = candleManager.getCandles();

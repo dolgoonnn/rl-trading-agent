@@ -16,7 +16,7 @@
 
 import fs from 'fs';
 import { execSync } from 'child_process';
-import { RUN18_STRATEGY_CONFIG } from '../src/lib/bot/config';
+import { RUN20_STRATEGY_CONFIG } from '../src/lib/bot/config';
 
 // ============================================
 // Configuration
@@ -112,7 +112,7 @@ function buildBacktestArgs(config: ParamSnapshot): string {
   return [
     '--strategy ob',
     '--sl-mode dynamic_rr',
-    `--friction ${RUN18_STRATEGY_CONFIG.frictionPerSide}`,
+    `--friction ${RUN20_STRATEGY_CONFIG.frictionPerSide}`,
     '--suppress-regime "ranging+normal,ranging+high,downtrend+high"',
     `--threshold ${config.baseThreshold.toFixed(3)}`,
     '--exit-mode simple',
@@ -200,14 +200,14 @@ function computeDrift(current: ParamSnapshot, newParams: ParamSnapshot): DriftIt
 
 function snapshotFromConfig(): ParamSnapshot {
   return {
-    baseThreshold: RUN18_STRATEGY_CONFIG.baseThreshold,
-    obHalfLife: RUN18_STRATEGY_CONFIG.obHalfLife,
-    atrExtensionBands: RUN18_STRATEGY_CONFIG.atrExtensionBands,
-    maxBars: RUN18_STRATEGY_CONFIG.maxBars,
-    cooldownBars: RUN18_STRATEGY_CONFIG.cooldownBars,
-    partialTP: { ...RUN18_STRATEGY_CONFIG.partialTP },
-    weights: { ...RUN18_STRATEGY_CONFIG.weights },
-    regimeThresholds: { ...RUN18_STRATEGY_CONFIG.regimeThresholds },
+    baseThreshold: RUN20_STRATEGY_CONFIG.baseThreshold,
+    obHalfLife: RUN20_STRATEGY_CONFIG.obHalfLife,
+    atrExtensionBands: RUN20_STRATEGY_CONFIG.atrExtensionBands,
+    maxBars: RUN20_STRATEGY_CONFIG.maxBars,
+    cooldownBars: RUN20_STRATEGY_CONFIG.cooldownBars,
+    partialTP: { ...RUN20_STRATEGY_CONFIG.partialTP },
+    weights: { ...RUN20_STRATEGY_CONFIG.weights },
+    regimeThresholds: { ...RUN20_STRATEGY_CONFIG.regimeThresholds },
   };
 }
 

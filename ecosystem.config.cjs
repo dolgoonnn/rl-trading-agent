@@ -2,7 +2,7 @@
  * PM2 Ecosystem Configuration
  *
  * Two independent bots:
- * 1. Crypto ICT Bot — 10-symbol, 1H candles, confluence scorer (Run 18 defaults)
+ * 1. Crypto ICT Bot — 10-symbol, 1H candles, confluence scorer (Run 20 defaults)
  * 2. Gold F2F Bot — XAUTUSDT, daily candles, forecast-to-fill strategy
  *
  * Usage:

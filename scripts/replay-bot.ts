@@ -27,7 +27,7 @@ import {
   OrderManager,
   PositionTracker,
   RiskEngine,
-  RUN18_STRATEGY_CONFIG,
+  RUN20_STRATEGY_CONFIG,
   DEFAULT_CIRCUIT_BREAKERS,
 } from '../src/lib/bot';
 import { db } from '../src/lib/data/db';
@@ -143,12 +143,12 @@ function sleep(ms: number): Promise<void> {
 
 /** Mirrors backtest-confluence.ts friction functions exactly */
 function btApplyEntryFriction(price: number, direction: 'long' | 'short'): number {
-  const friction = RUN18_STRATEGY_CONFIG.frictionPerSide;
+  const friction = RUN20_STRATEGY_CONFIG.frictionPerSide;
   return direction === 'long' ? price * (1 + friction) : price * (1 - friction);
 }
 
 function btApplyExitFriction(price: number, direction: 'long' | 'short'): number {
-  const friction = RUN18_STRATEGY_CONFIG.frictionPerSide;
+  const friction = RUN20_STRATEGY_CONFIG.frictionPerSide;
   return direction === 'long' ? price * (1 - friction) : price * (1 + friction);
 }
 
@@ -181,7 +181,7 @@ function simulateBacktestPartialTP(
 ): BacktestTradeResult {
   const adjustedEntry = btApplyEntryFriction(rawEntry, direction);
   let currentSL = stopLoss;
-  const partialConfig = RUN18_STRATEGY_CONFIG.partialTP;
+  const partialConfig = RUN20_STRATEGY_CONFIG.partialTP;
 
   const riskDistance = direction === 'long'
     ? rawEntry - stopLoss
@@ -299,8 +299,8 @@ interface ReplayStats {
 
 async function runReplay(config: ReplayConfig): Promise<void> {
   // Initialize bot components
-  const signalEngine = new SignalEngine(RUN18_STRATEGY_CONFIG);
-  const orderManager = new OrderManager('paper', RUN18_STRATEGY_CONFIG);
+  const signalEngine = new SignalEngine(RUN20_STRATEGY_CONFIG);
+  const orderManager = new OrderManager('paper', RUN20_STRATEGY_CONFIG);
   const tracker = new PositionTracker(config.capital);
   // Circuit breakers are DISABLED in replay mode. They use Date.now() for
   // time-based expiry which is wall-clock time — in fast-forward mode, a
@@ -549,7 +549,7 @@ async function runReplay(config: ReplayConfig): Promise<void> {
                 sig.direction,
                 barIndex,
                 candles,
-                RUN18_STRATEGY_CONFIG.maxBars,
+                RUN20_STRATEGY_CONFIG.maxBars,
               );
               pendingBTResults.set(position.id, btResult);
               pendingBTMeta.set(position.id, { symbol, entryBar: barIndex, direction: sig.direction });

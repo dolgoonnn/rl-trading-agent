@@ -1,10 +1,10 @@
 /**
- * Bot Configuration — Run 18 CMA-ES Optimized Defaults
+ * Bot Configuration — Run 20 CMA-ES Optimized Defaults
  *
  * These are the production-validated parameters from CMA-ES optimization:
- * - 78.1% walk-forward pass rate
- * - PBO = 18.5%, DSR = 6.77
- * - MC trade-level ALL PASS
+ * - 69.7% walk-forward pass rate (fitness=967.9)
+ * - PBO = 21%, DSR = 7.58
+ * - Validated 5/7 checks
  */
 
 import type {
@@ -34,44 +34,44 @@ export const DEFAULT_BOT_CONFIG: BotConfig = {
 };
 
 // ============================================
-// Strategy Config — Run 18 CMA-ES Optimized
+// Strategy Config — Run 20 CMA-ES Optimized
 // ============================================
 
-export const RUN18_STRATEGY_CONFIG: StrategyConfig = {
+export const RUN20_STRATEGY_CONFIG: StrategyConfig = {
   activeStrategies: ['order_block'],
   weights: {
-    structureAlignment: 2.660,
-    killZoneActive: 0.814,
-    liquiditySweep: 1.733,
-    obProximity: 1.103,
-    fvgAtCE: 1.554,
-    recentBOS: 1.255,
-    rrRatio: 0.627,
-    oteZone: 0.787,
-    obFvgConfluence: 1.352,
+    structureAlignment: 0.1928,
+    killZoneActive: 1.2658,
+    liquiditySweep: 1.4896,
+    obProximity: 2.7262,
+    fvgAtCE: 2.3162,
+    recentBOS: 2.2229,
+    rrRatio: 0.5567,
+    oteZone: 1.0621,
+    obFvgConfluence: 1.0892,
     breakerConfluence: 0,
     obVolumeQuality: 0,
     momentumConfirmation: 0,
     fundingAlignment: 0,
   },
-  baseThreshold: 4.672,
+  baseThreshold: 4.048,
   regimeThresholds: {
-    'uptrend+high': 2.86,
-    'uptrend+normal': 6.17,
-    'uptrend+low': 3.13,
-    'downtrend+normal': 4.33,
-    'downtrend+low': 4.48,
+    'uptrend+high': 3.14,
+    'uptrend+normal': 5.74,
+    'uptrend+low': 5.49,
+    'downtrend+normal': 4.38,
+    'downtrend+low': 6.50,
   },
   suppressedRegimes: ['ranging+normal', 'ranging+high', 'downtrend+high'],
-  obHalfLife: 18,
-  atrExtensionBands: 4.10,
-  cooldownBars: 8,
-  maxBars: 108,
+  obHalfLife: 12,
+  atrExtensionBands: 5.79,
+  cooldownBars: 7,
+  maxBars: 160,
   exitMode: 'partial_tp',
   partialTP: {
-    fraction: 0.55,
-    triggerR: 0.84,
-    beBuffer: 0.05,
+    fraction: 0.50,
+    triggerR: 1.41,
+    beBuffer: 0.20,
   },
   frictionPerSide: 0.0007, // 0.07% combined commission + slippage
 };

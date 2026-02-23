@@ -30,37 +30,37 @@ import { estimatePBO, type WindowResult } from '../src/lib/rl/utils/pbo';
 // ============================================
 
 const PROD_WEIGHTS: Partial<ConfluenceWeights> = {
-  structureAlignment: 2.561,
-  killZoneActive: 0.566,
-  liquiditySweep: 1.347,
-  obProximity: 1.374,
-  fvgAtCE: 0.674,
-  recentBOS: 1.492,
-  rrRatio: 0.294,
-  oteZone: 0.610,
-  obFvgConfluence: 1.162,
+  structureAlignment: 0.1928,
+  killZoneActive: 1.2658,
+  liquiditySweep: 1.4896,
+  obProximity: 2.7262,
+  fvgAtCE: 2.3162,
+  recentBOS: 2.2229,
+  rrRatio: 0.5567,
+  oteZone: 1.0621,
+  obFvgConfluence: 1.0892,
   momentumConfirmation: 0,
 };
 
 const PROD_REGIME_THRESHOLDS: Record<string, number> = {
-  'uptrend+high': 2.90,
-  'uptrend+normal': 5.21,
-  'uptrend+low': 2.90,
-  'downtrend+normal': 5.20,
-  'downtrend+low': 4.16,
+  'uptrend+high': 3.14,
+  'uptrend+normal': 5.74,
+  'uptrend+low': 5.49,
+  'downtrend+normal': 4.38,
+  'downtrend+low': 6.50,
 };
 
 const PROD_SUPPRESS = ['ranging+normal', 'ranging+high', 'downtrend+high'];
-const PROD_THRESHOLD = 4.80;
-const PROD_ATR_EXT = 2.63;
-const PROD_HALF_LIFE = 19;
-const PROD_COOLDOWN = 8;
-const PROD_MAX_BARS = 112;
-const PROD_PARTIAL_FRACTION = 0.44;
-const PROD_PARTIAL_TRIGGER_R = 0.94;
-const PROD_PARTIAL_BE_BUFFER = 0.12;
+const PROD_THRESHOLD = 4.05;
+const PROD_ATR_EXT = 5.79;
+const PROD_HALF_LIFE = 12;
+const PROD_COOLDOWN = 7;
+const PROD_MAX_BARS = 160;
+const PROD_PARTIAL_FRACTION = 0.50;
+const PROD_PARTIAL_TRIGGER_R = 1.41;
+const PROD_PARTIAL_BE_BUFFER = 0.20;
 
-const SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'LINKUSDT', 'DOGEUSDT', 'NEARUSDT', 'ADAUSDT'];
+const SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'];
 
 // ============================================
 // Config Variants to Test
@@ -101,16 +101,16 @@ function prodVariant(id: string, overrides: Partial<ConfigVariant> = {}): Config
 
 /** Configs spanning the parameter space around production values */
 const VARIANTS: ConfigVariant[] = [
-  // Production config (Broad Run 4)
+  // Production config (Run 20)
   prodVariant('prod'),
 
   // Threshold variants
-  prodVariant('thresh-4.2', { threshold: 4.2 }),
-  prodVariant('thresh-5.2', { threshold: 5.2 }),
+  prodVariant('thresh-3.5', { threshold: 3.5 }),
+  prodVariant('thresh-4.5', { threshold: 4.5 }),
 
   // ATR extension variants
-  prodVariant('atr-2.0', { atrExtension: 2.0 }),
-  prodVariant('atr-3.2', { atrExtension: 3.2 }),
+  prodVariant('atr-4.5', { atrExtension: 4.5 }),
+  prodVariant('atr-6.5', { atrExtension: 6.5 }),
 
   // No regime thresholds (flat threshold across all regimes)
   prodVariant('no-regime-thresh', { regimeThresholds: {} }),
@@ -372,7 +372,7 @@ async function main(): Promise<void> {
   }
 
   // Save results
-  const outputPath = path.resolve('experiments/pbo-results-7sym.json');
+  const outputPath = path.resolve('experiments/pbo-results-3sym-run20.json');
   fs.writeFileSync(outputPath, JSON.stringify({
     symbols: SYMBOLS,
     variants: VARIANTS.map((v) => v.id),
@@ -383,7 +383,7 @@ async function main(): Promise<void> {
     passes: pboResult.passes,
   }, null, 2));
 
-  console.log(`\nResults saved to: experiments/pbo-results-7sym.json`);
+  console.log(`\nResults saved to: experiments/pbo-results-3sym-run20.json`);
 }
 
 main().catch((err: unknown) => {

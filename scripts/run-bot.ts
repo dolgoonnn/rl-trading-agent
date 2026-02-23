@@ -8,7 +8,7 @@
  *
  * PM2-compatible: handles SIGTERM/SIGINT for graceful shutdown.
  *
- * Crypto-only: BTC/ETH/SOL with order_block strategy (Run 18 CMA-ES config).
+ * Crypto-only: BTC/ETH/SOL with order_block strategy (Run 20 CMA-ES config).
  *
  * Usage:
  *   npx tsx scripts/run-bot.ts                    # Default (BTC/ETH/SOL)
@@ -33,7 +33,7 @@ import {
   FundingArbBot,
   LimitOrderExecutor,
   DEFAULT_BOT_CONFIG,
-  RUN18_STRATEGY_CONFIG,
+  RUN20_STRATEGY_CONFIG,
   DEFAULT_RISK_CONFIG,
   DEFAULT_LTF_CONFIG,
   DEFAULT_FUNDING_ARB_CONFIG,
@@ -153,10 +153,10 @@ class TradingBot {
 
     // Initialize components
     this.dataFeed = new DataFeed();
-    this.signalEngine = new SignalEngine(RUN18_STRATEGY_CONFIG);
+    this.signalEngine = new SignalEngine(RUN20_STRATEGY_CONFIG);
     this.orderManager = new OrderManager(
       config.mode,
-      RUN18_STRATEGY_CONFIG,
+      RUN20_STRATEGY_CONFIG,
     );
     this.tracker = new PositionTracker(config.initialCapital);
     this.riskEngine = new RiskEngine({
@@ -214,7 +214,7 @@ class TradingBot {
     console.log('ICT Paper Trading Bot');
     console.log('='.repeat(60));
     console.log(`Mode: ${this.config.mode}`);
-    console.log(`Strategy: order_block (Run 18 CMA-ES)`);
+    console.log(`Strategy: order_block (Run 20 CMA-ES)`);
     console.log(`Symbols: ${this.config.symbols.join(', ')}`);
     console.log(`Capital: $${this.config.initialCapital}`);
     console.log(`Risk/trade: ${(this.config.riskPerTrade * 100).toFixed(2)}%`);

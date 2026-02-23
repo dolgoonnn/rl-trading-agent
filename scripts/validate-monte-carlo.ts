@@ -48,26 +48,26 @@ import {
 // Production Configs
 // ============================================
 
-// --- 3-symbol (Run 18) ---
-const RUN18_WEIGHTS: Partial<ConfluenceWeights> = {
-  structureAlignment: 2.660,
-  killZoneActive: 0.814,
-  liquiditySweep: 1.733,
-  obProximity: 1.103,
-  fvgAtCE: 1.554,
-  recentBOS: 1.255,
-  rrRatio: 0.627,
-  oteZone: 0.787,
-  obFvgConfluence: 1.352,
+// --- 3-symbol (Run 20) ---
+const RUN20_WEIGHTS: Partial<ConfluenceWeights> = {
+  structureAlignment: 0.1928,
+  killZoneActive: 1.2658,
+  liquiditySweep: 1.4896,
+  obProximity: 2.7262,
+  fvgAtCE: 2.3162,
+  recentBOS: 2.2229,
+  rrRatio: 0.5567,
+  oteZone: 1.0621,
+  obFvgConfluence: 1.0892,
   momentumConfirmation: 0,
 };
 
-const RUN18_REGIME_THRESHOLDS: Record<string, number> = {
-  'uptrend+high': 2.86,
-  'uptrend+normal': 6.17,
-  'uptrend+low': 3.13,
-  'downtrend+normal': 4.33,
-  'downtrend+low': 4.48,
+const RUN20_REGIME_THRESHOLDS: Record<string, number> = {
+  'uptrend+high': 3.14,
+  'uptrend+normal': 5.74,
+  'uptrend+low': 5.49,
+  'downtrend+normal': 4.38,
+  'downtrend+low': 6.50,
 };
 
 interface ProdConfig {
@@ -88,20 +88,20 @@ interface ProdConfig {
 }
 
 const CONFIG_3SYM: ProdConfig = {
-  name: '3sym (Run 18)',
+  name: '3sym (Run 20)',
   symbols: ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'],
-  threshold: 4.672,
-  atrExtension: 4.10,
-  halfLife: 18,
-  cooldown: 8,
-  maxBars: 108,
-  partialFraction: 0.55,
-  partialTriggerR: 0.84,
-  partialBeBuffer: 0.05,
+  threshold: 4.048,
+  atrExtension: 5.79,
+  halfLife: 12,
+  cooldown: 7,
+  maxBars: 160,
+  partialFraction: 0.50,
+  partialTriggerR: 1.41,
+  partialBeBuffer: 0.20,
   suppress: ['ranging+normal', 'ranging+high', 'downtrend+high'],
-  regimeThresholds: RUN18_REGIME_THRESHOLDS,
-  weights: RUN18_WEIGHTS,
-  modelPath: 'models/cmaes_run18_escape.json',
+  regimeThresholds: RUN20_REGIME_THRESHOLDS,
+  weights: RUN20_WEIGHTS,
+  modelPath: 'models/cmaes_run20_widebounds.json',
 };
 
 // --- 7-symbol (Broad Run 4) ---
