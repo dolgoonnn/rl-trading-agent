@@ -491,8 +491,8 @@ class ConfluencePaperTrader {
         : trade.entryTime as number;
 
     const riskDistance = side === 'long'
-      ? trade.entryPrice - trade.stopLoss
-      : trade.stopLoss - trade.entryPrice;
+      ? rawEntryPrice - trade.stopLoss
+      : trade.stopLoss - rawEntryPrice;
 
     // Find entryIndex in candle buffer (fallback to 0, only used for display now)
     const candles = candleManager.getCandles();
