@@ -5,7 +5,7 @@
 set -e
 
 echo "=== Starting ICT Trading Bots ==="
-echo "  Crypto: 10-symbol, Run 18 defaults"
+echo "  Crypto: 10-symbol, Run 20 defaults"
 echo "  Gold F2F: XAUTUSDT, zscore50 filter, lambda=0.95, theta=0.91"
 echo ""
 
