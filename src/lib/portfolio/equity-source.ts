@@ -1,5 +1,6 @@
 import type { Database as BetterSqlite3Database } from 'better-sqlite3';
 import type { EquityPoint } from './types';
+import * as fs from 'node:fs';
 
 const MS_PER_DAY = 86_400_000;
 
@@ -44,4 +45,18 @@ export function readCryptoEquityFromDb(
     )
     .all() as EquityRow[];
   return rows.map((r: EquityRow) => ({ timestamp: r.timestamp, equity: r.equity }));
+}
+
+export function readGoldDailyReturnsFromJson(filePath: string): number[] {
+  if (!fs.existsSync(filePath)) return [];
+  try {
+    const raw = fs.readFileSync(filePath, 'utf-8');
+    const parsed = JSON.parse(raw) as { rolling30dReturns?: unknown };
+    if (!Array.isArray(parsed.rolling30dReturns)) return [];
+    return parsed.rolling30dReturns.filter(
+      (r): r is number => typeof r === 'number' && Number.isFinite(r),
+    );
+  } catch {
+    return [];
+  }
 }

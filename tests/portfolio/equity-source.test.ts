@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import Database from 'better-sqlite3';
-import { resampleToUtcDaily, toDailyReturns, readCryptoEquityFromDb } from '@/lib/portfolio/equity-source';
+import { resampleToUtcDaily, toDailyReturns, readCryptoEquityFromDb, readGoldDailyReturnsFromJson } from '@/lib/portfolio/equity-source';
 import type { EquityPoint } from '@/lib/portfolio/types';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as os from 'node:os';
 
 const D = (utc: string) => new Date(utc).getTime();
 
@@ -98,5 +101,33 @@ describe('readCryptoEquityFromDb', () => {
       'CREATE TABLE bot_equity_snapshots (id INTEGER PRIMARY KEY, timestamp INTEGER NOT NULL, equity REAL NOT NULL)',
     );
     expect(readCryptoEquityFromDb(db)).toEqual([]);
+  });
+});
+
+function writeGoldFixture(state: object): string {
+  const p = path.join(os.tmpdir(), `gold-fixture-${Date.now()}.json`);
+  fs.writeFileSync(p, JSON.stringify(state));
+  return p;
+}
+
+describe('readGoldDailyReturnsFromJson', () => {
+  it('returns the rolling30dReturns array', () => {
+    const p = writeGoldFixture({
+      equity: 10500,
+      initialCapital: 10000,
+      rolling30dReturns: [0.01, -0.005, 0.02, 0],
+    });
+    expect(readGoldDailyReturnsFromJson(p)).toEqual([0.01, -0.005, 0.02, 0]);
+  });
+
+  it('returns empty when state is missing the field', () => {
+    const p = writeGoldFixture({ equity: 10000 });
+    expect(readGoldDailyReturnsFromJson(p)).toEqual([]);
+  });
+
+  it('returns empty when file does not exist', () => {
+    expect(
+      readGoldDailyReturnsFromJson('/tmp/definitely-not-real-12345.json'),
+    ).toEqual([]);
   });
 });
