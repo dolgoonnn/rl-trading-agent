@@ -1,0 +1,151 @@
+[21:41:23] ============================================================
+[21:41:23] CMA-ES Production-Matched Optimizer
+[21:41:23] ============================================================
+[21:41:23] Strategy: ob
+[21:41:23] Dimensions: 23
+[21:41:23]   Weights: 10
+[21:41:23]   Regime thresholds: 5
+[21:41:23]   Hyperparameters: 8
+[21:41:23] Population: 16
+[21:41:23] Generations: 30
+[21:41:23] Sigma: 0.15
+[21:41:23] Warm start: models/cmaes_run20_widebounds.json
+[21:41:23] Output: models/cmaes_run21_currentdata.json
+[21:41:23] Symbols: BTCUSDT,ETHUSDT,SOLUSDT
+[21:41:23] Friction: 0.0007
+[21:41:23] Suppress: ranging+normal,ranging+high,downtrend+high
+[21:41:23] 
+[21:41:23] Loaded warm-start from models/cmaes_run20_widebounds.json (fitness=967.9, 23d)
+[21:41:23] --- Evaluating Baseline ---
+[21:41:32] Baseline: fitness=523.4, passRate=51%, trades=822, PnL=-2.2%
+[21:41:32] 
+[21:41:32] --- CMA-ES Optimization ---
++[21:41:45]   C0 detail: pass=55.3%, trades=568, WR=42.6%, PnL=20.3%, fit=576.7
+[21:41:45]   C0 threshold=4.59, atrExt=5.77
++++++++++++++++
+[21:44:16] Gen   0: mean=657.1, genBest=852.2, allTimeBest=852.2 (gen 0), sigma=0.1365
++...+...........
+[21:46:51] Gen   1: mean=707.3, genBest=870.7, allTimeBest=870.7 (gen 1), sigma=0.1269
+................
+[21:49:24] Gen   2: mean=669.7, genBest=865.2, allTimeBest=870.7 (gen 1), sigma=0.1197
+................
+[21:51:51] Gen   3: mean=643.8, genBest=852.8, allTimeBest=870.7 (gen 1), sigma=0.1189
+................
+[21:54:34] Gen   4: mean=641.4, genBest=850.7, allTimeBest=870.7 (gen 1), sigma=0.1166
+[21:54:34]   baseThreshold=4.01, halfLife=15, atrExt=7.0
+[21:54:34]   regimes: uptrend+high:2.6, uptrend+normal:5.4, uptrend+low:5.4, downtrend+normal:4.7, downtrend+low:6.5
+................
+[21:57:09] Gen   5: mean=658.5, genBest=861.5, allTimeBest=870.7 (gen 1), sigma=0.1173
+................
+[22:00:21] Gen   6: mean=629.1, genBest=818.8, allTimeBest=870.7 (gen 1), sigma=0.1173
+.........+......
+[22:04:14] Gen   7: mean=647.3, genBest=871.5, allTimeBest=871.5 (gen 7), sigma=0.1164
+................
+[22:07:13] Gen   8: mean=665.2, genBest=829.1, allTimeBest=871.5 (gen 7), sigma=0.1151
+................
+[22:10:45] Gen   9: mean=572.5, genBest=812.6, allTimeBest=871.5 (gen 7), sigma=0.1116
+[22:10:45]   baseThreshold=3.67, halfLife=10, atrExt=6.0
+[22:10:45]   regimes: uptrend+high:3.4, uptrend+normal:5.2, uptrend+low:4.9, downtrend+normal:3.2, downtrend+low:5.8
+................
+[22:14:21] Gen  10: mean=628.7, genBest=818.4, allTimeBest=871.5 (gen 7), sigma=0.1097
+................
+[22:17:32] Gen  11: mean=592.2, genBest=749.6, allTimeBest=871.5 (gen 7), sigma=0.1088
+................
+[22:21:04] Gen  12: mean=593.1, genBest=735.3, allTimeBest=871.5 (gen 7), sigma=0.1092
+................
+[22:25:28] Gen  13: mean=621.1, genBest=796.1, allTimeBest=871.5 (gen 7), sigma=0.1098
+................
+[22:29:18] Gen  14: mean=597.9, genBest=808.3, allTimeBest=871.5 (gen 7), sigma=0.1094
+[22:29:18]   baseThreshold=3.67, halfLife=10, atrExt=6.0
+[22:29:18]   regimes: uptrend+high:3.4, uptrend+normal:5.2, uptrend+low:4.9, downtrend+normal:3.2, downtrend+low:5.8
+................
+[22:32:30] Gen  15: mean=598.2, genBest=811.3, allTimeBest=871.5 (gen 7), sigma=0.1083
+................
+[22:35:18] Gen  16: mean=615.1, genBest=855.4, allTimeBest=871.5 (gen 7), sigma=0.1048
+................
+[22:37:59] Gen  17: mean=666.1, genBest=849.5, allTimeBest=871.5 (gen 7), sigma=0.0979
+................
+[22:40:37] Gen  18: mean=686.5, genBest=846.6, allTimeBest=871.5 (gen 7), sigma=0.0931
+................
+[22:43:42] Gen  19: mean=699.5, genBest=832.6, allTimeBest=871.5 (gen 7), sigma=0.0882
+[22:43:42]   baseThreshold=3.67, halfLife=10, atrExt=6.0
+[22:43:42]   regimes: uptrend+high:3.4, uptrend+normal:5.2, uptrend+low:4.9, downtrend+normal:3.2, downtrend+low:5.8
+................
+[22:46:59] Gen  20: mean=713.2, genBest=830.9, allTimeBest=871.5 (gen 7), sigma=0.0858
+................
+[22:50:02] Gen  21: mean=642.3, genBest=830.6, allTimeBest=871.5 (gen 7), sigma=0.0818
+..............+.
+[22:52:53] Gen  22: mean=701.5, genBest=876.7, allTimeBest=876.7 (gen 22), sigma=0.0818
+................
+[22:55:46] Gen  23: mean=731.2, genBest=872.4, allTimeBest=876.7 (gen 22), sigma=0.0805
+.........+......
+[22:59:17] Gen  24: mean=747.7, genBest=879.2, allTimeBest=879.2 (gen 24), sigma=0.0774
+[22:59:17]   baseThreshold=3.00, halfLife=6, atrExt=6.5
+[22:59:17]   regimes: uptrend+high:2.7, uptrend+normal:6.0, uptrend+low:5.0, downtrend+normal:5.2, downtrend+low:6.3
+................
+[23:03:05] Gen  25: mean=760.2, genBest=841.8, allTimeBest=879.2 (gen 24), sigma=0.0767
+................
+[23:06:15] Gen  26: mean=727.1, genBest=875.7, allTimeBest=879.2 (gen 24), sigma=0.0762
+..........+.....
+[23:09:24] Gen  27: mean=758.9, genBest=915.6, allTimeBest=915.6 (gen 27), sigma=0.0741
+................
+[23:12:31] Gen  28: mean=779.2, genBest=884.6, allTimeBest=915.6 (gen 27), sigma=0.0729
+................
+[23:15:11] Gen  29: mean=762.9, genBest=872.7, allTimeBest=915.6 (gen 27), sigma=0.0698
+[23:15:11]   baseThreshold=3.06, halfLife=5, atrExt=7.0
+[23:15:11]   regimes: uptrend+high:2.5, uptrend+normal:6.3, uptrend+low:5.2, downtrend+normal:5.2, downtrend+low:5.9
+[23:15:11] Early stop at gen 29 (converged)
+[23:15:11] 
+[23:15:11] --- Final Evaluation ---
+[23:15:22] 
+[23:15:22] ============================================================
+[23:15:22] RESULTS: Baseline vs CMA-ES Production
+[23:15:22] ============================================================
+[23:15:22]   Metric        | Baseline       | CMA-ES         | Delta
+[23:15:22]   --------------+----------------+----------------+---------
+[23:15:22]   Pass Rate     |          51.4% |          64.8% |  13.4pp
+[23:15:22]   Trades        |            822 |            607 |    -215
+[23:15:22]   Win Rate      |          51.0% |          47.8% |  -3.2pp
+[23:15:22]   Total PnL     |          -2.2% |         768.0% | 770.2pp
+[23:15:22]   Fitness       |          523.4 |          915.6 |   392.2
+[23:15:22]   VERDICT: CMA-ES WINS
+[23:15:22] ============================================================
+[23:15:22] 
+[23:15:22] Optimized weight multipliers:
+[23:15:22]   structureAlignment        = 2.118 (1.06x)
+[23:15:22]   killZoneActive            = 0.633 (1.27x)
+[23:15:22]   liquiditySweep            = 1.400 (0.70x)
+[23:15:22]   obProximity               = 2.149 (2.15x)
+[23:15:22]   fvgAtCE                   = 2.133 (2.13x)
+[23:15:22]   recentBOS                 = 1.683 (1.68x)
+[23:15:22]   rrRatio                   = 0.388 (0.26x)
+[23:15:22]   oteZone                   = 0.849 (1.70x)
+[23:15:22]   obFvgConfluence           = 0.866 (0.87x)
+[23:15:22]   momentumConfirmation      = 0.000 (NaNx)
+[23:15:22] 
+[23:15:22] Optimized regime thresholds:
+[23:15:22]   Base: 3.06
+[23:15:22]   uptrend+high              = 2.50
+[23:15:22]   uptrend+normal            = 6.29
+[23:15:22]   uptrend+low               = 5.22
+[23:15:22]   downtrend+normal          = 5.17
+[23:15:22]   downtrend+low             = 5.95
+[23:15:22]   OB freshness half-life: 5
+[23:15:22]   ATR extension bands: 7.00
+[23:15:22]   Partial TP: 31% @ 1.23R, BE buffer 0.16
+[23:15:22]   Max bars: 168, Cooldown bars: 9
+[23:15:22] 
+[23:15:22] Per-symbol breakdown (from final eval):
+[23:15:22]   Total: passRate=64.8%, trades=607, PnL=768.0%
+[23:15:22] 
+[23:15:22] --- Overfitting Risk Assessment ---
+[23:15:22]   Parameters optimized:     23
+[23:15:22]   Total trades:             607
+[23:15:22]   Trades per parameter:     26.4
+[23:15:22]   [33mCAUTION: trades/params ratio 26.4 < 50x ideal.[0m
+[23:15:22]   [33m  Acceptable, but more data (1150+ trades) would reduce overfitting risk.[0m
+[23:15:22] 
+[23:15:22] Reproduce with:
+[23:15:22]   npx tsx scripts/backtest-confluence.ts --strategy ob --sl-mode dynamic_rr --friction 0.0007 --suppress-regime ranging+normal,ranging+high,downtrend+high --threshold 3.064 --exit-mode simple --partial-tp 0.31,1.23,0.16 --atr-extension 7.00 --ob-half-life 5 --max-bars 168 --cooldown-bars 9 --symbols BTCUSDT,ETHUSDT,SOLUSDT --regime-threshold uptrend+high:2.50,uptrend+normal:6.29,uptrend+low:5.22,downtrend+normal:5.17,downtrend+low:5.95 --weights structureAlignment:2.1179,killZoneActive:0.6327,liquiditySweep:1.3999,obProximity:2.1494,fvgAtCE:2.1334,recentBOS:1.6834,rrRatio:0.3877,oteZone:0.8493,obFvgConfluence:0.8663,momentumConfirmation:0.0000
+[23:15:22] 
+[23:15:22] Model saved to /Users/apple/projects/personal/ict-trading/models/models/cmaes_run21_currentdata.json

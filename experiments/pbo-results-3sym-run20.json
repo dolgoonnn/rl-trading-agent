@@ -14,9 +14,9 @@
     "no-suppress",
     "2-suppress"
   ],
-  "pbo": 0.21,
+  "pbo": 0.6815,
   "numCombinations": 2000,
-  "numOverfit": 420,
-  "avgLogitOOS": -2.106317716497586,
-  "passes": true
+  "numOverfit": 1363,
+  "avgLogitOOS": 0.9156420879308467,
+  "passes": false
 }
