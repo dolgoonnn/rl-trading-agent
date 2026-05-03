@@ -1,3 +1,4 @@
+import type { Database as BetterSqlite3Database } from 'better-sqlite3';
 import type { EquityPoint } from './types';
 
 const MS_PER_DAY = 86_400_000;
@@ -27,4 +28,20 @@ export function toDailyReturns(series: EquityPoint[]): number[] {
     out.push(curr / prev - 1);
   }
   return out;
+}
+
+interface EquityRow {
+  timestamp: number;
+  equity: number;
+}
+
+export function readCryptoEquityFromDb(
+  db: BetterSqlite3Database,
+): EquityPoint[] {
+  const rows = db
+    .prepare(
+      'SELECT timestamp, equity FROM bot_equity_snapshots ORDER BY timestamp ASC',
+    )
+    .all() as EquityRow[];
+  return rows.map((r: EquityRow) => ({ timestamp: r.timestamp, equity: r.equity }));
 }

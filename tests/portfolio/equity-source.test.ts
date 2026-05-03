@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { resampleToUtcDaily, toDailyReturns } from '@/lib/portfolio/equity-source';
+import Database from 'better-sqlite3';
+import { resampleToUtcDaily, toDailyReturns, readCryptoEquityFromDb } from '@/lib/portfolio/equity-source';
 import type { EquityPoint } from '@/lib/portfolio/types';
 
 const D = (utc: string) => new Date(utc).getTime();
@@ -56,5 +57,46 @@ describe('toDailyReturns', () => {
     expect(
       toDailyReturns([{ timestamp: 0, equity: 100 }]),
     ).toEqual([]);
+  });
+});
+
+function makeFixtureDb(): Database.Database {
+  const db = new Database(':memory:');
+  db.exec(`
+    CREATE TABLE bot_equity_snapshots (
+      id INTEGER PRIMARY KEY,
+      timestamp INTEGER NOT NULL,
+      equity REAL NOT NULL,
+      peak_equity REAL NOT NULL DEFAULT 0,
+      drawdown REAL NOT NULL DEFAULT 0,
+      open_positions INTEGER NOT NULL DEFAULT 0,
+      daily_pnl REAL NOT NULL DEFAULT 0,
+      cumulative_pnl REAL NOT NULL DEFAULT 0
+    )
+  `);
+  const insert = db.prepare(
+    'INSERT INTO bot_equity_snapshots (timestamp, equity) VALUES (?, ?)',
+  );
+  insert.run(D('2026-01-01T05:00:00Z'), 1000);
+  insert.run(D('2026-01-01T18:00:00Z'), 1010);
+  insert.run(D('2026-01-02T03:00:00Z'), 1020);
+  return db;
+}
+
+describe('readCryptoEquityFromDb', () => {
+  it('returns rows ordered by timestamp', () => {
+    const db = makeFixtureDb();
+    const rows = readCryptoEquityFromDb(db);
+    expect(rows).toHaveLength(3);
+    expect(rows[0]!.equity).toBe(1000);
+    expect(rows[2]!.equity).toBe(1020);
+  });
+
+  it('returns empty when table is empty', () => {
+    const db = new Database(':memory:');
+    db.exec(
+      'CREATE TABLE bot_equity_snapshots (id INTEGER PRIMARY KEY, timestamp INTEGER NOT NULL, equity REAL NOT NULL)',
+    );
+    expect(readCryptoEquityFromDb(db)).toEqual([]);
   });
 });
