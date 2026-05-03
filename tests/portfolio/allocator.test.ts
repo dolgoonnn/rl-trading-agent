@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { computeInverseVolWeights } from '@/lib/portfolio/allocator';
+import type { StrategyAllocation } from '@/lib/portfolio/types';
 
 describe('computeInverseVolWeights', () => {
   it('gives equal weight when vols are equal', () => {
@@ -22,8 +23,8 @@ describe('computeInverseVolWeights', () => {
       { strategy: 'ict-3sym', dailyReturns: highVol },
       { strategy: 'f2f-gold', dailyReturns: lowVol },
     ]);
-    const crypto = r.allocations.find((a) => a.strategy === 'ict-3sym')!;
-    const gold = r.allocations.find((a) => a.strategy === 'f2f-gold')!;
+    const crypto = r.allocations.find((a: StrategyAllocation) => a.strategy === 'ict-3sym')!;
+    const gold = r.allocations.find((a: StrategyAllocation) => a.strategy === 'f2f-gold')!;
     expect(gold.weight).toBeGreaterThan(crypto.weight);
     expect(crypto.weight + gold.weight).toBeCloseTo(1, 6);
   });
@@ -33,8 +34,8 @@ describe('computeInverseVolWeights', () => {
       { strategy: 'ict-3sym', dailyReturns: Array(50).fill(0).map((_, i) => (i % 2 ? 0.005 : -0.005)) },
       { strategy: 'f2f-gold', dailyReturns: [0.01, -0.01, 0.01] }, // cold start
     ]);
-    expect(r.allocations.find((a) => a.strategy === 'ict-3sym')!.weight).toBeCloseTo(1, 6);
-    const gold = r.allocations.find((a) => a.strategy === 'f2f-gold')!;
+    expect(r.allocations.find((a: StrategyAllocation) => a.strategy === 'ict-3sym')!.weight).toBeCloseTo(1, 6);
+    const gold = r.allocations.find((a: StrategyAllocation) => a.strategy === 'f2f-gold')!;
     expect(gold.excluded?.reason).toMatch(/insufficient/i);
     expect(gold.weight).toBe(0);
     expect(r.warnings.length).toBeGreaterThan(0);
