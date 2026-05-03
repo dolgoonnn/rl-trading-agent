@@ -1,5 +1,5 @@
 import type { Database as BetterSqlite3Database } from 'better-sqlite3';
-import type { EquityPoint } from './types';
+import type { EquityPoint, StrategyId } from './types';
 import * as fs from 'node:fs';
 
 const MS_PER_DAY = 86_400_000;
@@ -59,4 +59,28 @@ export function readGoldDailyReturnsFromJson(filePath: string): number[] {
   } catch {
     return [];
   }
+}
+
+export interface EquitySources {
+  cryptoDb: BetterSqlite3Database | null;
+  goldStatePath: string;
+}
+
+export function getDailyReturnsForStrategy(
+  strategy: StrategyId,
+  lookbackDays: number,
+  sources: EquitySources,
+): number[] {
+  if (strategy === 'f2f-gold') {
+    const all = readGoldDailyReturnsFromJson(sources.goldStatePath);
+    return all.slice(-lookbackDays);
+  }
+  // ict-3sym, ict-7sym both come from the crypto bot DB.
+  // 7-sym is currently unused — same source, same shape; the strategy
+  // identifier is here to support future per-strategy filtering.
+  if (!sources.cryptoDb) return [];
+  const series = readCryptoEquityFromDb(sources.cryptoDb);
+  const daily = resampleToUtcDaily(series);
+  const truncated = daily.slice(-(lookbackDays + 1));
+  return toDailyReturns(truncated);
 }

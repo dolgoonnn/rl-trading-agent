@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import Database from 'better-sqlite3';
-import { resampleToUtcDaily, toDailyReturns, readCryptoEquityFromDb, readGoldDailyReturnsFromJson } from '@/lib/portfolio/equity-source';
+import {
+  resampleToUtcDaily,
+  toDailyReturns,
+  readCryptoEquityFromDb,
+  readGoldDailyReturnsFromJson,
+  getDailyReturnsForStrategy,
+  type EquitySources,
+} from '@/lib/portfolio/equity-source';
 import type { EquityPoint } from '@/lib/portfolio/types';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -129,5 +136,37 @@ describe('readGoldDailyReturnsFromJson', () => {
     expect(
       readGoldDailyReturnsFromJson('/tmp/definitely-not-real-12345.json'),
     ).toEqual([]);
+  });
+});
+
+describe('getDailyReturnsForStrategy', () => {
+  it('routes ict-3sym through the crypto reader and returns truncated tail', () => {
+    const db = makeFixtureDb();
+    // Add daily snapshots for 5 distinct UTC days
+    const insert = db.prepare(
+      'INSERT INTO bot_equity_snapshots (timestamp, equity) VALUES (?, ?)',
+    );
+    insert.run(D('2026-01-04T12:00:00Z'), 1030);
+    insert.run(D('2026-01-05T12:00:00Z'), 1040);
+
+    const sources: EquitySources = {
+      cryptoDb: db,
+      goldStatePath: '/tmp/missing.json',
+    };
+    const r = getDailyReturnsForStrategy('ict-3sym', 60, sources);
+    // 4 distinct UTC days resampled → 3 daily returns
+    expect(r).toHaveLength(3);
+  });
+
+  it('routes f2f-gold through the gold reader', () => {
+    const p = writeGoldFixture({
+      rolling30dReturns: Array(40).fill(0.001),
+    });
+    const sources: EquitySources = {
+      cryptoDb: null,
+      goldStatePath: p,
+    };
+    const r = getDailyReturnsForStrategy('f2f-gold', 30, sources);
+    expect(r).toHaveLength(30); // last 30 of 40
   });
 });
