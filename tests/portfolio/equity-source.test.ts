@@ -31,7 +31,7 @@ describe('resampleToUtcDaily', () => {
       { timestamp: D('2026-01-04T12:00:00Z'), equity: 1100 },
     ];
     const out = resampleToUtcDaily(points);
-    expect(out.map((p) => new Date(p.timestamp).toISOString())).toEqual([
+    expect(out.map((p: EquityPoint) => new Date(p.timestamp).toISOString())).toEqual([
       '2026-01-01T00:00:00.000Z',
       '2026-01-04T00:00:00.000Z',
     ]);
