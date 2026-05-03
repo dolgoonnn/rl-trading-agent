@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resampleToUtcDaily } from '@/lib/portfolio/equity-source';
+import { resampleToUtcDaily, toDailyReturns } from '@/lib/portfolio/equity-source';
 import type { EquityPoint } from '@/lib/portfolio/types';
 
 const D = (utc: string) => new Date(utc).getTime();
@@ -35,5 +35,26 @@ describe('resampleToUtcDaily', () => {
       '2026-01-01T00:00:00.000Z',
       '2026-01-04T00:00:00.000Z',
     ]);
+  });
+});
+
+describe('toDailyReturns', () => {
+  it('computes simple daily returns from a daily-resampled series', () => {
+    const series: EquityPoint[] = [
+      { timestamp: D('2026-01-01T00:00:00Z'), equity: 1000 },
+      { timestamp: D('2026-01-02T00:00:00Z'), equity: 1010 },
+      { timestamp: D('2026-01-03T00:00:00Z'), equity: 990 },
+    ];
+    const r = toDailyReturns(series);
+    expect(r).toHaveLength(2);
+    expect(r[0]).toBeCloseTo(0.01, 6);
+    expect(r[1]).toBeCloseTo(-0.01980198, 6);
+  });
+
+  it('returns empty when fewer than 2 points', () => {
+    expect(toDailyReturns([])).toEqual([]);
+    expect(
+      toDailyReturns([{ timestamp: 0, equity: 100 }]),
+    ).toEqual([]);
   });
 });

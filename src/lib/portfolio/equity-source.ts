@@ -16,3 +16,15 @@ export function resampleToUtcDaily(points: EquityPoint[]): EquityPoint[] {
   }
   return [...byDay.values()].sort((a, b) => a.timestamp - b.timestamp);
 }
+
+export function toDailyReturns(series: EquityPoint[]): number[] {
+  if (series.length < 2) return [];
+  const out: number[] = [];
+  for (let i = 1; i < series.length; i++) {
+    const prev = series[i - 1]!.equity;
+    const curr = series[i]!.equity;
+    if (prev === 0) continue;
+    out.push(curr / prev - 1);
+  }
+  return out;
+}
