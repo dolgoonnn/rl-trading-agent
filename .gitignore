@@ -56,3 +56,7 @@ ict-trading.db
 
 # Runtime allocator output
 data/allocator-recommendations.json
+
+# Runtime monitor output
+data/decay-status.json
+data/decay-alerts-log.json
