@@ -53,3 +53,6 @@ ict-trading.db
 
 # Worktrees
 .worktrees/
+
+# Runtime allocator output
+data/allocator-recommendations.json

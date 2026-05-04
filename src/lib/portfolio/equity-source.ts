@@ -39,6 +39,16 @@ interface EquityRow {
 export function readCryptoEquityFromDb(
   db: BetterSqlite3Database,
 ): EquityPoint[] {
+  // Guard against cold-start: table may not exist if the bot has never run.
+  const tableExists = (
+    db
+      .prepare(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='bot_equity_snapshots'",
+      )
+      .get() as { 1: number } | undefined
+  ) !== undefined;
+  if (!tableExists) return [];
+
   const rows = db
     .prepare(
       'SELECT timestamp, equity FROM bot_equity_snapshots ORDER BY timestamp ASC',
