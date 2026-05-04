@@ -53,3 +53,8 @@ ict-trading.db
 
 # Worktrees
 .worktrees/
+
+# Portfolio allocator + decay monitor runtime outputs (path A)
+data/allocator-recommendations.json
+data/decay-status.json
+data/decay-alerts-log.json
