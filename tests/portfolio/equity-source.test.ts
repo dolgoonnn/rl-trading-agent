@@ -109,6 +109,11 @@ describe('readCryptoEquityFromDb', () => {
     );
     expect(readCryptoEquityFromDb(db)).toEqual([]);
   });
+
+  it('returns empty when the table does not exist (cold-start guard)', () => {
+    const db = new Database(':memory:');
+    expect(readCryptoEquityFromDb(db)).toEqual([]);
+  });
 });
 
 function writeGoldFixture(state: object): string {
