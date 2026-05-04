@@ -59,20 +59,26 @@ function load90dEquityForStrategy(
     }
     if (!parsed.rolling30dReturns || parsed.rolling30dReturns.length === 0)
       return [];
+    // Drop returns that would break the backwards walk: NaN/Infinity, or -1
+    // exactly (which would produce Infinity equity via `eq / (1 + r)`).
+    const rs = parsed.rolling30dReturns.filter(
+      (r): r is number => typeof r === 'number' && Number.isFinite(r) && r > -1,
+    );
+    if (rs.length === 0) return [];
     const startEquity = parsed.equity ?? 10000;
     let eq = startEquity;
-    // Walk backwards: reconstruct equity at each prior day from the most recent.
     const reverseEquity: EquityPoint[] = [
       { timestamp: Date.now(), equity: eq },
     ];
-    const rs = parsed.rolling30dReturns;
     let t = Date.now();
     for (let i = rs.length - 1; i >= 0; i--) {
       t -= 86_400_000;
-      eq = eq / (1 + rs[i]!); // invert the return
+      eq = eq / (1 + rs[i]!);
       reverseEquity.push({ timestamp: t, equity: eq });
     }
-    return reverseEquity.reverse();
+    // Cap to LOOKBACK_EQUITY_DAYS, mirroring the crypto path. The gold bot
+    // already trims rolling30dReturns to 90 entries, so this is defensive.
+    return reverseEquity.reverse().slice(-LOOKBACK_EQUITY_DAYS);
   }
   // crypto: pull last 90 daily-resampled equity points from DB
   if (!sources.cryptoDb) return [];
