@@ -40,7 +40,7 @@ export function readRecentCandles(
 }
 
 function openDb(): BetterSqlite3Database | null {
-  const dbPath = path.resolve('data/app.db');
+  const dbPath = path.resolve('data/ict-trading.db');
   if (!fs.existsSync(dbPath)) return null;
   return new Database(dbPath, { readonly: true });
 }

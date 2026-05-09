@@ -17,7 +17,7 @@ export const setupsRouter = router({
       }),
     )
     .query(({ input }) => {
-      const dbPath = path.resolve('data/app.db');
+      const dbPath = path.resolve('data/ict-trading.db');
       if (!fs.existsSync(dbPath)) {
         return {
           available: false as const,
