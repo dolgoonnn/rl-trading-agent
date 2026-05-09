@@ -1,0 +1,21 @@
+{
+  "config": {
+    "symbols": [
+      "BTCUSDT"
+    ],
+    "minFundingRate": 0.005,
+    "closeBelowRate": 0.00005,
+    "positionSizeUSDT": 2000,
+    "maxHoldTimeHours": 168,
+    "commissionPerSide": 0.00055,
+    "spreadAssumption": {
+      "BTCUSDT": 0.0002,
+      "ETHUSDT": 0.0003,
+      "SOLUSDT": 0.0003
+    },
+    "maxArbPositions": 3
+  },
+  "trades": [],
+  "totalPnl": 0,
+  "totalTrades": 0
+}

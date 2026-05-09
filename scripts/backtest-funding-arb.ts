@@ -20,6 +20,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { fileURLToPath } from 'node:url';
 
 // ============================================
 // Types
@@ -36,7 +37,7 @@ interface FuturesRecord {
   fundingRate: number;
 }
 
-interface ArbTrade {
+export interface ArbTrade {
   symbol: string;
   direction: 'short_perp' | 'long_perp';
   entryTimestamp: number;
@@ -51,7 +52,7 @@ interface ArbTrade {
   exitReason: string;
 }
 
-interface BacktestConfig {
+export interface BacktestConfig {
   symbols: string[];
   minFundingRate: number;
   closeBelowRate: number;
@@ -119,7 +120,7 @@ function parseArgs(): BacktestConfig {
 // Data Loading
 // ============================================
 
-function loadFundingData(symbol: string): FundingRecord[] {
+export function loadFundingData(symbol: string): FundingRecord[] {
   const dataDir = path.resolve(__dirname, '../data');
 
   // Try native funding rates first
@@ -162,7 +163,7 @@ function loadFundingData(symbol: string): FundingRecord[] {
 // Backtest Engine
 // ============================================
 
-function backtestSymbol(
+export function backtestSymbol(
   symbol: string,
   records: FundingRecord[],
   config: BacktestConfig,
@@ -434,4 +435,6 @@ function main(): void {
   console.log(`\nResults saved to ${outPath}`);
 }
 
-main();
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main();
+}
