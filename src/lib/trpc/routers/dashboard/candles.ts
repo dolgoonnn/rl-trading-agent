@@ -14,11 +14,19 @@ interface CandleRow {
   volume: number;
 }
 
+export function botCandlesTableExists(db: BetterSqlite3Database): boolean {
+  const row = db
+    .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='bot_candles' LIMIT 1`)
+    .get() as { name: string } | undefined;
+  return !!row;
+}
+
 export function readRecentCandles(
   db: BetterSqlite3Database,
   symbol: string,
   n: number,
 ): CandleRow[] {
+  if (!botCandlesTableExists(db)) return [];
   const rows = db
     .prepare(
       `SELECT timestamp, open, high, low, close, volume
