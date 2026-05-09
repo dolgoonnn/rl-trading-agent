@@ -20,6 +20,7 @@ export default function SetupPage({ params }: PageProps) {
 
   const candlesQ = trpc.dashboard.candles.recent.useQuery({ symbol, n: 300 });
   const setupsQ = trpc.dashboard.setups.live.useQuery({ symbol, candleCount: 500 });
+  const overlaysQ = trpc.dashboard.overlays.scan.useQuery({ symbol, candleCount: 500 });
   const statsQ = trpc.dashboard.stats.byPattern.useQuery();
   const decayQ = trpc.dashboard.decay.status.useQuery();
 
@@ -44,6 +45,17 @@ export default function SetupPage({ params }: PageProps) {
   };
 
   const strategyId = 'ict-3sym';
+
+  const overlays = overlaysQ.data;
+  const selected = setupsData?.allScored?.[0]?.signal ?? null;
+  const setupLines = selected
+    ? {
+        entry: selected.entryPrice,
+        stopLoss: selected.stopLoss,
+        takeProfit: selected.takeProfit,
+        side: selected.direction,
+      }
+    : null;
 
   const cards: SetupCardData[] = (setupsData?.allScored ?? []).slice(0, 5).map((s) => {
     const sig = s.signal;
@@ -77,6 +89,17 @@ export default function SetupPage({ params }: PageProps) {
       </header>
       <main className="space-y-6 p-6">
         <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-2">
+          <div className="mb-2 flex flex-wrap gap-3 px-2 pt-1 text-[10px] font-mono text-zinc-500">
+            <span><span className="inline-block h-2 w-3 align-middle" style={{ background: 'rgba(34,197,94,0.4)' }} /> bull OB</span>
+            <span><span className="inline-block h-2 w-3 align-middle" style={{ background: 'rgba(239,68,68,0.4)' }} /> bear OB</span>
+            <span><span className="inline-block h-2 w-3 align-middle" style={{ background: 'rgba(59,130,246,0.3)' }} /> bull FVG</span>
+            <span><span className="inline-block h-2 w-3 align-middle" style={{ background: 'rgba(234,179,8,0.3)' }} /> bear FVG</span>
+            <span className="text-emerald-400">— SSL</span>
+            <span className="text-rose-400">— BSL</span>
+            <span className="text-amber-400">▲ sweep</span>
+            <span className="text-blue-400">● BOS</span>
+            <span className="text-purple-400">● CHoCH</span>
+          </div>
           {candlesQ.isLoading ? (
             <div className="flex h-[400px] items-center justify-center text-zinc-500">
               loading candles…
@@ -86,7 +109,13 @@ export default function SetupPage({ params }: PageProps) {
               no candle data
             </div>
           ) : (
-            <SetupChart candles={candles} />
+            <SetupChart
+              candles={candles}
+              rects={overlays?.rects ?? []}
+              lines={overlays?.lines ?? []}
+              markers={overlays?.markers ?? []}
+              setupLines={setupLines}
+            />
           )}
         </section>
         <section>

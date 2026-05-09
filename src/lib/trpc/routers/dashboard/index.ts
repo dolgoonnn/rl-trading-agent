@@ -4,6 +4,7 @@ import { decayRouter } from './decay';
 import { candlesRouter } from './candles';
 import { biasRouter } from './bias';
 import { setupsRouter } from './setups';
+import { overlaysRouter } from './overlays';
 
 export const dashboardRouter = router({
   stats: statsRouter,
@@ -11,4 +12,5 @@ export const dashboardRouter = router({
   candles: candlesRouter,
   bias: biasRouter,
   setups: setupsRouter,
+  overlays: overlaysRouter,
 });
