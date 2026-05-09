@@ -4,6 +4,8 @@ import { use } from 'react';
 import Link from 'next/link';
 import { trpc } from '@/lib/trpc/client';
 import { SetupChart } from '@/components/dashboard/SetupChart';
+import { KillZoneBadge } from '@/components/dashboard/KillZoneBadge';
+import { HTFMiniGrid } from '@/components/dashboard/HTFMiniGrid';
 import {
   SetupCard,
   type SetupCardData,
@@ -83,11 +85,15 @@ export default function SetupPage({ params }: PageProps) {
           </Link>
           <h1 className="font-mono text-xl font-semibold">{symbol}</h1>
         </div>
-        <span className="text-xs text-zinc-500">
-          {setupsQ.isLoading ? 'loading…' : setupsData?.available ? 'live' : 'no data'}
-        </span>
+        <div className="flex items-center gap-3">
+          <KillZoneBadge />
+          <span className="text-xs text-zinc-500">
+            {setupsQ.isLoading ? 'loading…' : setupsData?.available ? 'live' : 'no data'}
+          </span>
+        </div>
       </header>
       <main className="space-y-6 p-6">
+        <HTFMiniGrid symbol={symbol} setupSide={selected?.direction ?? null} />
         <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-2">
           <div className="mb-2 flex flex-wrap gap-3 px-2 pt-1 text-[10px] font-mono text-zinc-500">
             <span><span className="inline-block h-2 w-3 align-middle" style={{ background: 'rgba(34,197,94,0.4)' }} /> bull OB</span>

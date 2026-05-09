@@ -10,6 +10,7 @@ import {
   type IPriceLine,
 } from 'lightweight-charts';
 import { RectanglePrimitive, type RectSpec } from './RectanglePrimitive';
+import { killZoneWindowsInRange, KILL_ZONE_FILL } from './killzones';
 
 export interface SetupChartCandle {
   timestamp: number;
@@ -106,7 +107,24 @@ export function SetupChart({
       })),
     );
 
-    // Rectangle primitive for OB/FVG overlays
+    // Kill-zone background bands across the visible candle range
+    const firstTs = candles[0]?.timestamp ?? 0;
+    const lastTs = candles[candles.length - 1]?.timestamp ?? 0;
+    const kzWindows = firstTs && lastTs ? killZoneWindowsInRange(firstTs, lastTs) : [];
+    const kzRects: RectSpec[] = kzWindows.map((w) => ({
+      startTime: w.startMs,
+      endTime: w.endMs,
+      high: 0,
+      low: 0,
+      fillColor: KILL_ZONE_FILL[w.kind],
+      borderColor: 'transparent',
+      fullHeight: true,
+    }));
+    const kzPrim = new RectanglePrimitive();
+    kzPrim.setRects(kzRects);
+    series.attachPrimitive(kzPrim);
+
+    // Rectangle primitive for OB/FVG overlays (drawn on top of KZ bands)
     const rectPrim = new RectanglePrimitive();
     const rectSpecs: RectSpec[] = rects.map((r) => ({
       startTime: r.startTime,
