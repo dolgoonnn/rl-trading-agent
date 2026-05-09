@@ -6,12 +6,15 @@ import { trpc } from '@/lib/trpc/client';
 import { SetupChart } from '@/components/dashboard/SetupChart';
 import { KillZoneBadge } from '@/components/dashboard/KillZoneBadge';
 import { HTFMiniGrid } from '@/components/dashboard/HTFMiniGrid';
+import { ChecklistCard } from '@/components/dashboard/ChecklistCard';
 import {
   SetupCard,
   type SetupCardData,
   type SetupCardStats,
   type SetupCardDecay,
 } from '@/components/dashboard/SetupCard';
+
+const RUN20_THRESHOLD = 4.048;
 
 interface PageProps {
   params: Promise<{ symbol: string }>;
@@ -147,12 +150,24 @@ export default function SetupPage({ params }: PageProps) {
             <div className="grid gap-3 md:grid-cols-2">
               {cards.map((c, i) => (
                 <SetupCard
-                  key={i}
+                  key={`card-${i}`}
                   data={c}
                   stats={statsForStrategy(c.strategyId)}
                   decay={decayForStrategy(c.strategyId)}
                 />
               ))}
+              {cards[0] && (
+                <div className="md:col-span-2">
+                  <ChecklistCard
+                    side={cards[0].side}
+                    totalScore={cards[0].confluenceScore}
+                    threshold={RUN20_THRESHOLD}
+                    factorBreakdown={Object.fromEntries(
+                      cards[0].scoreBreakdown.map((b) => [b.factor, b.value]),
+                    )}
+                  />
+                </div>
+              )}
             </div>
           )}
         </section>
