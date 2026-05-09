@@ -90,12 +90,23 @@ export default function SetupPage({ params }: PageProps) {
           )}
         </section>
         <section>
-          <h2 className="mb-3 text-sm uppercase tracking-wider text-zinc-400">Active setups</h2>
+          <div className="mb-3 flex items-baseline justify-between">
+            <h2 className="text-sm uppercase tracking-wider text-zinc-400">
+              {setupsData && setupsData.barOffset === 0 ? 'Active setups' : 'Recent setups'}
+            </h2>
+            {setupsData && setupsData.barOffset > 0 && (
+              <span className="text-xs text-zinc-500">
+                last candidate {setupsData.barOffset} bar{setupsData.barOffset === 1 ? '' : 's'} ago
+                &middot; scanned {setupsData.scannedBars} bars
+              </span>
+            )}
+            <span className="text-xs text-zinc-500">regime: {setupsData?.regime ?? '—'}</span>
+          </div>
           {setupsQ.isLoading ? (
             <p className="text-zinc-500">loading…</p>
           ) : cards.length === 0 ? (
             <p className="text-zinc-500">
-              no active setups &middot; {setupsData?.reasoning?.[0] ?? ''}
+              no setups in last {setupsData?.scannedBars ?? 50} bars &middot; {setupsData?.reasoning?.[0] ?? ''}
             </p>
           ) : (
             <div className="grid gap-3 md:grid-cols-2">

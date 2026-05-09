@@ -6,7 +6,10 @@ import { router, publicProcedure } from '../../init';
 import { SignalEngine } from '@/lib/bot/signal-engine';
 import type { BotSymbol } from '@/types/bot';
 import type { Candle } from '@/types';
+import type { ScoredSignal } from '@/lib/rl/strategies/confluence-scorer';
 import { readRecentCandles } from './candles';
+
+const LOOKBACK_BARS = 50;
 
 export const setupsRouter = router({
   live: publicProcedure
@@ -22,9 +25,11 @@ export const setupsRouter = router({
         return {
           available: false as const,
           signal: null,
-          allScored: [],
+          allScored: [] as ScoredSignal[],
           regime: 'unknown',
           reasoning: [] as string[],
+          barOffset: 0,
+          scannedBars: 0,
         };
       }
       const db = new Database(dbPath, { readonly: true });
@@ -34,19 +39,36 @@ export const setupsRouter = router({
           return {
             available: true as const,
             signal: null,
-            allScored: [],
+            allScored: [] as ScoredSignal[],
             regime: 'unknown',
             reasoning: ['Insufficient candle history'],
+            barOffset: 0,
+            scannedBars: 0,
           };
         }
         const engine = new SignalEngine();
-        const result = engine.evaluate(candles, input.symbol as BotSymbol);
+        const lastIdx = candles.length - 1;
+        const minIdx = Math.max(50, lastIdx - LOOKBACK_BARS + 1);
+
+        // Walk backwards looking for the most recent bar that produced any candidates.
+        let chosen = engine.evaluate(candles, input.symbol as BotSymbol, lastIdx);
+        let chosenIdx = lastIdx;
+        for (let i = lastIdx - 1; i >= minIdx && chosen.allScored.length === 0; i--) {
+          const r = engine.evaluate(candles, input.symbol as BotSymbol, i);
+          if (r.allScored.length > 0) {
+            chosen = r;
+            chosenIdx = i;
+            break;
+          }
+        }
         return {
           available: true as const,
-          signal: result.signal,
-          allScored: result.allScored,
-          regime: result.regime,
-          reasoning: result.reasoning,
+          signal: chosen.signal,
+          allScored: chosen.allScored,
+          regime: chosen.regime,
+          reasoning: chosen.reasoning,
+          barOffset: lastIdx - chosenIdx,
+          scannedBars: lastIdx - minIdx + 1,
         };
       } finally {
         db.close();
