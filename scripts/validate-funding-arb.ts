@@ -43,17 +43,40 @@ const SLIDE_DAYS = 30;
 const MC_ITERATIONS = 1000;
 const SKIP_RATE = 0.20;
 const MIN_DATA_YEARS = 2.5;
-const OUT_VALIDATION = path.resolve(
+
+interface CliOverrides {
+  minFundingRate?: number;
+  closeBelowRate?: number;
+  outValidation?: string;
+  outBaseline?: string;
+  numTrials: number;
+}
+
+function parseCliOverrides(): CliOverrides {
+  const args = process.argv.slice(2);
+  const o: CliOverrides = { numTrials: 1 };
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--min-rate') o.minFundingRate = parseFloat(args[++i]!);
+    else if (args[i] === '--close-rate') o.closeBelowRate = parseFloat(args[++i]!);
+    else if (args[i] === '--out') o.outValidation = path.resolve(args[++i]!);
+    else if (args[i] === '--out-baseline') o.outBaseline = path.resolve(args[++i]!);
+    else if (args[i] === '--num-trials') o.numTrials = parseInt(args[++i]!, 10);
+  }
+  return o;
+}
+
+const CLI = parseCliOverrides();
+const OUT_VALIDATION = CLI.outValidation ?? path.resolve(
   'experiments/funding-arb-validation-results.json',
 );
-const OUT_BASELINE = path.resolve(
+const OUT_BASELINE = CLI.outBaseline ?? path.resolve(
   'experiments/funding-arb-baseline.json',
 );
 
 const SHIPPED_DEFAULTS: BacktestConfig = {
   symbols: DEFAULT_SYMBOLS,
-  minFundingRate: 0.0002,
-  closeBelowRate: 0.00005,
+  minFundingRate: CLI.minFundingRate ?? 0.0002,
+  closeBelowRate: CLI.closeBelowRate ?? 0.00005,
   positionSizeUSDT: 2000,
   maxHoldTimeHours: 168,
   commissionPerSide: 0.00055,
@@ -171,7 +194,7 @@ async function main(): Promise<void> {
   );
 
   // ---- DSR ----
-  const dsrResult = calculateDeflatedSharpe(sharpe, trades.length, 1);
+  const dsrResult = calculateDeflatedSharpe(sharpe, trades.length, CLI.numTrials);
   console.log(`DSR: ${dsrResult.deflatedSharpe.toFixed(2)} (haircut ${dsrResult.haircut.toFixed(2)})`);
 
   // ---- MC ----

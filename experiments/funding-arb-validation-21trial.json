@@ -1,0 +1,70 @@
+{
+  "timestamp": "2026-05-09T16:45:40.359Z",
+  "dataRange": {
+    "start": "2023-02-23",
+    "end": "2026-02-01",
+    "bars": 7545
+  },
+  "config": {
+    "symbols": [
+      "BTCUSDT",
+      "ETHUSDT",
+      "SOLUSDT"
+    ],
+    "minFundingRate": 0.0002,
+    "closeBelowRate": 0.00005,
+    "positionSizeUSDT": 2000,
+    "maxHoldTimeHours": 168,
+    "commissionPerSide": 0.00055,
+    "spreadAssumption": {
+      "BTCUSDT": 0.0002,
+      "ETHUSDT": 0.0003,
+      "SOLUSDT": 0.0003
+    },
+    "maxArbPositions": 3
+  },
+  "checks": [
+    {
+      "name": "Walk-Forward >=60%",
+      "value": "85.7%",
+      "threshold": ">=60%",
+      "pass": true
+    },
+    {
+      "name": "DSR >0",
+      "value": "0.51",
+      "threshold": ">0",
+      "pass": true
+    },
+    {
+      "name": "MC Bootstrap Sharpe 5th >0",
+      "value": "1.39",
+      "threshold": ">0",
+      "pass": true
+    },
+    {
+      "name": "MC Bootstrap PnL 5th >0%",
+      "value": "3.4%",
+      "threshold": ">0%",
+      "pass": true
+    },
+    {
+      "name": "MC Skip 20% >=95%",
+      "value": "100.0%",
+      "threshold": ">=95%",
+      "pass": true
+    }
+  ],
+  "details": {
+    "totalTrades": 13,
+    "totalFundingCollected": 162.29784000000004,
+    "netPnl": 120.09783999999999,
+    "sharpe": 2.1123550613379054,
+    "deflatedSharpe": 0.5128688349278949,
+    "bootstrapSharpe5": 1.3909979232891727,
+    "bootstrapPnl5Pct": 0.03415511307449675,
+    "skip20PassRate": 1,
+    "wfWindowsPass": 6,
+    "wfWindowsTotal": 7
+  }
+}

@@ -1,0 +1,231 @@
+{
+  "numTrials": 21,
+  "gridShape": {
+    "minRates": [
+      0.00005,
+      0.0001,
+      0.00015,
+      0.0002,
+      0.0003,
+      0.0005
+    ],
+    "closeRates": [
+      0.00001,
+      0.000025,
+      0.00005,
+      0.0001
+    ]
+  },
+  "results": [
+    {
+      "minFundingRate": 0.00015,
+      "closeBelowRate": 0.0001,
+      "totalTrades": 13,
+      "netPnl": 120.28873999999998,
+      "sharpe": 2.6228208059848255,
+      "deflatedSharpe": 0.7017486837809661,
+      "wfPassRate": 0.5,
+      "wfWindowsTotal": 2
+    },
+    {
+      "minFundingRate": 0.0002,
+      "closeBelowRate": 0.0001,
+      "totalTrades": 13,
+      "netPnl": 120.28873999999998,
+      "sharpe": 2.6228208059848255,
+      "deflatedSharpe": 0.7017486837809661,
+      "wfPassRate": 0.5,
+      "wfWindowsTotal": 2
+    },
+    {
+      "minFundingRate": 0.0003,
+      "closeBelowRate": 0.0001,
+      "totalTrades": 13,
+      "netPnl": 120.28873999999998,
+      "sharpe": 2.6228208059848255,
+      "deflatedSharpe": 0.7017486837809661,
+      "wfPassRate": 0.5,
+      "wfWindowsTotal": 2
+    },
+    {
+      "minFundingRate": 0.0005,
+      "closeBelowRate": 0.0001,
+      "totalTrades": 13,
+      "netPnl": 120.28873999999998,
+      "sharpe": 2.6228208059848255,
+      "deflatedSharpe": 0.7017486837809661,
+      "wfPassRate": 0.5,
+      "wfWindowsTotal": 2
+    },
+    {
+      "minFundingRate": 0.00005,
+      "closeBelowRate": 0.00001,
+      "totalTrades": 13,
+      "netPnl": 120.09783999999999,
+      "sharpe": 2.612942395927689,
+      "deflatedSharpe": 0.6981858599565327,
+      "wfPassRate": 0.5,
+      "wfWindowsTotal": 2
+    },
+    {
+      "minFundingRate": 0.00005,
+      "closeBelowRate": 0.000025,
+      "totalTrades": 13,
+      "netPnl": 120.09783999999999,
+      "sharpe": 2.612942395927689,
+      "deflatedSharpe": 0.6981858599565327,
+      "wfPassRate": 0.5,
+      "wfWindowsTotal": 2
+    },
+    {
+      "minFundingRate": 0.0001,
+      "closeBelowRate": 0.00001,
+      "totalTrades": 13,
+      "netPnl": 120.09783999999999,
+      "sharpe": 2.612942395927689,
+      "deflatedSharpe": 0.6981858599565327,
+      "wfPassRate": 0.5,
+      "wfWindowsTotal": 2
+    },
+    {
+      "minFundingRate": 0.0001,
+      "closeBelowRate": 0.000025,
+      "totalTrades": 13,
+      "netPnl": 120.09783999999999,
+      "sharpe": 2.612942395927689,
+      "deflatedSharpe": 0.6981858599565327,
+      "wfPassRate": 0.5,
+      "wfWindowsTotal": 2
+    },
+    {
+      "minFundingRate": 0.0001,
+      "closeBelowRate": 0.00005,
+      "totalTrades": 13,
+      "netPnl": 120.09783999999999,
+      "sharpe": 2.612942395927689,
+      "deflatedSharpe": 0.6981858599565327,
+      "wfPassRate": 0.5,
+      "wfWindowsTotal": 2
+    },
+    {
+      "minFundingRate": 0.00015,
+      "closeBelowRate": 0.00001,
+      "totalTrades": 13,
+      "netPnl": 120.09783999999999,
+      "sharpe": 2.612942395927689,
+      "deflatedSharpe": 0.6981858599565327,
+      "wfPassRate": 0.5,
+      "wfWindowsTotal": 2
+    },
+    {
+      "minFundingRate": 0.00015,
+      "closeBelowRate": 0.000025,
+      "totalTrades": 13,
+      "netPnl": 120.09783999999999,
+      "sharpe": 2.612942395927689,
+      "deflatedSharpe": 0.6981858599565327,
+      "wfPassRate": 0.5,
+      "wfWindowsTotal": 2
+    },
+    {
+      "minFundingRate": 0.00015,
+      "closeBelowRate": 0.00005,
+      "totalTrades": 13,
+      "netPnl": 120.09783999999999,
+      "sharpe": 2.612942395927689,
+      "deflatedSharpe": 0.6981858599565327,
+      "wfPassRate": 0.5,
+      "wfWindowsTotal": 2
+    },
+    {
+      "minFundingRate": 0.0002,
+      "closeBelowRate": 0.00001,
+      "totalTrades": 13,
+      "netPnl": 120.09783999999999,
+      "sharpe": 2.612942395927689,
+      "deflatedSharpe": 0.6981858599565327,
+      "wfPassRate": 0.5,
+      "wfWindowsTotal": 2
+    },
+    {
+      "minFundingRate": 0.0002,
+      "closeBelowRate": 0.000025,
+      "totalTrades": 13,
+      "netPnl": 120.09783999999999,
+      "sharpe": 2.612942395927689,
+      "deflatedSharpe": 0.6981858599565327,
+      "wfPassRate": 0.5,
+      "wfWindowsTotal": 2
+    },
+    {
+      "minFundingRate": 0.0002,
+      "closeBelowRate": 0.00005,
+      "totalTrades": 13,
+      "netPnl": 120.09783999999999,
+      "sharpe": 2.612942395927689,
+      "deflatedSharpe": 0.6981858599565327,
+      "wfPassRate": 0.5,
+      "wfWindowsTotal": 2
+    },
+    {
+      "minFundingRate": 0.0003,
+      "closeBelowRate": 0.00001,
+      "totalTrades": 13,
+      "netPnl": 120.09783999999999,
+      "sharpe": 2.612942395927689,
+      "deflatedSharpe": 0.6981858599565327,
+      "wfPassRate": 0.5,
+      "wfWindowsTotal": 2
+    },
+    {
+      "minFundingRate": 0.0003,
+      "closeBelowRate": 0.000025,
+      "totalTrades": 13,
+      "netPnl": 120.09783999999999,
+      "sharpe": 2.612942395927689,
+      "deflatedSharpe": 0.6981858599565327,
+      "wfPassRate": 0.5,
+      "wfWindowsTotal": 2
+    },
+    {
+      "minFundingRate": 0.0003,
+      "closeBelowRate": 0.00005,
+      "totalTrades": 13,
+      "netPnl": 120.09783999999999,
+      "sharpe": 2.612942395927689,
+      "deflatedSharpe": 0.6981858599565327,
+      "wfPassRate": 0.5,
+      "wfWindowsTotal": 2
+    },
+    {
+      "minFundingRate": 0.0005,
+      "closeBelowRate": 0.00001,
+      "totalTrades": 13,
+      "netPnl": 120.09783999999999,
+      "sharpe": 2.612942395927689,
+      "deflatedSharpe": 0.6981858599565327,
+      "wfPassRate": 0.5,
+      "wfWindowsTotal": 2
+    },
+    {
+      "minFundingRate": 0.0005,
+      "closeBelowRate": 0.000025,
+      "totalTrades": 13,
+      "netPnl": 120.09783999999999,
+      "sharpe": 2.612942395927689,
+      "deflatedSharpe": 0.6981858599565327,
+      "wfPassRate": 0.5,
+      "wfWindowsTotal": 2
+    },
+    {
+      "minFundingRate": 0.0005,
+      "closeBelowRate": 0.00005,
+      "totalTrades": 13,
+      "netPnl": 120.09783999999999,
+      "sharpe": 2.612942395927689,
+      "deflatedSharpe": 0.6981858599565327,
+      "wfPassRate": 0.5,
+      "wfWindowsTotal": 2
+    }
+  ]
+}
