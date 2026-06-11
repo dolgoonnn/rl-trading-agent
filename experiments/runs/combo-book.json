@@ -1,0 +1,16 @@
+{
+  "suitable": [
+    "A:Au-overnight",
+    "B:Ag-overnight",
+    "C:Au-fix-short",
+    "D:Au-AMfix-long",
+    "I:Ag-ownfix-short",
+    "F:Au-NFP-mom",
+    "J:US500-overnight",
+    "K:EUR-morning-short",
+    "L:EUR-h22-long"
+  ],
+  "bookTotalPct": 283.8,
+  "bookSharpe": 1.44,
+  "bookMaxDDPct": 19.2
+}

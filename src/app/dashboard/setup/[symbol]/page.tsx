@@ -7,6 +7,8 @@ import { SetupChart } from '@/components/dashboard/SetupChart';
 import { KillZoneBadge } from '@/components/dashboard/KillZoneBadge';
 import { HTFMiniGrid } from '@/components/dashboard/HTFMiniGrid';
 import { ChecklistCard } from '@/components/dashboard/ChecklistCard';
+import { GoldContextPanel } from '@/components/dashboard/GoldContextPanel';
+import { SetupProposals } from '@/components/dashboard/SetupProposals';
 import {
   SetupCard,
   type SetupCardData,
@@ -76,6 +78,8 @@ export default function SetupPage({ params }: PageProps) {
         value,
       })),
       strategyId,
+      symbol,
+      regime: setupsData?.regime,
     };
   });
 
@@ -96,6 +100,8 @@ export default function SetupPage({ params }: PageProps) {
         </div>
       </header>
       <main className="space-y-6 p-6">
+        <SetupProposals symbol={symbol} />
+        <GoldContextPanel symbol={symbol} />
         <HTFMiniGrid symbol={symbol} setupSide={selected?.direction ?? null} />
         <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-2">
           <div className="mb-2 flex flex-wrap gap-3 px-2 pt-1 text-[10px] font-mono text-zinc-500">
@@ -103,6 +109,10 @@ export default function SetupPage({ params }: PageProps) {
             <span><span className="inline-block h-2 w-3 align-middle" style={{ background: 'rgba(239,68,68,0.4)' }} /> bear OB</span>
             <span><span className="inline-block h-2 w-3 align-middle" style={{ background: 'rgba(59,130,246,0.3)' }} /> bull FVG</span>
             <span><span className="inline-block h-2 w-3 align-middle" style={{ background: 'rgba(234,179,8,0.3)' }} /> bear FVG</span>
+            <span><span className="inline-block h-2 w-3 align-middle" style={{ background: 'rgba(168,85,247,0.5)' }} /> unicorn (OB∩FVG)</span>
+            <span className="text-zinc-400">HTF zones fainter</span>
+            <span className="text-emerald-300">▲ past W</span>
+            <span className="text-rose-400">▲ past L</span>
             <span className="text-emerald-400">— SSL</span>
             <span className="text-rose-400">— BSL</span>
             <span className="text-amber-400">▲ sweep</span>
@@ -124,6 +134,15 @@ export default function SetupPage({ params }: PageProps) {
               lines={overlays?.lines ?? []}
               markers={overlays?.markers ?? []}
               setupLines={setupLines}
+              pastTrades={overlays?.pastTrades ?? []}
+              candidates={(setupsData?.allScored ?? []).slice(0, 5).map((s, i) => ({
+                rank: i + 1,
+                side: s.signal.direction,
+                entry: s.signal.entryPrice,
+                stopLoss: s.signal.stopLoss,
+                takeProfit: s.signal.takeProfit,
+                score: s.totalScore,
+              }))}
             />
           )}
         </section>

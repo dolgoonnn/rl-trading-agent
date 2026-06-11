@@ -1,0 +1,167 @@
+{
+  "generatedAt": "2026-06-11T11:35:39.802Z",
+  "rows": [
+    {
+      "leg": "A:Au-overnight",
+      "activeDays": 2950,
+      "breakevenBpsPerSide": 1.89,
+      "validated": {
+        "sharpe": 0.97,
+        "totalPct": 93.6
+      },
+      "venueRealistic": {
+        "sharpe": 0.82,
+        "totalPct": 78.9
+      },
+      "pessimistic": {
+        "sharpe": 0.67,
+        "totalPct": 64.1
+      },
+      "verdictAtVenueRealistic": "PASS"
+    },
+    {
+      "leg": "B:Ag-overnight",
+      "activeDays": 2950,
+      "breakevenBpsPerSide": 2.86,
+      "validated": {
+        "sharpe": 0.59,
+        "totalPct": 109.9
+      },
+      "venueRealistic": {
+        "sharpe": 0.27,
+        "totalPct": 50.9
+      },
+      "pessimistic": {
+        "sharpe": 0.11,
+        "totalPct": 21.4
+      },
+      "verdictAtVenueRealistic": "MARGINAL"
+    },
+    {
+      "leg": "C:Au-fix-short",
+      "activeDays": 2951,
+      "breakevenBpsPerSide": 0.79,
+      "validated": {
+        "sharpe": 0.48,
+        "totalPct": 29.2
+      },
+      "venueRealistic": {
+        "sharpe": 0.33,
+        "totalPct": 20.3
+      },
+      "pessimistic": {
+        "sharpe": -0.01,
+        "totalPct": -0.4
+      },
+      "verdictAtVenueRealistic": "PASS"
+    },
+    {
+      "leg": "D:Au-AMfix-long",
+      "activeDays": 2951,
+      "breakevenBpsPerSide": 0.49,
+      "validated": {
+        "sharpe": 0.35,
+        "totalPct": 11.1
+      },
+      "venueRealistic": {
+        "sharpe": 0.07,
+        "totalPct": 2.3
+      },
+      "pessimistic": {
+        "sharpe": -0.58,
+        "totalPct": -18.4
+      },
+      "verdictAtVenueRealistic": "MARGINAL"
+    },
+    {
+      "leg": "I:Ag-ownfix-short",
+      "activeDays": 2951,
+      "breakevenBpsPerSide": 1.98,
+      "validated": {
+        "sharpe": 0.92,
+        "totalPct": 57.7
+      },
+      "venueRealistic": {
+        "sharpe": 0.92,
+        "totalPct": 57.7
+      },
+      "pessimistic": {
+        "sharpe": 0.45,
+        "totalPct": 28.2
+      },
+      "verdictAtVenueRealistic": "PASS"
+    },
+    {
+      "leg": "F:Au-NFP-mom",
+      "activeDays": 132,
+      "breakevenBpsPerSide": 3.57,
+      "validated": {
+        "sharpe": 1.69,
+        "totalPct": 8.6
+      },
+      "venueRealistic": {
+        "sharpe": 1.61,
+        "totalPct": 8.2
+      },
+      "pessimistic": {
+        "sharpe": 1.43,
+        "totalPct": 7.3
+      },
+      "verdictAtVenueRealistic": "PASS"
+    },
+    {
+      "leg": "J:US500-overnight",
+      "activeDays": 2837,
+      "breakevenBpsPerSide": 1.32,
+      "validated": {
+        "sharpe": 0.37,
+        "totalPct": 46.6
+      },
+      "venueRealistic": {
+        "sharpe": 0.37,
+        "totalPct": 46.6
+      },
+      "pessimistic": {
+        "sharpe": 0.23,
+        "totalPct": 29.6
+      },
+      "verdictAtVenueRealistic": "PASS"
+    },
+    {
+      "leg": "K:EUR-morning-short",
+      "activeDays": 2976,
+      "breakevenBpsPerSide": 0.85,
+      "validated": {
+        "sharpe": 1.25,
+        "totalPct": 41.9
+      },
+      "venueRealistic": {
+        "sharpe": 0.9,
+        "totalPct": 30
+      },
+      "pessimistic": {
+        "sharpe": 0.63,
+        "totalPct": 21.1
+      },
+      "verdictAtVenueRealistic": "PASS"
+    },
+    {
+      "leg": "L:EUR-h22-long",
+      "activeDays": 3553,
+      "breakevenBpsPerSide": 0.29,
+      "validated": {
+        "sharpe": 0.95,
+        "totalPct": 10.2
+      },
+      "venueRealistic": {
+        "sharpe": -4.04,
+        "totalPct": -43.1
+      },
+      "pessimistic": {
+        "sharpe": -8.04,
+        "totalPct": -85.8
+      },
+      "verdictAtVenueRealistic": "FAIL"
+    }
+  ]
+}

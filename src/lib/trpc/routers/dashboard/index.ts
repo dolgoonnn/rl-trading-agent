@@ -5,6 +5,9 @@ import { candlesRouter } from './candles';
 import { biasRouter } from './bias';
 import { setupsRouter } from './setups';
 import { overlaysRouter } from './overlays';
+import { goldContextRouter } from './gold-briefing';
+import { liveStatsRouter } from './live-stats';
+import { queueRouter } from './queue';
 
 export const dashboardRouter = router({
   stats: statsRouter,
@@ -13,4 +16,7 @@ export const dashboardRouter = router({
   bias: biasRouter,
   setups: setupsRouter,
   overlays: overlaysRouter,
+  goldContext: goldContextRouter,
+  liveStats: liveStatsRouter,
+  queue: queueRouter,
 });

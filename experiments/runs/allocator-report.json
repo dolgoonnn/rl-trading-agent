@@ -1,0 +1,45 @@
+{
+  "generatedAt": "2026-06-11T11:41:45.643Z",
+  "capital": 100000,
+  "volTarget": 0.12,
+  "sizing": {
+    "weights": {
+      "crypto": 0.5,
+      "sessionBookRetail": 0.3,
+      "f2f": 0.2
+    },
+    "dm": 1.58,
+    "bookScale": 1.2,
+    "notional": {
+      "crypto": 70604,
+      "sessionBookRetail": 38371,
+      "f2f": 81232
+    }
+  },
+  "live": [
+    {
+      "sleeve": "crypto",
+      "days": 1,
+      "cumPnlPct": -5.28,
+      "sharpe30": null,
+      "sharpe60": null,
+      "status": "NO DATA"
+    },
+    {
+      "sleeve": "sessionBookRetail",
+      "days": 1,
+      "cumPnlPct": 0.52,
+      "sharpe30": null,
+      "sharpe60": null,
+      "status": "NO DATA"
+    },
+    {
+      "sleeve": "f2f",
+      "days": 0,
+      "cumPnlPct": 0,
+      "sharpe30": null,
+      "sharpe60": null,
+      "status": "NO DATA"
+    }
+  ]
+}

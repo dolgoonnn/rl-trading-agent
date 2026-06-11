@@ -1,0 +1,265 @@
+{
+  "results": [
+    {
+      "variant": "base",
+      "frictionPerSide": 0,
+      "trades": 1288,
+      "totalRetPct": 63.39,
+      "winRate": 54,
+      "sharpe": 2.07,
+      "maxDDPct": 7.15,
+      "perYearPct": {
+        "2015": 17.9,
+        "2016": 26.83,
+        "2017": 12.24,
+        "2018": 2.58,
+        "2019": 3.84
+      },
+      "yearsPositive": "5/5",
+      "rolling3moPassRate": 75,
+      "bootstrapSharpe5": 1.43,
+      "bootstrapPnl5Pct": 41.41,
+      "skip20PctProfitable": 100,
+      "firstHalfPct": 54.99,
+      "secondHalfPct": 8.4
+    },
+    {
+      "variant": "base",
+      "frictionPerSide": 0.00005,
+      "trades": 1288,
+      "totalRetPct": 50.51,
+      "winRate": 52.8,
+      "sharpe": 1.65,
+      "maxDDPct": 7.9,
+      "perYearPct": {
+        "2015": 15.33,
+        "2016": 24.25,
+        "2017": 9.67,
+        "2018": 0,
+        "2019": 1.26
+      },
+      "yearsPositive": "4/5",
+      "rolling3moPassRate": 70,
+      "bootstrapSharpe5": 0.98,
+      "bootstrapPnl5Pct": 28.53,
+      "skip20PctProfitable": 100,
+      "firstHalfPct": 48.55,
+      "secondHalfPct": 1.96
+    },
+    {
+      "variant": "base",
+      "frictionPerSide": 0.0001,
+      "trades": 1288,
+      "totalRetPct": 37.63,
+      "winRate": 51.6,
+      "sharpe": 1.23,
+      "maxDDPct": 8.65,
+      "perYearPct": {
+        "2015": 12.76,
+        "2016": 21.67,
+        "2017": 7.1,
+        "2018": -2.58,
+        "2019": -1.32
+      },
+      "yearsPositive": "3/5",
+      "rolling3moPassRate": 60,
+      "bootstrapSharpe5": 0.54,
+      "bootstrapPnl5Pct": 15.65,
+      "skip20PctProfitable": 100,
+      "firstHalfPct": 42.11,
+      "secondHalfPct": -4.48
+    },
+    {
+      "variant": "base",
+      "frictionPerSide": 0.0002,
+      "trades": 1288,
+      "totalRetPct": 11.87,
+      "winRate": 48.8,
+      "sharpe": 0.39,
+      "maxDDPct": 19.39,
+      "perYearPct": {
+        "2015": 7.62,
+        "2016": 16.51,
+        "2017": 1.96,
+        "2018": -7.74,
+        "2019": -6.48
+      },
+      "yearsPositive": "3/5",
+      "rolling3moPassRate": 45,
+      "bootstrapSharpe5": -0.37,
+      "bootstrapPnl5Pct": -10.11,
+      "skip20PctProfitable": 95.8,
+      "firstHalfPct": 29.23,
+      "secondHalfPct": -17.36
+    },
+    {
+      "variant": "wknd-gap",
+      "frictionPerSide": 0,
+      "trades": 1288,
+      "totalRetPct": 63.47,
+      "winRate": 54.2,
+      "sharpe": 1.99,
+      "maxDDPct": 6.77,
+      "perYearPct": {
+        "2015": 20.44,
+        "2016": 25.24,
+        "2017": 10.26,
+        "2018": 2.32,
+        "2019": 5.22
+      },
+      "yearsPositive": "5/5",
+      "rolling3moPassRate": 75,
+      "bootstrapSharpe5": 1.32,
+      "bootstrapPnl5Pct": 39.91,
+      "skip20PctProfitable": 100,
+      "firstHalfPct": 54.59,
+      "secondHalfPct": 8.88
+    },
+    {
+      "variant": "wknd-gap",
+      "frictionPerSide": 0.00005,
+      "trades": 1288,
+      "totalRetPct": 50.59,
+      "winRate": 53,
+      "sharpe": 1.59,
+      "maxDDPct": 7.32,
+      "perYearPct": {
+        "2015": 17.87,
+        "2016": 22.65,
+        "2017": 7.69,
+        "2018": -0.25,
+        "2019": 2.64
+      },
+      "yearsPositive": "4/5",
+      "rolling3moPassRate": 65,
+      "bootstrapSharpe5": 0.89,
+      "bootstrapPnl5Pct": 27.03,
+      "skip20PctProfitable": 100,
+      "firstHalfPct": 48.15,
+      "secondHalfPct": 2.44
+    },
+    {
+      "variant": "wknd-gap",
+      "frictionPerSide": 0.0001,
+      "trades": 1288,
+      "totalRetPct": 37.71,
+      "winRate": 51.6,
+      "sharpe": 1.18,
+      "maxDDPct": 7.87,
+      "perYearPct": {
+        "2015": 15.3,
+        "2016": 20.06,
+        "2017": 5.12,
+        "2018": -2.82,
+        "2019": 0.06
+      },
+      "yearsPositive": "4/5",
+      "rolling3moPassRate": 55,
+      "bootstrapSharpe5": 0.46,
+      "bootstrapPnl5Pct": 14.15,
+      "skip20PctProfitable": 100,
+      "firstHalfPct": 41.71,
+      "secondHalfPct": -4
+    },
+    {
+      "variant": "wknd-gap",
+      "frictionPerSide": 0.0002,
+      "trades": 1288,
+      "totalRetPct": 11.95,
+      "winRate": 48.9,
+      "sharpe": 0.38,
+      "maxDDPct": 18.99,
+      "perYearPct": {
+        "2015": 10.16,
+        "2016": 14.88,
+        "2017": -0.02,
+        "2018": -7.96,
+        "2019": -5.1
+      },
+      "yearsPositive": "2/5",
+      "rolling3moPassRate": 50,
+      "bootstrapSharpe5": -0.4,
+      "bootstrapPnl5Pct": -11.61,
+      "skip20PctProfitable": 95.1,
+      "firstHalfPct": 28.83,
+      "secondHalfPct": -16.88
+    }
+  ],
+  "hourGrid": [
+    {
+      "entry": 21,
+      "exit": 6,
+      "trades": 1376,
+      "totalPct": 48.97,
+      "sharpe": 1.64
+    },
+    {
+      "entry": 21,
+      "exit": 7,
+      "trades": 1376,
+      "totalPct": 44.41,
+      "sharpe": 1.38
+    },
+    {
+      "entry": 21,
+      "exit": 8,
+      "trades": 1376,
+      "totalPct": 37,
+      "sharpe": 1.12
+    },
+    {
+      "entry": 22,
+      "exit": 6,
+      "trades": 1288,
+      "totalPct": 55.08,
+      "sharpe": 1.94
+    },
+    {
+      "entry": 22,
+      "exit": 7,
+      "trades": 1288,
+      "totalPct": 50.51,
+      "sharpe": 1.65
+    },
+    {
+      "entry": 22,
+      "exit": 8,
+      "trades": 1288,
+      "totalPct": 43.11,
+      "sharpe": 1.37
+    },
+    {
+      "entry": 23,
+      "exit": 6,
+      "trades": 1288,
+      "totalPct": 31.84,
+      "sharpe": 1.17
+    },
+    {
+      "entry": 23,
+      "exit": 7,
+      "trades": 1288,
+      "totalPct": 27.27,
+      "sharpe": 0.92
+    },
+    {
+      "entry": 23,
+      "exit": 8,
+      "trades": 1288,
+      "totalPct": 19.87,
+      "sharpe": 0.65
+    }
+  ],
+  "buyAndHold": {
+    "totalRetPct": 24.55,
+    "sharpe": 0.36,
+    "maxDDPct": 21.16,
+    "perYearPct": {
+      "2015": -11.2,
+      "2016": 8.09,
+      "2017": 12.43,
+      "2018": -1.58,
+      "2019": 16.81
+    }
+  }
+}

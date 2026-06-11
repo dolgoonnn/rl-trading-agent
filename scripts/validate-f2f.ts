@@ -64,6 +64,8 @@ interface ValidationOpts {
   numTrials: number;
   direction: F2FDirectionMode;
   regimeFilter: RegimeFilterType;
+  /** Override WF slide (bars). slide = valBars (126) → non-overlapping windows */
+  slideBars?: number;
 }
 
 function parseArgs(): ValidationOpts {
@@ -112,6 +114,9 @@ function parseArgs(): ValidationOpts {
       case '--regime-filter':
         opts.regimeFilter = args[++i]! as RegimeFilterType;
         break;
+      case '--slide':
+        opts.slideBars = parseInt(args[++i]!, 10);
+        break;
     }
   }
 
@@ -152,7 +157,13 @@ function main(): void {
   console.log(`  Direction: ${opts.direction}`);
   console.log(`  DSR trials: ${opts.numTrials}\n`);
 
-  const config: F2FWalkForwardConfig = { ...F2F_DEFAULT_WF_CONFIG };
+  const config: F2FWalkForwardConfig = {
+    ...F2F_DEFAULT_WF_CONFIG,
+    ...(opts.slideBars !== undefined && { slideBars: opts.slideBars }),
+  };
+  if (opts.slideBars !== undefined) {
+    console.log(`  WF slide override: ${config.slideBars} bars${config.slideBars >= config.valBars ? ' (NON-OVERLAPPING windows)' : ''}\n`);
+  }
   const checks: CheckResult[] = [];
   const startTime = Date.now();
 

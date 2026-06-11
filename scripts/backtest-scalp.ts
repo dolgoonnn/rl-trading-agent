@@ -31,8 +31,9 @@ import { BBSqueezeStrategy } from '../src/lib/scalp/strategies/bb-squeeze';
 import { ATRBreakoutStrategy } from '../src/lib/scalp/strategies/atr-breakout';
 import { SilverBulletStrategy } from '../src/lib/scalp/strategies/silver-bullet';
 import { SessionRangeStrategy } from '../src/lib/scalp/strategies/session-range';
-import type { ScalpStrategy, ScalpStrategyName, KillZoneMode, ICT5mConfig } from '../src/lib/scalp/strategies/types';
-import { DEFAULT_SCALP_CONFIG, DEFAULT_ICT5M_CONFIG } from '../src/lib/scalp/strategies/types';
+import { SweepChochStrategy } from '../src/lib/scalp/strategies/sweep-choch';
+import type { ScalpStrategy, ScalpStrategyName, KillZoneMode, ICT5mConfig, SweepChochConfig } from '../src/lib/scalp/strategies/types';
+import { DEFAULT_SCALP_CONFIG, DEFAULT_ICT5M_CONFIG, DEFAULT_SWEEP_CHOCH_CONFIG } from '../src/lib/scalp/strategies/types';
 import { detectRegime, regimeLabel } from '../src/lib/ict/regime-detector';
 import {
   runWalkForward,
@@ -324,6 +325,7 @@ function createStrategy(
   name: ScalpStrategyName,
   ict5mConfig: ICT5mConfig,
   atrConfig?: ATRBreakoutConfig,
+  sweepChochConfig?: Partial<SweepChochConfig>,
 ): ScalpStrategy {
   switch (name) {
     case 'ict_5m':
@@ -338,8 +340,10 @@ function createStrategy(
       return new SilverBulletStrategy();
     case 'session_range':
       return new SessionRangeStrategy();
+    case 'sweep_choch':
+      return new SweepChochStrategy(sweepChochConfig);
     default:
-      throw new Error(`Unknown scalp strategy: ${name}. Available: ict_5m, mean_reversion, bb_squeeze, atr_breakout, silver_bullet, session_range`);
+      throw new Error(`Unknown scalp strategy: ${name}. Available: ict_5m, mean_reversion, bb_squeeze, atr_breakout, silver_bullet, session_range, sweep_choch`);
   }
 }
 
@@ -532,7 +536,23 @@ async function main(): Promise<void> {
   const atrExpansionArg = getArg('atr-expansion');
   const momentumBarsArg = getArg('momentum-bars');
   const atrTargetRRArg = getArg('atr-target-rr');
+  const tfArg = getArg('tf');
+  const biasModeArg = getArg('bias-mode');
+  const swingLookbackArg = getArg('swing-lookback');
+  const slAtrBufferArg = getArg('sl-atr-buffer');
+  const targetRArg = getArg('target-r');
+  const sessionArg = getArg('session');
   const jsonOutputMode = hasFlag('json');
+
+  // Execution timeframe in minutes (default 5 — original harness behavior)
+  const tf = tfArg ? parseInt(tfArg, 10) : 5;
+  if (!Number.isInteger(tf) || tf < 1 || tf > 60) {
+    console.error(`Invalid --tf ${tfArg}: must be an integer 1-60 (minutes)`);
+    process.exit(1);
+  }
+  // Bar-count defaults below are calibrated for 5m; rescale so unspecified
+  // windows keep the same calendar duration on any execution timeframe.
+  const tfScale = 5 / tf;
 
   // Determine symbols
   const symbols = symbolsArg
@@ -543,11 +563,11 @@ async function main(): Promise<void> {
   const strategyName = strategyArg ?? DEFAULT_SCALP_CONFIG.strategy;
   const threshold = thresholdArg ? parseFloat(thresholdArg) : DEFAULT_SCALP_CONFIG.threshold;
   const friction = frictionArg ? parseFloat(frictionArg) : DEFAULT_SCALP_CONFIG.frictionPerSide;
-  const maxBars = maxBarsArg ? parseInt(maxBarsArg, 10) : DEFAULT_SCALP_CONFIG.maxBars;
-  const cooldownBars = cooldownBarsArg ? parseInt(cooldownBarsArg, 10) : DEFAULT_SCALP_CONFIG.cooldownBars;
-  const trainBars = trainBarsArg ? parseInt(trainBarsArg, 10) : DEFAULT_SCALP_CONFIG.trainBars;
-  const valBars = valBarsArg ? parseInt(valBarsArg, 10) : DEFAULT_SCALP_CONFIG.valBars;
-  const slideBars = slideBarsArg ? parseInt(slideBarsArg, 10) : DEFAULT_SCALP_CONFIG.slideBars;
+  const maxBars = maxBarsArg ? parseInt(maxBarsArg, 10) : Math.round(DEFAULT_SCALP_CONFIG.maxBars * tfScale);
+  const cooldownBars = cooldownBarsArg ? parseInt(cooldownBarsArg, 10) : Math.round(DEFAULT_SCALP_CONFIG.cooldownBars * tfScale);
+  const trainBars = trainBarsArg ? parseInt(trainBarsArg, 10) : Math.round(DEFAULT_SCALP_CONFIG.trainBars * tfScale);
+  const valBars = valBarsArg ? parseInt(valBarsArg, 10) : Math.round(DEFAULT_SCALP_CONFIG.valBars * tfScale);
+  const slideBars = slideBarsArg ? parseInt(slideBarsArg, 10) : Math.round(DEFAULT_SCALP_CONFIG.slideBars * tfScale);
 
   // Parse suppress-regime
   const suppressRegimes = suppressRegimeArg
@@ -566,6 +586,20 @@ async function main(): Promise<void> {
     ict5mConfig.minRR = ict5mConfig.targetRR * 0.8;
   }
 
+  // Parse sweep+CHoCH config
+  if (biasModeArg && biasModeArg !== 'choch' && biasModeArg !== 'none') {
+    console.error(`Invalid --bias-mode ${biasModeArg}: must be 'choch' or 'none'`);
+    process.exit(1);
+  }
+  const sweepChochConfig: Partial<SweepChochConfig> = {
+    ...(biasModeArg && { biasMode: biasModeArg as 'choch' | 'none' }),
+    ...(swingLookbackArg && { swingLookback: parseInt(swingLookbackArg, 10) }),
+    ...(slAtrBufferArg && { slAtrBuffer: parseFloat(slAtrBufferArg) }),
+    ...(targetRArg && { targetR: parseFloat(targetRArg) }),
+    ...(sessionArg && { sessionFilter: sessionArg !== 'off' }),
+  };
+  const resolvedSweepConfig = { ...DEFAULT_SWEEP_CHOCH_CONFIG, ...sweepChochConfig };
+
   // Parse partial TP
   let partialTP: PartialTPConfig | undefined;
   let exitMode: 'simple' | 'partial_tp' = 'simple';
@@ -582,8 +616,13 @@ async function main(): Promise<void> {
   }
 
   // Verify data exists for all symbols
-  const tempDataDir = path.resolve(__dirname, '..', 'data', '.scalp-temp');
-  if (!fs.existsSync(tempDataDir)) fs.mkdirSync(tempDataDir, { recursive: true });
+  // Per-process temp dir so concurrent backtest runs don't clobber each other.
+  // tf=1 needs no temp copy: the aggregation is a passthrough, so the WF
+  // framework can read the source data/{sym}_1m.json files directly.
+  const sourceDataDir = path.resolve(__dirname, '..', 'data');
+  const useSourceDataDir = tf === 1;
+  const tempDataDir = path.resolve(sourceDataDir, `.scalp-temp-${process.pid}`);
+  if (!useSourceDataDir && !fs.existsSync(tempDataDir)) fs.mkdirSync(tempDataDir, { recursive: true });
 
   const validSymbols: string[] = [];
   for (const sym of symbols) {
@@ -597,13 +636,15 @@ async function main(): Promise<void> {
     const candles1m: Candle[] = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
     if (!jsonOutputMode) console.log(`  ${candles1m.length.toLocaleString()} 1m candles loaded`);
 
-    // Aggregate to 5m
-    const candles5m = aggregate(candles1m, 5);
-    if (!jsonOutputMode) console.log(`  ${candles5m.length.toLocaleString()} 5m candles aggregated`);
+    // Aggregate to execution timeframe (tf=1 is a passthrough)
+    const candlesTf = aggregate(candles1m, tf);
+    if (!jsonOutputMode) console.log(`  ${candlesTf.length.toLocaleString()} ${tf}m candles aggregated`);
 
-    // Write temp 5m data for WF framework
-    const temp5mPath = path.resolve(tempDataDir, `${sym}_5m.json`);
-    fs.writeFileSync(temp5mPath, JSON.stringify(candles5m));
+    // Write temp execution-TF data for WF framework (tf=1 reads the source directly)
+    if (!useSourceDataDir) {
+      const tempTfPath = path.resolve(tempDataDir, `${sym}_${tf}m.json`);
+      fs.writeFileSync(tempTfPath, JSON.stringify(candlesTf));
+    }
     validSymbols.push(sym);
   }
 
@@ -624,12 +665,13 @@ async function main(): Promise<void> {
     console.log(`\n=== Scalp Backtest Config ===`);
     console.log(`  Strategy: ${strategyName}`);
     console.log(`  Symbols: ${validSymbols.join(', ')}`);
+    console.log(`  Timeframe: ${tf}m`);
     console.log(`  Threshold: ${threshold}`);
     console.log(`  Friction/side: ${(friction * 100).toFixed(3)}%`);
-    console.log(`  Max bars: ${maxBars} (${(maxBars * 5 / 60).toFixed(1)} hours)`);
-    console.log(`  Cooldown: ${cooldownBars} bars (${cooldownBars * 5} min)`);
+    console.log(`  Max bars: ${maxBars} (${(maxBars * tf / 60).toFixed(1)} hours)`);
+    console.log(`  Cooldown: ${cooldownBars} bars (${cooldownBars * tf} min)`);
     console.log(`  Exit mode: ${exitMode}${partialTP ? ` (${(partialTP.fraction * 100).toFixed(0)}%@${partialTP.triggerR}R, BE buffer=${partialTP.beBuffer})` : ''}`);
-    console.log(`  WF windows: train=${trainBars} (${(trainBars * 5 / 60 / 24).toFixed(1)}d) val=${valBars} (${(valBars * 5 / 60 / 24).toFixed(1)}d) slide=${slideBars}`);
+    console.log(`  WF windows: train=${trainBars} (${(trainBars * tf / 60 / 24).toFixed(1)}d) val=${valBars} (${(valBars * tf / 60 / 24).toFixed(1)}d) slide=${slideBars}`);
     if (suppressRegimes.length > 0) {
       console.log(`  Suppress regimes: ${suppressRegimes.join(', ')}`);
     }
@@ -643,31 +685,40 @@ async function main(): Promise<void> {
       console.log(`  Momentum bars: ${atrConfig.momentumBars ?? 3}`);
       console.log(`  ATR target R:R: ${atrConfig.targetRR ?? 1.5}`);
     }
+    if (strategyName === 'sweep_choch') {
+      console.log(`  Bias mode: ${resolvedSweepConfig.biasMode}`);
+      console.log(`  Swing lookback: ${resolvedSweepConfig.swingLookback}`);
+      console.log(`  SL ATR buffer: ${resolvedSweepConfig.slAtrBuffer}`);
+      console.log(`  Target R: ${resolvedSweepConfig.targetR}`);
+      console.log(`  Session filter: ${resolvedSweepConfig.sessionFilter ? 'on (07-21 UTC)' : 'off'}`);
+    }
     console.log('');
   }
 
   // Create strategy and runner
-  const strategy = createStrategy(strategyName, ict5mConfig, atrConfig);
+  const strategy = createStrategy(strategyName, ict5mConfig, atrConfig, sweepChochConfig);
   const { runner, allTrades } = createScalpRunner(
     strategy, threshold, exitMode, maxBars, cooldownBars, friction, suppressRegimes, partialTP,
   );
 
-  // Run walk-forward validation on 5m candles
+  // Run walk-forward validation on execution-TF candles
   const walkForwardResult = await runWalkForward(runner, {
     symbols: validSymbols,
     trainWindowBars: trainBars,
     valWindowBars: valBars,
     slideStepBars: slideBars,
     lookbackBuffer: 100,
-    dataDir: tempDataDir,
-    timeframe: '5m',
+    dataDir: useSourceDataDir ? sourceDataDir : tempDataDir,
+    timeframe: `${tf}m`,
   }, { quiet: jsonOutputMode });
 
-  // Clean up temp data
-  for (const sym of validSymbols) {
-    try { fs.unlinkSync(path.resolve(tempDataDir, `${sym}_5m.json`)); } catch { /* ignore */ }
+  // Clean up temp data (never touch the source data dir)
+  if (!useSourceDataDir) {
+    for (const sym of validSymbols) {
+      try { fs.unlinkSync(path.resolve(tempDataDir, `${sym}_${tf}m.json`)); } catch { /* ignore */ }
+    }
+    try { fs.rmdirSync(tempDataDir); } catch { /* ignore */ }
   }
-  try { fs.rmdirSync(tempDataDir); } catch { /* ignore */ }
 
   // Compute summary metrics
   const wins = allTrades.filter((t) => t.pnlPercent > 0).length;
@@ -678,9 +729,9 @@ async function main(): Promise<void> {
   const maxDD = calculateMaxDrawdown(allTrades.map((t) => t.pnlPercent));
 
   // Avg bars held
-  const fiveMinMs = 5 * 60_000;
+  const tfMs = tf * 60_000;
   const avgBarsHeld = allTrades.length > 0
-    ? allTrades.reduce((s, t) => s + (t.exitTimestamp - t.entryTimestamp) / fiveMinMs, 0) / allTrades.length
+    ? allTrades.reduce((s, t) => s + (t.exitTimestamp - t.entryTimestamp) / tfMs, 0) / allTrades.length
     : 0;
 
   const result: ScalpBacktestResult = {
@@ -708,7 +759,7 @@ async function main(): Promise<void> {
     console.log(`  Avg PnL/trade: ${(avgPnl * 100).toFixed(3)}%`);
     console.log(`  Sharpe: ${sharpe.toFixed(2)}`);
     console.log(`  Max Drawdown: ${(maxDD * 100).toFixed(1)}%`);
-    console.log(`  Avg bars held: ${avgBarsHeld.toFixed(1)} (${(avgBarsHeld * 5 / 60).toFixed(1)} hours)`);
+    console.log(`  Avg bars held: ${avgBarsHeld.toFixed(1)} (${(avgBarsHeld * tf / 60).toFixed(1)} hours)`);
     console.log(`  WF pass rate: ${(walkForwardResult.passRate * 100).toFixed(1)}%`);
 
     // Print per-symbol per-window results
@@ -730,6 +781,7 @@ async function main(): Promise<void> {
       'npx tsx scripts/backtest-scalp.ts',
       `--strategy ${strategyName}`,
       validSymbols.length > 1 ? `--symbols ${validSymbols.join(',')}` : `--symbol ${validSymbols[0]}`,
+      `--tf ${tf}`,
       `--threshold ${threshold}`,
       `--friction ${friction}`,
       `--max-bars ${maxBars}`,
@@ -747,6 +799,13 @@ async function main(): Promise<void> {
       if (atrConfig.atrExpansionMultiple) cmd.push(`--atr-expansion ${atrConfig.atrExpansionMultiple}`);
       if (atrConfig.momentumBars) cmd.push(`--momentum-bars ${atrConfig.momentumBars}`);
       if (atrConfig.targetRR) cmd.push(`--atr-target-rr ${atrConfig.targetRR}`);
+    }
+    if (strategyName === 'sweep_choch') {
+      cmd.push(`--bias-mode ${resolvedSweepConfig.biasMode}`);
+      cmd.push(`--swing-lookback ${resolvedSweepConfig.swingLookback}`);
+      cmd.push(`--sl-atr-buffer ${resolvedSweepConfig.slAtrBuffer}`);
+      cmd.push(`--target-r ${resolvedSweepConfig.targetR}`);
+      cmd.push(`--session ${resolvedSweepConfig.sessionFilter ? 'on' : 'off'}`);
     }
     if (partialTP) {
       cmd.push(`--partial-tp "${partialTP.fraction},${partialTP.triggerR},${partialTP.beBuffer}"`);

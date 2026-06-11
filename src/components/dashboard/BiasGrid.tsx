@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { trpc } from '@/lib/trpc/client';
 import { BiasBadge } from './BiasBadge';
 
-const SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'] as const;
+const SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XAUUSD'] as const;
 const TIMEFRAMES = ['1H', '4H', '1D'] as const;
 
 export function BiasGrid() {

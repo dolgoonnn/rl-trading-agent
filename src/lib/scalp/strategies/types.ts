@@ -14,7 +14,8 @@ export type ScalpStrategyName =
   | 'bb_squeeze'
   | 'atr_breakout'
   | 'silver_bullet'
-  | 'session_range';
+  | 'session_range'
+  | 'sweep_choch';
 
 /** Kill zone mode for crypto-specific session tuning */
 export type KillZoneMode =
@@ -72,6 +73,28 @@ export const DEFAULT_ICT5M_CONFIG: ICT5mConfig = {
   minRR: 1.2,
   obProximity: 0.005,
   killZoneMode: 'traditional',
+};
+
+/** Sweep + CHoCH strategy configuration (reverse-engineered vendor model) */
+export interface SweepChochConfig {
+  /** Pivot bars required on each side of a swing (default: 3) */
+  swingLookback: number;
+  /** 'choch' = latest structure break must align; 'none' = pure sweep reversal */
+  biasMode: 'choch' | 'none';
+  /** SL buffer beyond the sweep wick, in ATR(14) multiples (default: 0.3) */
+  slAtrBuffer: number;
+  /** Full take-profit in R multiples (vendor: 4) */
+  targetR: number;
+  /** Restrict entries to London+NY (07:00-21:00 UTC) */
+  sessionFilter: boolean;
+}
+
+export const DEFAULT_SWEEP_CHOCH_CONFIG: SweepChochConfig = {
+  swingLookback: 3,
+  biasMode: 'choch',
+  slAtrBuffer: 0.3,
+  targetR: 4,
+  sessionFilter: true,
 };
 
 /** Scalp backtest configuration */

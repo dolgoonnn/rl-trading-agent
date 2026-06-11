@@ -1,0 +1,283 @@
+{
+  "results": [
+    {
+      "variant": "base",
+      "frictionPerSide": 0,
+      "trades": 1661,
+      "totalRetPct": 171.82,
+      "winRate": 56.2,
+      "sharpe": 1.35,
+      "maxDDPct": 19.89,
+      "perYearPct": {
+        "2020": 37.62,
+        "2021": 15.62,
+        "2022": 10.3,
+        "2023": 18.85,
+        "2024": 14.37,
+        "2025": 52.95,
+        "2026": 22.1
+      },
+      "yearsPositive": "7/7",
+      "rolling3moPassRate": 84.6,
+      "bootstrapSharpe5": 0.69,
+      "bootstrapPnl5Pct": 87.83,
+      "skip20PctProfitable": 100,
+      "firstHalfPct": 72.72,
+      "secondHalfPct": 99.1
+    },
+    {
+      "variant": "base",
+      "frictionPerSide": 0.00005,
+      "trades": 1661,
+      "totalRetPct": 155.21,
+      "winRate": 55.6,
+      "sharpe": 1.22,
+      "maxDDPct": 19.94,
+      "perYearPct": {
+        "2020": 35.03,
+        "2021": 13.04,
+        "2022": 7.72,
+        "2023": 16.28,
+        "2024": 11.78,
+        "2025": 50.37,
+        "2026": 20.98
+      },
+      "yearsPositive": "7/7",
+      "rolling3moPassRate": 80.8,
+      "bootstrapSharpe5": 0.55,
+      "bootstrapPnl5Pct": 71.22,
+      "skip20PctProfitable": 100,
+      "firstHalfPct": 64.42,
+      "secondHalfPct": 90.79
+    },
+    {
+      "variant": "base",
+      "frictionPerSide": 0.0001,
+      "trades": 1661,
+      "totalRetPct": 138.6,
+      "winRate": 55.4,
+      "sharpe": 1.09,
+      "maxDDPct": 19.99,
+      "perYearPct": {
+        "2020": 32.44,
+        "2021": 10.46,
+        "2022": 5.14,
+        "2023": 13.71,
+        "2024": 9.19,
+        "2025": 47.79,
+        "2026": 19.86
+      },
+      "yearsPositive": "7/7",
+      "rolling3moPassRate": 80.8,
+      "bootstrapSharpe5": 0.42,
+      "bootstrapPnl5Pct": 54.61,
+      "skip20PctProfitable": 100,
+      "firstHalfPct": 56.12,
+      "secondHalfPct": 82.48
+    },
+    {
+      "variant": "base",
+      "frictionPerSide": 0.0002,
+      "trades": 1661,
+      "totalRetPct": 105.38,
+      "winRate": 54.1,
+      "sharpe": 0.83,
+      "maxDDPct": 20.09,
+      "perYearPct": {
+        "2020": 27.26,
+        "2021": 5.3,
+        "2022": -0.02,
+        "2023": 8.57,
+        "2024": 4.01,
+        "2025": 42.63,
+        "2026": 17.62
+      },
+      "yearsPositive": "6/7",
+      "rolling3moPassRate": 76.9,
+      "bootstrapSharpe5": 0.16,
+      "bootstrapPnl5Pct": 21.39,
+      "skip20PctProfitable": 100,
+      "firstHalfPct": 39.52,
+      "secondHalfPct": 65.86
+    },
+    {
+      "variant": "wknd-gap",
+      "frictionPerSide": 0,
+      "trades": 1661,
+      "totalRetPct": 184.28,
+      "winRate": 55.7,
+      "sharpe": 1.4,
+      "maxDDPct": 24.6,
+      "perYearPct": {
+        "2020": 46.1,
+        "2021": 22.92,
+        "2022": 13.87,
+        "2023": 17.78,
+        "2024": 14.08,
+        "2025": 53.51,
+        "2026": 16.01
+      },
+      "yearsPositive": "7/7",
+      "rolling3moPassRate": 88.5,
+      "bootstrapSharpe5": 0.74,
+      "bootstrapPnl5Pct": 100.23,
+      "skip20PctProfitable": 100,
+      "firstHalfPct": 90.56,
+      "secondHalfPct": 93.72
+    },
+    {
+      "variant": "wknd-gap",
+      "frictionPerSide": 0.00005,
+      "trades": 1661,
+      "totalRetPct": 167.67,
+      "winRate": 55.1,
+      "sharpe": 1.27,
+      "maxDDPct": 25.23,
+      "perYearPct": {
+        "2020": 43.51,
+        "2021": 20.33,
+        "2022": 11.29,
+        "2023": 15.21,
+        "2024": 11.5,
+        "2025": 50.93,
+        "2026": 14.89
+      },
+      "yearsPositive": "7/7",
+      "rolling3moPassRate": 88.5,
+      "bootstrapSharpe5": 0.61,
+      "bootstrapPnl5Pct": 83.62,
+      "skip20PctProfitable": 100,
+      "firstHalfPct": 82.26,
+      "secondHalfPct": 85.41
+    },
+    {
+      "variant": "wknd-gap",
+      "frictionPerSide": 0.0001,
+      "trades": 1661,
+      "totalRetPct": 151.06,
+      "winRate": 54.8,
+      "sharpe": 1.15,
+      "maxDDPct": 25.86,
+      "perYearPct": {
+        "2020": 40.92,
+        "2021": 17.74,
+        "2022": 8.71,
+        "2023": 12.64,
+        "2024": 8.92,
+        "2025": 48.35,
+        "2026": 13.77
+      },
+      "yearsPositive": "7/7",
+      "rolling3moPassRate": 88.5,
+      "bootstrapSharpe5": 0.49,
+      "bootstrapPnl5Pct": 67.01,
+      "skip20PctProfitable": 100,
+      "firstHalfPct": 73.96,
+      "secondHalfPct": 77.1
+    },
+    {
+      "variant": "wknd-gap",
+      "frictionPerSide": 0.0002,
+      "trades": 1661,
+      "totalRetPct": 117.84,
+      "winRate": 53.4,
+      "sharpe": 0.9,
+      "maxDDPct": 27.12,
+      "perYearPct": {
+        "2020": 35.74,
+        "2021": 12.56,
+        "2022": 3.55,
+        "2023": 7.5,
+        "2024": 3.76,
+        "2025": 43.19,
+        "2026": 11.53
+      },
+      "yearsPositive": "7/7",
+      "rolling3moPassRate": 80.8,
+      "bootstrapSharpe5": 0.25,
+      "bootstrapPnl5Pct": 33.79,
+      "skip20PctProfitable": 100,
+      "firstHalfPct": 57.36,
+      "secondHalfPct": 60.48
+    }
+  ],
+  "hourGrid": [
+    {
+      "entry": 21,
+      "exit": 6,
+      "trades": 1775,
+      "totalPct": 94.59,
+      "sharpe": 0.79
+    },
+    {
+      "entry": 21,
+      "exit": 7,
+      "trades": 1775,
+      "totalPct": 126.23,
+      "sharpe": 0.98
+    },
+    {
+      "entry": 21,
+      "exit": 8,
+      "trades": 1775,
+      "totalPct": 156.76,
+      "sharpe": 1.19
+    },
+    {
+      "entry": 22,
+      "exit": 6,
+      "trades": 1661,
+      "totalPct": 123.57,
+      "sharpe": 1.04
+    },
+    {
+      "entry": 22,
+      "exit": 7,
+      "trades": 1661,
+      "totalPct": 155.21,
+      "sharpe": 1.22
+    },
+    {
+      "entry": 22,
+      "exit": 8,
+      "trades": 1661,
+      "totalPct": 185.74,
+      "sharpe": 1.43
+    },
+    {
+      "entry": 23,
+      "exit": 6,
+      "trades": 1661,
+      "totalPct": 66,
+      "sharpe": 0.56
+    },
+    {
+      "entry": 23,
+      "exit": 7,
+      "trades": 1661,
+      "totalPct": 97.64,
+      "sharpe": 0.78
+    },
+    {
+      "entry": 23,
+      "exit": 8,
+      "trades": 1661,
+      "totalPct": 128.17,
+      "sharpe": 0.99
+    }
+  ],
+  "buyAndHold": {
+    "totalRetPct": 128.87,
+    "sharpe": 0.45,
+    "maxDDPct": 59.63,
+    "perYearPct": {
+      "2020": 38.85,
+      "2021": -12.38,
+      "2022": 2.77,
+      "2023": -0.74,
+      "2024": 19.47,
+      "2025": 90.68,
+      "2026": -9.79
+    }
+  }
+}

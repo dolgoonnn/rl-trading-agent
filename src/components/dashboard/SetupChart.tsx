@@ -21,11 +21,33 @@ export interface SetupChartCandle {
 }
 
 export interface ChartOverlayRect {
-  kind: 'ob-bull' | 'ob-bear' | 'fvg-bull' | 'fvg-bear';
+  kind: 'ob-bull' | 'ob-bear' | 'fvg-bull' | 'fvg-bear' | 'unicorn';
   startTime: number;
   endTime: number;
   high: number;
   low: number;
+  tf?: '1H' | '4H' | '1D';
+  strength?: number;
+}
+
+export interface ChartPastTrade {
+  id: string;
+  direction: 'long' | 'short';
+  entryTime: number;
+  entryPrice: number;
+  exitTime: number;
+  exitPrice: number;
+  outcome: 'win' | 'loss';
+  pnlPercent: number;
+}
+
+export interface ChartCandidateSetup {
+  rank: number;
+  side: 'long' | 'short';
+  entry: number;
+  stopLoss: number;
+  takeProfit: number;
+  score: number;
 }
 
 export interface ChartOverlayLine {
@@ -55,15 +77,29 @@ interface Props {
   lines?: ChartOverlayLine[];
   markers?: ChartOverlayMarker[];
   setupLines?: ChartSetupLines | null;
+  pastTrades?: ChartPastTrade[];
+  candidates?: ChartCandidateSetup[];
   height?: number;
 }
 
-const RECT_STYLE: Record<ChartOverlayRect['kind'], { fill: string; border: string }> = {
+const BASE_RECT_STYLE: Record<ChartOverlayRect['kind'], { fill: string; border: string }> = {
   'ob-bull': { fill: 'rgba(34, 197, 94, 0.18)', border: 'rgba(34, 197, 94, 0.55)' },
   'ob-bear': { fill: 'rgba(239, 68, 68, 0.18)', border: 'rgba(239, 68, 68, 0.55)' },
   'fvg-bull': { fill: 'rgba(59, 130, 246, 0.12)', border: 'rgba(59, 130, 246, 0.4)' },
   'fvg-bear': { fill: 'rgba(234, 179, 8, 0.12)', border: 'rgba(234, 179, 8, 0.4)' },
+  'unicorn': { fill: 'rgba(168, 85, 247, 0.32)', border: 'rgba(168, 85, 247, 0.85)' },
 };
+
+// HTF zones get fainter fill + thicker border so they're context, not noise
+function styleForRect(r: ChartOverlayRect): { fill: string; border: string } {
+  const base = BASE_RECT_STYLE[r.kind];
+  if (r.kind === 'unicorn') return base;
+  const tf = r.tf ?? '1H';
+  if (tf === '1H') return base;
+  // For HTF, halve fill alpha so they sit behind LTF zones
+  const fill = base.fill.replace(/[\d.]+\)$/, (m) => `${parseFloat(m) * 0.55})`);
+  return { fill, border: base.border };
+}
 
 export function SetupChart({
   candles,
@@ -71,6 +107,8 @@ export function SetupChart({
   lines = [],
   markers = [],
   setupLines = null,
+  pastTrades = [],
+  candidates = [],
   height = 480,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -124,16 +162,25 @@ export function SetupChart({
     kzPrim.setRects(kzRects);
     series.attachPrimitive(kzPrim);
 
-    // Rectangle primitive for OB/FVG overlays (drawn on top of KZ bands)
+    // Rectangle primitive for OB/FVG overlays (drawn on top of KZ bands).
+    // Sort so HTF context renders first (back), then LTF, then unicorn confluence on top.
+    const sortedRects = [...rects].sort((a, b) => {
+      const order = (r: ChartOverlayRect) =>
+        r.kind === 'unicorn' ? 3 : r.tf === '1D' ? 0 : r.tf === '4H' ? 1 : 2;
+      return order(a) - order(b);
+    });
     const rectPrim = new RectanglePrimitive();
-    const rectSpecs: RectSpec[] = rects.map((r) => ({
-      startTime: r.startTime,
-      endTime: r.endTime,
-      high: r.high,
-      low: r.low,
-      fillColor: RECT_STYLE[r.kind].fill,
-      borderColor: RECT_STYLE[r.kind].border,
-    }));
+    const rectSpecs: RectSpec[] = sortedRects.map((r) => {
+      const style = styleForRect(r);
+      return {
+        startTime: r.startTime,
+        endTime: r.endTime,
+        high: r.high,
+        low: r.low,
+        fillColor: style.fill,
+        borderColor: style.border,
+      };
+    });
     rectPrim.setRects(rectSpecs);
     series.attachPrimitive(rectPrim);
 
@@ -157,7 +204,7 @@ export function SetupChart({
       priceLines.push(pl);
     }
 
-    // Setup entry/SL/TP lines
+    // Top-1 setup entry/SL/TP — solid, labeled
     if (setupLines) {
       priceLines.push(
         series.createPriceLine({
@@ -166,7 +213,7 @@ export function SetupChart({
           lineWidth: 2,
           lineStyle: LineStyle.Solid,
           axisLabelVisible: true,
-          title: `entry ${setupLines.side}`,
+          title: `#1 entry ${setupLines.side}`,
         }),
         series.createPriceLine({
           price: setupLines.stopLoss,
@@ -174,7 +221,7 @@ export function SetupChart({
           lineWidth: 1,
           lineStyle: LineStyle.Dashed,
           axisLabelVisible: true,
-          title: 'SL',
+          title: '#1 SL',
         }),
         series.createPriceLine({
           price: setupLines.takeProfit,
@@ -182,23 +229,60 @@ export function SetupChart({
           lineWidth: 1,
           lineStyle: LineStyle.Dashed,
           axisLabelVisible: true,
-          title: 'TP',
+          title: '#1 TP',
         }),
       );
     }
 
-    // Markers (sweeps / BOS / CHoCH)
-    if (markers.length > 0) {
-      const sm: SeriesMarker<Time>[] = markers
-        .slice()
-        .sort((a, b) => a.time - b.time)
-        .map((m) => ({
-          time: Math.floor(m.time / 1000) as Time,
-          position: m.direction === 'bullish' ? 'belowBar' : 'aboveBar',
-          color: m.kind === 'sweep' ? '#f59e0b' : m.kind === 'choch' ? '#a855f7' : '#3b82f6',
-          shape: m.kind === 'sweep' ? 'arrowUp' : 'circle',
-          text: m.text,
-        }));
+    // Lower-ranked candidates — thinner, dotted, no axis label clutter
+    for (const cand of candidates) {
+      if (cand.rank === 1) continue; // already drawn above
+      const dim = 0.55 - cand.rank * 0.08;
+      const alpha = Math.max(0.18, dim);
+      priceLines.push(
+        series.createPriceLine({
+          price: cand.entry,
+          color: `rgba(251, 191, 36, ${alpha})`,
+          lineWidth: 1,
+          lineStyle: LineStyle.Dotted,
+          axisLabelVisible: false,
+          title: `#${cand.rank} ${cand.side} ${cand.score.toFixed(1)}`,
+        }),
+      );
+    }
+
+    // Markers (sweeps / BOS / CHoCH) + past-trade entry/exit markers (W=green, L=red)
+    const allMarkers: SeriesMarker<Time>[] = [
+      ...markers.map((m) => ({
+        time: Math.floor(m.time / 1000) as Time,
+        position: (m.direction === 'bullish' ? 'belowBar' : 'aboveBar') as 'belowBar' | 'aboveBar',
+        color: m.kind === 'sweep' ? '#f59e0b' : m.kind === 'choch' ? '#a855f7' : '#3b82f6',
+        shape: (m.kind === 'sweep' ? 'arrowUp' : 'circle') as 'arrowUp' | 'circle',
+        text: m.text,
+      })),
+      ...pastTrades.flatMap((t) => {
+        const winColor = t.outcome === 'win' ? '#10b981' : '#ef4444';
+        const tag = `${t.outcome === 'win' ? 'W' : 'L'} ${t.pnlPercent >= 0 ? '+' : ''}${(t.pnlPercent * 100).toFixed(1)}%`;
+        return [
+          {
+            time: Math.floor(t.entryTime / 1000) as Time,
+            position: (t.direction === 'long' ? 'belowBar' : 'aboveBar') as 'belowBar' | 'aboveBar',
+            color: winColor,
+            shape: (t.direction === 'long' ? 'arrowUp' : 'arrowDown') as 'arrowUp' | 'arrowDown',
+            text: tag,
+          },
+          {
+            time: Math.floor(t.exitTime / 1000) as Time,
+            position: (t.direction === 'long' ? 'aboveBar' : 'belowBar') as 'belowBar' | 'aboveBar',
+            color: winColor,
+            shape: 'square' as 'square',
+            text: '',
+          },
+        ];
+      }),
+    ];
+    if (allMarkers.length > 0) {
+      const sm = allMarkers.sort((a, b) => (a.time as number) - (b.time as number));
       const setMarkers = (series as unknown as { setMarkers?: (m: SeriesMarker<Time>[]) => void }).setMarkers;
       if (typeof setMarkers === 'function') setMarkers.call(series, sm);
     }
@@ -215,7 +299,7 @@ export function SetupChart({
       ro.disconnect();
       chart.remove();
     };
-  }, [candles, rects, lines, markers, setupLines, height]);
+  }, [candles, rects, lines, markers, setupLines, pastTrades, candidates, height]);
 
   return <div ref={containerRef} className="w-full" style={{ height }} />;
 }
