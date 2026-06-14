@@ -1,0 +1,410 @@
+{
+  "meta": {
+    "probe": "crypto funding/basis carry feasibility (BIS WP1087 cash-and-carry spec)",
+    "date": "2026-06-14",
+    "symbols": [
+      "BTCUSDT",
+      "ETHUSDT",
+      "SOLUSDT"
+    ],
+    "costModel": {
+      "takerBpsPerSide": 5.5,
+      "spreadBpsPerSide": {
+        "BTCUSDT": 2,
+        "ETHUSDT": 3,
+        "SOLUSDT": 3
+      },
+      "chargedOn": "both legs, open + close"
+    },
+    "grounding": {
+      "primary": "Schmeling, Schrimpf, Todorov — BIS Working Paper 1087 \"Crypto carry\" (2023)",
+      "replication": "arXiv:2510.14435 \"Cryptocurrency as an Investable Asset Class\" (2025), §3.9",
+      "publishedFullSample": {
+        "meanApyPct": 8,
+        "volPct": 0.8,
+        "sharpe": 6.45,
+        "period": "2020-08..2025-05"
+      },
+      "published2024Sharpe": 4.06,
+      "published2025": "negative",
+      "interpretation": "crash-risk premium; high carry predicts future crashes (not arbitrage profit)"
+    }
+  },
+  "perSymbol": {
+    "BTCUSDT": {
+      "alwaysOn": {
+        "symbol": "BTCUSDT",
+        "variant": "always_on",
+        "thresholdBps": 0,
+        "cycles": 1,
+        "settlementsHeld": 3220,
+        "totalSettlements": 3220,
+        "timeInMarketPct": 100,
+        "grossFundingPct": 24.072215999999525,
+        "costPct": 0.29999999999997806,
+        "netPct": 23.772215999999545,
+        "netApyPct": 8.092080050326034,
+        "grossApyPct": 8.194200273997975,
+        "costShareOfGrossPct": 1.2462500336486844,
+        "netSharpe": 24.09501015262646,
+        "netSharpeDaily": 16.28411347669706,
+        "realizedVolAnnualPct": 0.49612844855622534,
+        "maxDrawdownPct": 0.3,
+        "years": 2.937713894592745
+      },
+      "gated": [
+        {
+          "symbol": "BTCUSDT",
+          "variant": "threshold_gated",
+          "thresholdBps": 2,
+          "cycles": 37,
+          "settlementsHeld": 166,
+          "totalSettlements": 3220,
+          "timeInMarketPct": 5.15527950310559,
+          "grossFundingPct": 5.434607000000001,
+          "costPct": 11.100000000000003,
+          "netPct": -5.665393000000002,
+          "netApyPct": -1.9285040011649588,
+          "grossApyPct": 1.849944274697111,
+          "costShareOfGrossPct": 204.24659961612682,
+          "netSharpe": -1.8938992009077404,
+          "netSharpeDaily": -1.9014276231057265,
+          "realizedVolAnnualPct": 1.0126021049642562,
+          "maxDrawdownPct": 5.697540000000002,
+          "years": 2.937713894592745
+        },
+        {
+          "symbol": "BTCUSDT",
+          "variant": "threshold_gated",
+          "thresholdBps": 5,
+          "cycles": 15,
+          "settlementsHeld": 24,
+          "totalSettlements": 3220,
+          "timeInMarketPct": 0.7453416149068323,
+          "grossFundingPct": 1.147807,
+          "costPct": 4.500000000000001,
+          "netPct": -3.3521930000000006,
+          "netApyPct": -1.141088996505126,
+          "grossApyPct": 0.3907143585740913,
+          "costShareOfGrossPct": 392.05197389456595,
+          "netSharpe": -1.9578352437208268,
+          "netSharpeDaily": -1.9337009312344677,
+          "realizedVolAnnualPct": 0.5891532687360787,
+          "maxDrawdownPct": 3.3521930000000006,
+          "years": 2.937713894592745
+        },
+        {
+          "symbol": "BTCUSDT",
+          "variant": "threshold_gated",
+          "thresholdBps": 8,
+          "cycles": 1,
+          "settlementsHeld": 2,
+          "totalSettlements": 3220,
+          "timeInMarketPct": 0.062111801242236024,
+          "grossFundingPct": 0.124428,
+          "costPct": 0.3,
+          "netPct": -0.175572,
+          "netApyPct": -0.05976483970177073,
+          "grossApyPct": 0.04235538397017707,
+          "costShareOfGrossPct": 241.1032886488572,
+          "netSharpe": -0.4765613160776295,
+          "netSharpeDaily": -0.47612714626235497,
+          "realizedVolAnnualPct": 0.12532014713033815,
+          "maxDrawdownPct": 0.211852,
+          "years": 2.937713894592745
+        },
+        {
+          "symbol": "BTCUSDT",
+          "variant": "threshold_gated",
+          "thresholdBps": 12,
+          "cycles": 0,
+          "settlementsHeld": 0,
+          "totalSettlements": 3220,
+          "timeInMarketPct": 0,
+          "grossFundingPct": 0,
+          "costPct": 0,
+          "netPct": 0,
+          "netApyPct": 0,
+          "grossApyPct": 0,
+          "costShareOfGrossPct": null,
+          "netSharpe": 0,
+          "netSharpeDaily": 0,
+          "realizedVolAnnualPct": 0,
+          "maxDrawdownPct": 0,
+          "years": 2.937713894592745
+        }
+      ],
+      "yearly": {
+        "2023": {
+          "grossApyPct": 7.573882620578814,
+          "n": 933
+        },
+        "2024": {
+          "grossApyPct": 11.859936024590258,
+          "n": 1098
+        },
+        "2025": {
+          "grossApyPct": 5.231742000000013,
+          "n": 1095
+        },
+        "2026": {
+          "grossApyPct": 5.762519042553194,
+          "n": 94
+        }
+      }
+    },
+    "ETHUSDT": {
+      "alwaysOn": {
+        "symbol": "ETHUSDT",
+        "variant": "always_on",
+        "thresholdBps": 0,
+        "cycles": 1,
+        "settlementsHeld": 3220,
+        "totalSettlements": 3220,
+        "timeInMarketPct": 100,
+        "grossFundingPct": 24.941925999999466,
+        "costPct": 0.3399999999999792,
+        "netPct": 24.601925999999487,
+        "netApyPct": 8.37451395293552,
+        "grossApyPct": 8.490250206430385,
+        "costShareOfGrossPct": 1.3631665814419724,
+        "netSharpe": 23.166482594944497,
+        "netSharpeDaily": 15.903686404376387,
+        "realizedVolAnnualPct": 0.5257265225188645,
+        "maxDrawdownPct": 0.33999999999999997,
+        "years": 2.937713894592745
+      },
+      "gated": [
+        {
+          "symbol": "ETHUSDT",
+          "variant": "threshold_gated",
+          "thresholdBps": 2,
+          "cycles": 35,
+          "settlementsHeld": 182,
+          "totalSettlements": 3220,
+          "timeInMarketPct": 5.6521739130434785,
+          "grossFundingPct": 6.1304989999999995,
+          "costPct": 11.899999999999999,
+          "netPct": -5.769501,
+          "netApyPct": -1.9639424419850886,
+          "grossApyPct": 2.086826430335508,
+          "costShareOfGrossPct": 194.11144182553494,
+          "netSharpe": -1.7449733672278198,
+          "netSharpeDaily": -1.6920294299323606,
+          "realizedVolAnnualPct": 1.1588278485798733,
+          "maxDrawdownPct": 5.769501,
+          "years": 2.937713894592745
+        },
+        {
+          "symbol": "ETHUSDT",
+          "variant": "threshold_gated",
+          "thresholdBps": 5,
+          "cycles": 17,
+          "settlementsHeld": 27,
+          "totalSettlements": 3220,
+          "timeInMarketPct": 0.8385093167701863,
+          "grossFundingPct": 1.2499590000000003,
+          "costPct": 5.78,
+          "netPct": -4.530041,
+          "netApyPct": -1.5420293338769804,
+          "grossApyPct": 0.42548697553588083,
+          "costShareOfGrossPct": 462.4151672174847,
+          "netSharpe": -2.1549018234193555,
+          "netSharpeDaily": -2.0981920248423007,
+          "realizedVolAnnualPct": 0.733745555854216,
+          "maxDrawdownPct": 4.530041,
+          "years": 2.937713894592745
+        },
+        {
+          "symbol": "ETHUSDT",
+          "variant": "threshold_gated",
+          "thresholdBps": 8,
+          "cycles": 1,
+          "settlementsHeld": 2,
+          "totalSettlements": 3220,
+          "timeInMarketPct": 0.062111801242236024,
+          "grossFundingPct": 0.10298899999999998,
+          "costPct": 0.33999999999999997,
+          "netPct": -0.237011,
+          "netApyPct": -0.08067872110904006,
+          "grossApyPct": 0.03505753238583411,
+          "costShareOfGrossPct": 330.1323442309373,
+          "netSharpe": -0.5351070812748842,
+          "netSharpeDaily": -0.5346484588551575,
+          "realizedVolAnnualPct": 0.15065680965615194,
+          "maxDrawdownPct": 0.25759099999999996,
+          "years": 2.937713894592745
+        },
+        {
+          "symbol": "ETHUSDT",
+          "variant": "threshold_gated",
+          "thresholdBps": 12,
+          "cycles": 0,
+          "settlementsHeld": 0,
+          "totalSettlements": 3220,
+          "timeInMarketPct": 0,
+          "grossFundingPct": 0,
+          "costPct": 0,
+          "netPct": 0,
+          "netApyPct": 0,
+          "grossApyPct": 0,
+          "costShareOfGrossPct": null,
+          "netSharpe": 0,
+          "netSharpeDaily": 0,
+          "realizedVolAnnualPct": 0,
+          "maxDrawdownPct": 0,
+          "years": 2.937713894592745
+        }
+      ],
+      "yearly": {
+        "2023": {
+          "grossApyPct": 7.81405848874602,
+          "n": 933
+        },
+        "2024": {
+          "grossApyPct": 12.906760013661254,
+          "n": 1098
+        },
+        "2025": {
+          "grossApyPct": 4.977600000000013,
+          "n": 1095
+        },
+        "2026": {
+          "grossApyPct": 4.242530904255319,
+          "n": 94
+        }
+      }
+    },
+    "SOLUSDT": {
+      "alwaysOn": {
+        "symbol": "SOLUSDT",
+        "variant": "always_on",
+        "thresholdBps": 0,
+        "cycles": 1,
+        "settlementsHeld": 3220,
+        "totalSettlements": 3220,
+        "timeInMarketPct": 100,
+        "grossFundingPct": 18.522716999999467,
+        "costPct": 0.33999999999998476,
+        "netPct": 18.18271699999948,
+        "netApyPct": 6.189410423345583,
+        "grossApyPct": 6.305146676840452,
+        "costShareOfGrossPct": 1.83558384010291,
+        "netSharpe": 10.644023462919753,
+        "netSharpeDaily": 6.854954695194603,
+        "realizedVolAnnualPct": 0.9014523465306518,
+        "maxDrawdownPct": 1.372616000000007,
+        "years": 2.937713894592745
+      },
+      "gated": [
+        {
+          "symbol": "SOLUSDT",
+          "variant": "threshold_gated",
+          "thresholdBps": 2,
+          "cycles": 49,
+          "settlementsHeld": 229,
+          "totalSettlements": 3220,
+          "timeInMarketPct": 7.111801242236025,
+          "grossFundingPct": 8.528894999999997,
+          "costPct": 16.659999999999993,
+          "netPct": -8.131104999999996,
+          "netApyPct": -2.767834204333642,
+          "grossApyPct": 2.90324221691519,
+          "costShareOfGrossPct": 195.3359725966845,
+          "netSharpe": -2.0809019605148973,
+          "netSharpeDaily": -2.015754614736265,
+          "realizedVolAnnualPct": 1.3708833118851338,
+          "maxDrawdownPct": 8.131104999999996,
+          "years": 2.937713894592745
+        },
+        {
+          "symbol": "SOLUSDT",
+          "variant": "threshold_gated",
+          "thresholdBps": 5,
+          "cycles": 17,
+          "settlementsHeld": 61,
+          "totalSettlements": 3220,
+          "timeInMarketPct": 1.8944099378881987,
+          "grossFundingPct": 3.5640469999999995,
+          "costPct": 5.779999999999999,
+          "netPct": -2.215953,
+          "netApyPct": -0.7543120533550791,
+          "grossApyPct": 1.2132042560577816,
+          "costShareOfGrossPct": 162.17519017005105,
+          "netSharpe": -1.0018574381050072,
+          "netSharpeDaily": -1.001114789010289,
+          "realizedVolAnnualPct": 0.7522552907170214,
+          "maxDrawdownPct": 2.8036609999999995,
+          "years": 2.937713894592745
+        },
+        {
+          "symbol": "SOLUSDT",
+          "variant": "threshold_gated",
+          "thresholdBps": 8,
+          "cycles": 7,
+          "settlementsHeld": 12,
+          "totalSettlements": 3220,
+          "timeInMarketPct": 0.37267080745341613,
+          "grossFundingPct": 0.755819,
+          "costPct": 2.38,
+          "netPct": -1.6241809999999999,
+          "netApyPct": -0.5528724233457595,
+          "grossApyPct": 0.25728135111835976,
+          "costShareOfGrossPct": 314.8902051946299,
+          "netSharpe": -1.288116587850503,
+          "netSharpeDaily": -1.3293242487023624,
+          "realizedVolAnnualPct": 0.4152332110761654,
+          "maxDrawdownPct": 1.6241809999999999,
+          "years": 2.937713894592745
+        },
+        {
+          "symbol": "SOLUSDT",
+          "variant": "threshold_gated",
+          "thresholdBps": 12,
+          "cycles": 0,
+          "settlementsHeld": 0,
+          "totalSettlements": 3220,
+          "timeInMarketPct": 0,
+          "grossFundingPct": 0,
+          "costPct": 0,
+          "netPct": 0,
+          "netApyPct": 0,
+          "grossApyPct": 0,
+          "costShareOfGrossPct": null,
+          "netSharpe": 0,
+          "netSharpeDaily": 0,
+          "realizedVolAnnualPct": 0,
+          "maxDrawdownPct": 0,
+          "years": 2.937713894592745
+        }
+      ],
+      "yearly": {
+        "2023": {
+          "grossApyPct": 5.26539845659163,
+          "n": 933
+        },
+        "2024": {
+          "grossApyPct": 13.687317500000045,
+          "n": 1098
+        },
+        "2025": {
+          "grossApyPct": 0.1865269999999992,
+          "n": 1095
+        },
+        "2026": {
+          "grossApyPct": 1.4557093085106376,
+          "n": 94
+        }
+      }
+    }
+  },
+  "portfolioEW": {
+    "grossApyPct": 7.663199052423036,
+    "netApyPct": 7.552001475535805,
+    "netSharpeDaily": 12.844131954120975,
+    "realizedVolAnnualPct": 0.5870233654831967,
+    "maxDrawdownPct": 0.004374903333333402,
+    "years": 2.937713894592745,
+    "settlements": 3220
+  }
+}
