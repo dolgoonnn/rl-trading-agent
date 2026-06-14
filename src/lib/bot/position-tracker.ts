@@ -640,12 +640,18 @@ export class PositionTracker {
   getRollingDeflatedSharpe(trials: number, windowDays = 30): number | null {
     const sharpe = this.getRollingSharpe(windowDays);
     if (sharpe === null) return null;
+    // Deflation needs >1 observation: the Sharpe-variance estimate diverges as
+    // trades→1 (yielding an Infinite haircut → −Infinity deflated). A tracker
+    // with <2 closed trades (e.g. a cold start) has no meaningful deflated
+    // Sharpe → return null, not a spurious −Infinity.
+    if (this.state.totalTrades < 2) return null;
     const dsr = calculateDeflatedSharpe(
       sharpe,
-      Math.max(1, this.state.totalTrades),
+      this.state.totalTrades,
       Math.max(1, trials),
     );
-    return dsr.deflatedSharpe;
+    // Guard any non-finite result (Infinite/ -Infinite / NaN) as "no signal".
+    return Number.isFinite(dsr.deflatedSharpe) ? dsr.deflatedSharpe : null;
   }
 
   /**
@@ -710,7 +716,9 @@ export class PositionTracker {
   ): { deflatedSharpe: number; n: number } | null {
     const obs = this.getRollingPerObservationSharpe(windowDays);
     if (obs === null) return null;
-    const dsr = calculateDeflatedSharpe(obs.sharpe, Math.max(1, obs.n), Math.max(1, trials));
+    if (obs.n < 2 || !Number.isFinite(obs.sharpe)) return null;
+    const dsr = calculateDeflatedSharpe(obs.sharpe, obs.n, Math.max(1, trials));
+    if (!Number.isFinite(dsr.deflatedSharpe)) return null;
     return { deflatedSharpe: dsr.deflatedSharpe, n: obs.n };
   }
 
