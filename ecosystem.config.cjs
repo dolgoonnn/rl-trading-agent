@@ -132,5 +132,34 @@ module.exports = {
       kill_timeout: 10000,
       listen_timeout: 10000,
     },
+    {
+      // L2 order-flow collector (read-only public Bybit WS). Accumulates 1s
+      // snapshots (mid, spreadBps, bidDepth5/askDepth5, imb5/25) + publicTrade +
+      // allLiquidation to data/orderflow/ — the precondition for the blocked
+      // OFI/CVD + liquidation-fade research (needs >=30-60d). Must stay alive;
+      // it stalled 2026-06-12, so run it durably. PAPER/read-only, no keys.
+      name: 'orderflow-collector',
+      script: './node_modules/.bin/tsx',
+      args: 'scripts/collect-btc-orderflow.ts',
+      cwd: __dirname,
+      instances: 1,
+      exec_mode: 'fork',
+      interpreter: 'none',
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '256M',
+      restart_delay: 10000, // reconnect quickly — WS drops shouldn't lose much data
+      max_restarts: 1000, // long-lived collector: many reconnects expected over weeks
+      min_uptime: '30s',
+      env: {
+        NODE_ENV: 'production',
+      },
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      error_file: 'logs/orderflow-collector-error.log',
+      out_file: 'logs/orderflow-collector-out.log',
+      merge_logs: true,
+      kill_timeout: 10000,
+      listen_timeout: 10000,
+    },
   ],
 };
