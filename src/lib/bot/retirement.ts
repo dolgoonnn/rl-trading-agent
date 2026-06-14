@@ -16,6 +16,26 @@
  *     cause. We never cut hard at the bottom of a normal drawdown on a short
  *     track record.
  *
+ * ACTIVE vs DISABLED legs (FIX-3 — be HONEST about what can fire):
+ *   With the DEFAULT config (both feature flags FALSE) the ACTIVE confluence is
+ *   EXACTLY:
+ *     1. absolute-DD HARD halt        (drawdown >= hardKillDD)
+ *     2. sustained-DSR streak HARD halt (dsrBreachConsecutive >= dsrBreachK, n>=MinTRL)
+ *     3. soft de-risk band            (drawdown in [eMaxDD, hardKillDD) ⇒ ×0.5)
+ *   The other TWO legs are DISABLED-pending-inputs and are PROVABLY SKIPPED while
+ *   their flag is false (a stray/stale `regimeCause=true` or a nonzero
+ *   `charterBreachConsecutive` can NOT trigger anything):
+ *     - regimeHaltEnabled=false  → the DSR-conclusive-WITH-regime-cause HARD halt
+ *       AND the standalone regime de-risk are both gated OFF. Reason: run-bot's
+ *       `consumeRegimeCause()` returns a hardcoded `false` (no regime-decay
+ *       detector wired), so this leg could never fire — the flag makes that
+ *       inactive state explicit instead of leaving dead code that LOOKS live.
+ *     - charterPathHaltEnabled=false → the charter-p5 RED HARD halt AND the
+ *       YELLOW de-risk are both gated OFF. Reason: run-bot's
+ *       `charterBreachConsecutive` is declared `=0` and never mutated (no
+ *       cumulative-PnL-vs-p5 probe wired), so this leg could never fire.
+ *   See `RetirementConfig` for the one-line TODO of the input each flag needs.
+ *
  * References:
  *   - Bailey & de Prado, "The Deflated Sharpe Ratio" (2014).
  *   - E[MaxDD] ≈ σ·√(2·ln(T·252))/SR — drawdown magnitude under a GBM equity
@@ -88,6 +108,31 @@ export interface RetirementHaltInputs {
   psr: number;
 
   /**
+   * Feature flag — is the regime/mechanism halt leg WIRED? (FIX-3, default false).
+   *
+   * When false (the production default today), BOTH regime legs are PROVABLY
+   * SKIPPED: the DSR-conclusive-WITH-regime-cause HARD halt and the standalone
+   * regime de-risk. This is NOT cosmetic — a stray/stale `regimeCause=true` can
+   * NOT trigger a halt or de-risk while this flag is false. The flag exists
+   * because `run-bot.ts:consumeRegimeCause()` returns a hardcoded `false`, so the
+   * leg can never fire; we make that inactive state explicit rather than ship
+   * dead code that looks live. Defaults false for back-compat.
+   */
+  regimeHaltEnabled?: boolean;
+
+  /**
+   * Feature flag — is the charter-p5 path halt leg WIRED? (FIX-3, default false).
+   *
+   * When false (the production default today), BOTH charter-path legs are PROVABLY
+   * SKIPPED: the charter-p5 RED HARD halt and the YELLOW de-risk. A nonzero
+   * `charterBreachConsecutive` can NOT trigger anything while this flag is false.
+   * The flag exists because `run-bot.ts:charterBreachConsecutive` is declared `=0`
+   * and never mutated (no cumulative-PnL-vs-p5 probe), so the leg can never fire.
+   * Defaults false for back-compat.
+   */
+  charterPathHaltEnabled?: boolean;
+
+  /**
    * A corroborating regime/mechanism cause is present (e.g. regime decay).
    *
    * CONTRACT (Issue A): this MUST be an EDGE-TRIGGERED signal — i.e. true ONLY on
@@ -123,15 +168,20 @@ export interface RetirementHaltInputs {
 /**
  * The confluence halt decision. Returns the most severe applicable action.
  *
- * Severity order (checked high → low; first match wins):
- *   1. ABSOLUTE drawdown stop: drawdown >= hardKillDD ⇒ HARD (unconditional).
- *   2. Charter 5th-pct path: k consecutive breaches ⇒ RED hard halt.
- *   3. DSR conclusive: deflated Sharpe < c AND snapshotCount >= MinTRL AND a
- *      regime cause ⇒ HARD.
+ * Severity order (checked high → low; first match wins). Legs marked [GATED] are
+ * SKIPPED entirely unless their feature flag is explicitly true (default false):
+ *   1. ABSOLUTE drawdown stop: drawdown >= hardKillDD ⇒ HARD (unconditional). [ACTIVE]
+ *   2. [GATED charterPathHaltEnabled] Charter 5th-pct path: k consecutive
+ *      breaches ⇒ RED hard halt.
+ *   3. [GATED regimeHaltEnabled] DSR conclusive: deflated Sharpe < c AND
+ *      snapshotCount >= MinTRL AND a regime cause ⇒ HARD.
+ *   3b. Sustained-DSR streak: dsrBreachConsecutive >= dsrBreachK (n>=MinTRL) ⇒
+ *      HARD, no regime cause needed. [ACTIVE]
  *   4. SOFT de-risk (multiplier 0.5) if ANY single Layer-2 trip is present:
- *        - drawdown in [eMaxDD, hardKillDD), OR
- *        - DSR insignificant (deflated Sharpe < c) at ANY track-record length, OR
- *        - a single charter breach (yellow).
+ *        - drawdown in [eMaxDD, hardKillDD), [ACTIVE] OR
+ *        - DSR insignificant (deflated Sharpe < c) at ANY track-record length, [ACTIVE] OR
+ *        - [GATED charterPathHaltEnabled] a single charter breach (yellow), OR
+ *        - [GATED regimeHaltEnabled] a standalone regime cause.
  *   5. Otherwise TRADE (multiplier 1).
  */
 export function checkRetirementHalt(inputs: RetirementHaltInputs): RetirementDecision {
@@ -144,6 +194,8 @@ export function checkRetirementHalt(inputs: RetirementHaltInputs): RetirementDec
     snapshotCount,
     minTrackRecordLength: minTRL,
     minAcceptableSharpe,
+    regimeHaltEnabled = false,
+    charterPathHaltEnabled = false,
     regimeCause,
     charterBreachConsecutive,
     charterBreachK,
@@ -161,7 +213,10 @@ export function checkRetirementHalt(inputs: RetirementHaltInputs): RetirementDec
   }
 
   // 2. Charter 5th-pct path — k consecutive breaches escalate to RED.
-  if (charterBreachConsecutive >= charterBreachK && charterBreachK > 0) {
+  // [GATED] Only fires when charterPathHaltEnabled (FIX-3). With the flag false
+  // (production default — no cumulative-PnL-vs-p5 probe is wired) this leg is
+  // PROVABLY SKIPPED, so a stale/nonzero charterBreachConsecutive can NOT halt.
+  if (charterPathHaltEnabled && charterBreachConsecutive >= charterBreachK && charterBreachK > 0) {
     return {
       action: 'halt',
       cause: `charter p5 path: RED — ${charterBreachConsecutive} consecutive breaches (>= k=${charterBreachK})`,
@@ -179,7 +234,12 @@ export function checkRetirementHalt(inputs: RetirementHaltInputs): RetirementDec
   }
 
   // 3. DSR CONCLUSIVE hard halt — requires MinTRL gate AND a regime cause.
-  if (dsrInsignificant && snapshotCount >= minTRL && regimeCause) {
+  // [GATED] Only fires when regimeHaltEnabled (FIX-3). With the flag false
+  // (production default — consumeRegimeCause() returns a hardcoded false) this
+  // leg is PROVABLY SKIPPED, so a stray/stale regimeCause=true can NOT escalate a
+  // sub-floor DSR to a HARD halt. The ACTIVE durable-edge-collapse signal is the
+  // sustained-DSR streak (3b), which needs no regime cause.
+  if (regimeHaltEnabled && dsrInsignificant && snapshotCount >= minTRL && regimeCause) {
     return {
       action: 'halt',
       cause: `DSR conclusive: deflated Sharpe < c=${minAcceptableSharpe} (n=${snapshotCount} >= MinTRL=${minTRL}) + regime cause`,
@@ -208,7 +268,9 @@ export function checkRetirementHalt(inputs: RetirementHaltInputs): RetirementDec
 
   // 4. SOFT de-risk on any single Layer-2 trip.
   const inDerriskBand = drawdown >= eMaxDD && drawdown < hardDD;
-  const charterYellow = charterBreachConsecutive >= 1;
+  // [GATED] charter YELLOW only counts when charterPathHaltEnabled (FIX-3); with
+  // the flag false a nonzero charterBreachConsecutive does NOT de-risk.
+  const charterYellow = charterPathHaltEnabled && charterBreachConsecutive >= 1;
 
   if (inDerriskBand) {
     return {
@@ -235,7 +297,10 @@ export function checkRetirementHalt(inputs: RetirementHaltInputs): RetirementDec
       multiplier: 0.5,
     };
   }
-  if (regimeCause) {
+  // [GATED] Standalone regime de-risk only fires when regimeHaltEnabled (FIX-3).
+  // With the flag false (production default — no regime-decay detector wired) a
+  // stray/stale regimeCause=true does NOT de-risk a healthy book.
+  if (regimeHaltEnabled && regimeCause) {
     // A standalone regime/mechanism trip is a single Layer-2 event ⇒ de-risk
     // (halve), never hard on its own. HARD requires it to corroborate a
     // conclusive DSR (handled above) or an absolute stop.
@@ -330,6 +395,10 @@ export interface RetirementTickInputs {
     minTrackRecordLength: number;
     charterBreachK: number;
     dsrBreachK: number;
+    /** FIX-3 feature flag — gate the regime/mechanism legs (default false). */
+    regimeHaltEnabled: boolean;
+    /** FIX-3 feature flag — gate the charter-p5 path legs (default false). */
+    charterPathHaltEnabled: boolean;
   };
 }
 
@@ -385,6 +454,9 @@ export function evaluateRetirementHalt(inputs: RetirementTickInputs): Retirement
     minTrackRecordLength: config.minTrackRecordLength,
     minAcceptableSharpe: config.minAcceptableSharpe,
     psr: config.psr,
+    // FIX-3: pass the feature flags so the gated legs are skipped unless enabled.
+    regimeHaltEnabled: config.regimeHaltEnabled,
+    charterPathHaltEnabled: config.charterPathHaltEnabled,
     regimeCause: inputs.regimeCause,
     charterBreachConsecutive: inputs.charterBreachConsecutive,
     charterBreachK: config.charterBreachK,

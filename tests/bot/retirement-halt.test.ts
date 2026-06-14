@@ -70,6 +70,11 @@ function baseInputs(over: Partial<RetirementHaltInputs> = {}): RetirementHaltInp
     minTrackRecordLength: 50,
     minAcceptableSharpe: 0.5,
     psr: 0.95,
+    // FIX-3: both inactive legs default OFF (mirrors RETIREMENT_CONFIG). Tests that
+    // exercise a gated leg opt in explicitly via `regimeHaltEnabled` /
+    // `charterPathHaltEnabled` overrides.
+    regimeHaltEnabled: false,
+    charterPathHaltEnabled: false,
     regimeCause: false,
     charterBreachConsecutive: 0,
     charterBreachK: 3,
@@ -132,9 +137,15 @@ describe('checkRetirementHalt — deflated-Sharpe / MinTRL confluence', () => {
     expect(r.multiplier).toBe(0.5);
   });
 
-  it('DSR insignificant AND snapshotCount >= MinTRL AND regime cause ⇒ HARD halt', () => {
+  it('DSR insignificant AND snapshotCount >= MinTRL AND regime cause ⇒ HARD halt (regime leg must be EXPLICITLY enabled)', () => {
+    // NOTE (FIX-3): the DSR-conclusive-WITH-regime-cause leg is gated behind
+    // `regimeHaltEnabled` and is DISABLED by default (no regime-decay detector
+    // wired). This test now opts in explicitly to prove the leg still WORKS when
+    // enabled — it is gated, not deleted. The default-config (flag false) case is
+    // asserted separately below.
     const r = checkRetirementHalt(
       baseInputs({
+        regimeHaltEnabled: true,
         rollingSharpe: 0.0,
         snapshotCount: 500,
         minTrackRecordLength: 50,
@@ -158,9 +169,12 @@ describe('checkRetirementHalt — deflated-Sharpe / MinTRL confluence', () => {
     expect(r.multiplier).toBe(0.5);
   });
 
-  it('DSR significant (healthy Sharpe) with a regime cause ⇒ derisk only (no DSR-conclusive trigger)', () => {
+  it('DSR significant (healthy Sharpe) with a regime cause ⇒ derisk only WHEN the regime leg is enabled (no DSR-conclusive trigger)', () => {
+    // With the regime leg explicitly enabled, a standalone regimeCause is a single
+    // Layer-2 trip ⇒ de-risk (not hard). Default-disabled behaviour is asserted below.
     const r = checkRetirementHalt(
       baseInputs({
+        regimeHaltEnabled: true,
         rollingSharpe: 2.5,
         regimeCause: true,
       }),
@@ -169,17 +183,135 @@ describe('checkRetirementHalt — deflated-Sharpe / MinTRL confluence', () => {
   });
 });
 
-describe('checkRetirementHalt — charter 5th-pct path escalation (yellow → red)', () => {
+describe('checkRetirementHalt — charter 5th-pct path escalation (yellow → red, leg EXPLICITLY enabled)', () => {
+  // NOTE (FIX-3): both charter-path legs (YELLOW de-risk + RED hard halt) are gated
+  // behind `charterPathHaltEnabled` and DISABLED by default (no charter-p5
+  // cumulative-PnL feed wired). These tests opt in explicitly to prove the legs
+  // still WORK when enabled. The default-config (flag false) case is asserted below.
   it('cumPnl below charter p5 once ⇒ yellow (derisk), not red', () => {
-    const r = checkRetirementHalt(baseInputs({ charterBreachConsecutive: 1, charterBreachK: 3 }));
+    const r = checkRetirementHalt(
+      baseInputs({ charterPathHaltEnabled: true, charterBreachConsecutive: 1, charterBreachK: 3 }),
+    );
     expect(r.action).toBe('derisk');
     expect(r.cause).toMatch(/charter|yellow|p5/i);
   });
 
   it('cumPnl below charter p5 for k consecutive checks ⇒ red (hard halt)', () => {
-    const r = checkRetirementHalt(baseInputs({ charterBreachConsecutive: 3, charterBreachK: 3 }));
+    const r = checkRetirementHalt(
+      baseInputs({ charterPathHaltEnabled: true, charterBreachConsecutive: 3, charterBreachK: 3 }),
+    );
     expect(r.action).toBe('halt');
     expect(r.cause).toMatch(/charter|red/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// checkRetirementHalt — FIX-3: inactive halt legs are GATED OFF by default
+//
+// Two legs can never fire today because their inputs are hardcoded stubs in
+// run-bot.ts (consumeRegimeCause()=false, charterBreachConsecutive never
+// incremented). Rather than silently leave dead code that LOOKS live, both legs
+// are gated behind explicit feature flags that DEFAULT FALSE. These tests prove
+// the gate: a stray/stale regimeCause=true or a nonzero charterBreach must NOT
+// change the decision while the corresponding flag is disabled.
+// ---------------------------------------------------------------------------
+
+describe('checkRetirementHalt — FIX-3 gated-off legs (default config)', () => {
+  it('default flags are false in RETIREMENT_CONFIG (both legs NOT wired)', () => {
+    expect(RETIREMENT_CONFIG.regimeHaltEnabled).toBe(false);
+    expect(RETIREMENT_CONFIG.charterPathHaltEnabled).toBe(false);
+  });
+
+  it('a stale regimeCause=true does NOT change the decision when regimeHaltEnabled=false (no halt, no de-risk from regime)', () => {
+    // Healthy book + a stray latched regimeCause. With the leg gated off, the
+    // standalone-regime de-risk (retirement.ts) MUST NOT fire ⇒ still trade.
+    const r = checkRetirementHalt(
+      baseInputs({ regimeHaltEnabled: false, rollingSharpe: 2.5, regimeCause: true }),
+    );
+    expect(r.action).toBe('trade');
+    expect(r.multiplier).toBe(1);
+  });
+
+  it('regimeCause=true + DSR conclusive + n>=MinTRL does NOT hard-halt when regimeHaltEnabled=false', () => {
+    // The DSR-conclusive-WITH-regime-cause hard halt is gated off. A sub-floor DSR
+    // alone (single Layer-2 trip) still de-risks, but it must NOT escalate to HARD
+    // via a (gated-off) regime cause.
+    const r = checkRetirementHalt(
+      baseInputs({
+        regimeHaltEnabled: false,
+        rollingSharpe: 0.0,
+        snapshotCount: 500,
+        minTrackRecordLength: 50,
+        regimeCause: true,
+      }),
+    );
+    expect(r.action).toBe('derisk'); // sub-floor DSR is a single Layer-2 trip, not HARD
+    expect(r.multiplier).toBe(0.5);
+    expect(r.cause).not.toMatch(/regime/i); // the regime leg did NOT contribute
+  });
+
+  it('a nonzero charterBreachConsecutive does NOT trigger RED when charterPathHaltEnabled=false', () => {
+    const r = checkRetirementHalt(
+      baseInputs({ charterPathHaltEnabled: false, charterBreachConsecutive: 3, charterBreachK: 3 }),
+    );
+    expect(r.action).toBe('trade');
+    expect(r.multiplier).toBe(1);
+  });
+
+  it('a single charterBreachConsecutive does NOT trigger YELLOW de-risk when charterPathHaltEnabled=false', () => {
+    const r = checkRetirementHalt(
+      baseInputs({ charterPathHaltEnabled: false, charterBreachConsecutive: 1, charterBreachK: 3 }),
+    );
+    expect(r.action).toBe('trade');
+    expect(r.multiplier).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// checkRetirementHalt — FIX-3: the ACTIVE confluence (default config) is EXACTLY
+// absolute-DD hard halt + sustained-DSR streak hard halt + the soft de-risk band.
+// Nothing else. These assert the live legs still fire with both flags FALSE.
+// ---------------------------------------------------------------------------
+
+describe('checkRetirementHalt — FIX-3 active halt set (default config, both flags false)', () => {
+  it('ACTIVE: DD >= hardKillDD ⇒ HARD halt (absolute stop)', () => {
+    const inp = baseInputs(); // flags false
+    const r = checkRetirementHalt({ ...inp, drawdown: inp.hardKillDD });
+    expect(r.action).toBe('halt');
+    expect(r.multiplier).toBe(0);
+    expect(r.cause).toMatch(/hard.*drawdown|absolute|hardKillDD/i);
+  });
+
+  it('ACTIVE: sustained-DSR streak (k=3, n>=MinTRL) ⇒ HARD halt, even without a regime cause', () => {
+    const r = checkRetirementHalt(
+      baseInputs({
+        regimeHaltEnabled: false, // gated off — must NOT be needed for this halt
+        rollingSharpe: 0.0, // sub-floor deflated Sharpe
+        snapshotCount: 500,
+        minTrackRecordLength: 50,
+        regimeCause: false,
+        dsrBreachConsecutive: 3,
+        dsrBreachK: 3,
+      }),
+    );
+    expect(r.action).toBe('halt');
+    expect(r.multiplier).toBe(0);
+    expect(r.cause).toMatch(/sustained DSR/i);
+  });
+
+  it('ACTIVE: DD in [eMaxDD, hardKillDD) ⇒ derisk 0.5 (soft band)', () => {
+    const inp = baseInputs(); // flags false
+    const mid = (inp.eMaxDD + inp.hardKillDD) / 2;
+    const r = checkRetirementHalt({ ...inp, drawdown: mid });
+    expect(r.action).toBe('derisk');
+    expect(r.multiplier).toBe(0.5);
+    expect(r.cause).toMatch(/drawdown/i);
+  });
+
+  it('ACTIVE SET is exactly these three: with flags off and none of the active conditions met ⇒ trade', () => {
+    const r = checkRetirementHalt(baseInputs()); // healthy, flags false
+    expect(r.action).toBe('trade');
+    expect(r.multiplier).toBe(1);
   });
 });
 

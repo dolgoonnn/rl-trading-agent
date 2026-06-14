@@ -206,6 +206,34 @@ export interface RetirementConfig {
    * DSR reading is noisy; `dsrBreachK` sustained breaches make it conclusive.
    */
   dsrBreachK: number;
+  /**
+   * Feature flag — is the regime/mechanism halt leg WIRED? Default FALSE.
+   *
+   * Gates BOTH the DSR-conclusive-WITH-regime-cause HARD halt and the standalone
+   * regime de-risk in `checkRetirementHalt`. Today `run-bot.ts:consumeRegimeCause()`
+   * returns a hardcoded `false`, so these legs can never fire — leaving the flag
+   * false makes that INACTIVE state explicit (not dead code masquerading as live)
+   * and provably skips the legs even if a stray/stale `regimeCause=true` is passed.
+   *
+   * TODO to enable: wire an EDGE-TRIGGERED regime-decay / mechanism-break detector
+   * into the tick (fresh-transition event, not a latched level) feeding `regimeCause`,
+   * then flip this to true.
+   */
+  regimeHaltEnabled: boolean;
+  /**
+   * Feature flag — is the charter-p5 cumulative-PnL path halt leg WIRED? Default FALSE.
+   *
+   * Gates BOTH the charter-p5 RED HARD halt and the YELLOW de-risk in
+   * `checkRetirementHalt`. Today `run-bot.ts:charterBreachConsecutive` is declared
+   * `=0` and never mutated, so these legs can never fire — leaving the flag false
+   * makes that INACTIVE state explicit and provably skips the legs even if a nonzero
+   * `charterBreachConsecutive` is passed.
+   *
+   * TODO to enable: wire a charter-p5 cumulative-PnL-vs-path probe that increments
+   * `charterBreachConsecutive` when live cumulative PnL sits below the 5th-percentile
+   * Monte-Carlo path, then flip this to true.
+   */
+  charterPathHaltEnabled: boolean;
 }
 
 // ============================================

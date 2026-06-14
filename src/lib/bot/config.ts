@@ -234,6 +234,18 @@ export const TRADEABILITY_CONFIG: TradeabilityConfig = {
  * - maxEntriesPerDay 3/symbol, maxConsecutiveLossesPerSymbol 4 → per-symbol
  *   throttle independent of strategy cooldownBars; pauses one symbol, not the book.
  * - heartbeatTimeoutMs 7_200_000 (2× a 1h bar) → stale feed latches a HALT.
+ *
+ * ACTIVE halt legs with this default config (FIX-3 — be HONEST about what fires):
+ *   1. ABSOLUTE drawdown hard halt   (DD >= hardKillDD ≈ 29.93%)
+ *   2. SUSTAINED-DSR streak hard halt (dsrBreachK=3 sub-floor checks, n >= MinTRL)
+ *   3. SOFT de-risk band              (DD in [eMaxDD, hardKillDD) ⇒ ×0.5)
+ * Exactly those three. The other two confluence legs are DISABLED-pending-inputs:
+ *   - regimeHaltEnabled=false      → regime/mechanism legs OFF (no regime-decay
+ *     detector feeds `regimeCause`; run-bot's consumeRegimeCause() returns false).
+ *   - charterPathHaltEnabled=false → charter-p5 path legs OFF (no cumulative-PnL-
+ *     vs-p5 probe feeds `charterBreachConsecutive`; it stays 0 in run-bot).
+ * Each flag carries a one-line TODO (in `RetirementConfig`) of the input to wire
+ * before it may be flipped true.
  */
 export const RETIREMENT_CONFIG: RetirementConfig = {
   sigmaAnnual: 0.12,
@@ -251,6 +263,13 @@ export const RETIREMENT_CONFIG: RetirementConfig = {
   // n >= MinTRL) escalate the DSR layer to a HARD halt even without a regime
   // cause. One reading is noise; three sustained breaches are an edge collapse.
   dsrBreachK: 3,
+  // FIX-3 feature flags — DEFAULT FALSE = leg NOT wired (see RetirementConfig docs).
+  // regimeHaltEnabled: enable AFTER an edge-triggered regime-decay detector feeds
+  //   `regimeCause` (today consumeRegimeCause() in run-bot.ts returns a hardcoded false).
+  regimeHaltEnabled: false,
+  // charterPathHaltEnabled: enable AFTER a charter-p5 cumulative-PnL-vs-path probe
+  //   feeds `charterBreachConsecutive` (today it is declared =0 and never mutated).
+  charterPathHaltEnabled: false,
 };
 
 // ============================================

@@ -172,20 +172,28 @@ class TradingBot {
   // Sustained-DSR breach counter (Issue B): carried across ticks so k consecutive
   // sub-floor deflated-Sharpe checks escalate to a HARD halt. Reset on any clear.
   private dsrBreachConsecutive = 0;
-  // Consecutive charter-p5 path breaches (yellow→red). Placeholder until the
-  // charter-path probe (Task 6) feeds a real cumulative-PnL-vs-p5 comparison;
-  // stays 0 today so the charter leg never trips spuriously.
+  // Consecutive charter-p5 path breaches (yellow→red). INERT: declared =0 and
+  // never mutated because no charter-p5 cumulative-PnL-vs-path probe is wired yet.
+  // The charter legs are therefore gated OFF via RETIREMENT_CONFIG.charterPathHaltEnabled
+  // = false (FIX-3) — even this stale 0 (or any nonzero) value can NOT trip the
+  // charter RED/YELLOW legs while that flag is false. To activate: wire a probe
+  // that increments this when live cumulative PnL drops below the p5 MC path, then
+  // flip charterPathHaltEnabled to true.
   private charterBreachConsecutive = 0;
   // De-risk gross-exposure multiplier carried INTO sizing for the current tick
   // when the retirement decision is 'derisk'. 1 = full size. Recomputed each tick.
   private retirementMultiplier = 1;
   // Dedupes the retirement HALT alert/log so a sustained halt does not spam.
   private retirementAlerted = false;
-  // NOTE (Issue A): an EDGE-TRIGGERED regime/mechanism cause would be memoed here
-  // (last-seen regime tag) so we raise regimeCause only on a FRESH decay
-  // transition, never as a sticky level. No regime-decay detector feeds the tick
-  // yet, so consumeRegimeCause() returns false and we keep no latch state — the
-  // sustained-DSR streak (Issue B) carries the durable-edge-collapse signal.
+  // NOTE (Issue A / FIX-3): an EDGE-TRIGGERED regime/mechanism cause would be
+  // memoed here (last-seen regime tag) so we raise regimeCause only on a FRESH
+  // decay transition, never as a sticky level. No regime-decay detector feeds the
+  // tick yet, so consumeRegimeCause() returns a hardcoded false and the regime
+  // legs are gated OFF via RETIREMENT_CONFIG.regimeHaltEnabled = false — even a
+  // stray/stale regimeCause=true can NOT trip a halt or de-risk while that flag is
+  // false. The sustained-DSR streak (Issue B) carries the durable-edge-collapse
+  // signal. To activate: wire the detector to feed regimeCause, then flip
+  // regimeHaltEnabled to true.
 
   constructor(
     config: BotConfig,
@@ -292,6 +300,22 @@ class TradingBot {
     }
     if (this.arbOnly) {
       console.log(`Mode: ARB ONLY (no directional trading)`);
+    }
+    // FIX-3: be HONEST about which retirement halt legs can actually fire. Two
+    // legs (regime/mechanism + charter-p5 path) are DISABLED-pending-inputs, so
+    // an operator is not misled into thinking 5 protections are live.
+    const activeHalts = [
+      'absolute-DD hard halt',
+      `sustained-DSR streak hard halt (k=${RETIREMENT_CONFIG.dsrBreachK}, n>=${RETIREMENT_CONFIG.minTrackRecordLength})`,
+      'soft de-risk band (eMaxDD→hardKillDD, ×0.5)',
+    ];
+    const disabledHalts = [
+      ...(RETIREMENT_CONFIG.regimeHaltEnabled ? [] : ['regime/mechanism (no detector wired)']),
+      ...(RETIREMENT_CONFIG.charterPathHaltEnabled ? [] : ['charter-p5 path (no cumulative-PnL probe wired)']),
+    ];
+    console.log(`Retirement ACTIVE halts: ${activeHalts.join('; ')}`);
+    if (disabledHalts.length > 0) {
+      console.log(`Retirement DISABLED-pending-inputs: ${disabledHalts.join('; ')}`);
     }
     console.log('='.repeat(60));
 
