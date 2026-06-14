@@ -5,8 +5,8 @@ Deep adversarial audit (run-it-and-trace-it) found several layers TESTED-but-UNW
 - [x] FIX-1 per-cell review ✅ `2ebe81e` — reads real P&L (legacy pnl_percent fallback), per-weekOf dedup (476→119, idempotent), cold-cohort no false-decay; ALSO cleaned a NUL key-delimiter that made review.ts a BINARY blob since c7f7544.
 - [x] FIX-2 entry guards ✅ `d40c6b5` — checkPreTradeGuards (mark collar/stale/crossed) + L2 tradeability now invoked at all 4 live entry sites (verified call-sites); limit-order qty capped; fail-safe on fetch.
 - [x] FIX-3 inert halt legs ✅ `cfe4e28` — gated behind disabled-by-default flags + assert active set = {abs-DD, sustained-DSR}; honest startup log (no faked inputs).
-- [ ] FIX-4 live closePosition gets no funding series → live fundingReturn=0 (sim/live mismatch); de-tautologize ledger invariant.
-- [ ] FIX-5 replay-bot db.delete(botTrades) runs in DEFAULT paper mode against the forward DB — guard it.
+- [x] FIX-4 live funding ✅ `f45886d` — both closePosition sites build+pass a Bybit-funding-history series (live fundingReturn now real, fail-safe); ledger invariant de-tautologized (cross-check vs independent pnl-derived net).
+- [x] FIX-5 replay-bot wipe ✅ `90bcf6d` — --fresh gated behind --confirm-wipe when bot_trades non-empty (pure resetWipeGuard); main() only runs when invoked directly.
 - [x] FIX-6 failing test ✅ `2106fc2` — getRollingDeflatedSharpe(Obs) returns null on cold/degenerate (<2 obs or non-finite) not -Infinity; suite green 246/246.
 - [ ] FIX-7 gold F2F sleeve has zero safety wiring (kill/halt) — wire or document unguarded.
 WHAT GENUINELY WORKS (verified): boot→migrate→tick→persist; latched kill-switch; absolute-DD (29.93%) + sustained-DSR halts; computePositionSize notional cap+stop floor; migration 0004; append-only decision-log; hourly snapshots.
