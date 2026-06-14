@@ -28,6 +28,9 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { getCppiExposureMultiplier } from '../src/lib/bot/risk-engine';
+import { expectedMaxDD, hardKillDD } from '../src/lib/bot/retirement';
+import { RETIREMENT_CONFIG } from '../src/lib/bot/config';
 
 // ============================================
 // Config
@@ -61,6 +64,59 @@ function corrOf(a: number[], b: number[]): number {
 function fmt(x: number, dp = 2): string { return x.toFixed(dp); }
 
 // ============================================
+// Live book drawdown (PURE — unit-testable without a DB)
+// ============================================
+
+/** A single live equity snapshot from `bot_equity_snapshots`. */
+export interface EquitySnapshot {
+  timestamp: number;
+  equity: number;
+}
+
+/**
+ * Trailing-peak drawdown of the LIVE book equity series.
+ *
+ *   drawdown = 1 - latestEquity / max(historicalPeak, latestEquity)
+ *
+ * Snapshots are sorted by `timestamp` so the latest is the chronological last
+ * (the DB read is already ordered, but we re-sort defensively). Returns 0 when
+ * there are no snapshots — the graceful fallback that maps to a CPPI multiplier
+ * of 1.0 (no cut) when there is no live history to size off yet. This is PURE
+ * (no DB / clock) so the CPPI cut is unit-testable in isolation.
+ */
+export function liveBookDrawdown(snapshots: EquitySnapshot[]): number {
+  if (snapshots.length === 0) return 0;
+  const sorted = [...snapshots].sort((a, b) => a.timestamp - b.timestamp);
+  const latest = sorted[sorted.length - 1]!.equity;
+  let peak = latest;
+  for (const s of sorted) peak = Math.max(peak, s.equity);
+  if (peak <= 0) return 0;
+  return Math.max(0, 1 - latest / peak);
+}
+
+/**
+ * Best-effort read of the LIVE crypto book equity series from
+ * `bot_equity_snapshots` (the same source the live monitor reads). Returns an
+ * empty array if the DB is missing/locked/empty so CPPI falls back to mult 1.0
+ * with a logged note — NEVER to the backtest curve's drawdown.
+ */
+function readLiveEquitySnapshots(): EquitySnapshot[] {
+  try {
+    // best-effort dynamic require so the allocator works even if the DB is locked/full
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Database = require('better-sqlite3') as typeof import('better-sqlite3');
+    const db = new Database(path.resolve(__dirname, '..', 'data', 'ict-trading.db'), { readonly: true });
+    const rows = db.prepare(
+      'SELECT timestamp, equity FROM bot_equity_snapshots ORDER BY timestamp',
+    ).all() as Array<{ timestamp: number; equity: number }>;
+    db.close();
+    return rows.map((r) => ({ timestamp: r.timestamp, equity: r.equity }));
+  } catch {
+    return []; // DB unavailable → graceful fallback to no-cut
+  }
+}
+
+// ============================================
 // Sizing from backtest series
 // ============================================
 
@@ -71,6 +127,15 @@ interface Sizing {
   bookScale: number;
   notional: Record<Sleeve, number>;
   bookVolAnn: number;
+  /**
+   * Current LIVE book drawdown from the trailing peak of the `bot_equity_snapshots`
+   * series (0 when no live history exists yet — CPPI then does not cut).
+   */
+  liveDrawdown: number;
+  /** True when there were no live snapshots ⇒ CPPI defaulted to 1.0 (no cut). */
+  liveDataAvailable: boolean;
+  /** CPPI continuous-drawdown exposure multiplier applied to all notionals. */
+  cppiMult: number;
 }
 
 function computeSizing(capital: number, volTargetAnn: number): Sizing {
@@ -109,11 +174,37 @@ function computeSizing(capital: number, volTargetAnn: number): Sizing {
   const bookVolAnn = std(book) * Math.sqrt(252);
   const bookScale = bookVolAnn > 0 ? Math.min(BOOK_LEVERAGE_CAP, volTargetAnn / bookVolAnn) : 1;
 
+  // CPPI continuous-drawdown cut, anchored to the FROZEN retirement bounds
+  // (reused, not re-derived). CRITICAL (reviewer FIX 1): the drawdown is the
+  // LIVE book drawdown from `bot_equity_snapshots`, NOT the backtest equity
+  // curve. Sizing CPPI off the historical backtest series produces a FIXED
+  // number decoupled from the live account — it could never cut when the LIVE
+  // book draws down. We therefore read the live snapshots and take their
+  // trailing-peak drawdown; the backtest `book` series above is used for
+  // vol/DM ESTIMATION ONLY. With no live history yet we fall back GRACEFULLY to
+  // drawdown 0 ⇒ multiplier 1.0 (no cut), never to the backtest drawdown. The
+  // cut RECOVERS as live equity recovers — independent of the latched kill.
+  const eMaxDD = expectedMaxDD({
+    sigmaAnnual: RETIREMENT_CONFIG.sigmaAnnual,
+    sharpe: RETIREMENT_CONFIG.sharpe,
+    horizonYears: RETIREMENT_CONFIG.horizonYears,
+  });
+  const hardDD = hardKillDD({ eMaxDD, bootstrapP5DD: RETIREMENT_CONFIG.bootstrapP5DD });
+  const liveSnapshots = readLiveEquitySnapshots();
+  const liveDataAvailable = liveSnapshots.length > 0;
+  const liveDrawdown = liveBookDrawdown(liveSnapshots);
+  if (!liveDataAvailable) {
+    console.log(
+      'CPPI: no live equity snapshots (bot_equity_snapshots) — falling back to exposureMult 1.0 (no cut).',
+    );
+  }
+  const cppiMult = getCppiExposureMultiplier({ drawdown: liveDrawdown, eMaxDD, hardKillDD: hardDD });
+
   const notional = {} as Record<Sleeve, number>;
   for (const s of SLEEVES) {
-    notional[s] = capital * CLUSTER_WEIGHTS[s] * scales[s] * dm * bookScale;
+    notional[s] = capital * CLUSTER_WEIGHTS[s] * scales[s] * dm * bookScale * cppiMult;
   }
-  return { vols, scales, dm, bookScale, notional, bookVolAnn };
+  return { vols, scales, dm, bookScale, notional, bookVolAnn, liveDrawdown, liveDataAvailable, cppiMult };
 }
 
 // ============================================
@@ -239,6 +330,8 @@ function main(): void {
     );
   }
   console.log(`DM=${fmt(s.dm)}  bookVol@weights=${fmt(s.bookVolAnn * 100, 1)}%  bookScale=${fmt(s.bookScale)}×`);
+  const ddSource = s.liveDataAvailable ? 'live bot_equity_snapshots' : 'no live data → fallback 1.0×';
+  console.log(`CPPI: liveDD=${fmt(s.liveDrawdown * 100, 1)}% (${ddSource}) → exposureMult=${fmt(s.cppiMult)}× (recoverable; independent of the latched kill-switch)`);
   console.log(`Total gross notional: $${Math.round(SLEEVES.reduce((t, k) => t + s.notional[k], 0)).toLocaleString()}`);
   console.log('\nExpected (backtest, venue-realistic): ~37%/yr, Sharpe ~2.5, maxDD ~10% at 12% target.');
   console.log('Worst NORMAL stretch: flat 6 months (do not kill sleeves on flat spells).\n');
@@ -261,6 +354,9 @@ function main(): void {
       weights: CLUSTER_WEIGHTS,
       dm: Math.round(s.dm * 100) / 100,
       bookScale: Math.round(s.bookScale * 100) / 100,
+      liveDrawdown: Math.round(s.liveDrawdown * 1e4) / 100,
+      liveDataAvailable: s.liveDataAvailable,
+      cppiMult: Math.round(s.cppiMult * 100) / 100,
       notional: Object.fromEntries(SLEEVES.map((k) => [k, Math.round(s.notional[k])])),
     },
     live: lives,
@@ -268,4 +364,7 @@ function main(): void {
   console.log(`Saved → ${outPath}`);
 }
 
-main();
+// Only run the allocator when executed directly (not when imported by tests).
+if (require.main === module) {
+  main();
+}

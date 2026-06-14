@@ -29,6 +29,11 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { calculateDeflatedSharpe } from '../src/lib/rl/utils/deflated-sharpe';
+import {
+  noTradeBand,
+  fractionalKellyVolTarget,
+} from '../src/lib/risk/sizing';
 
 // ============================================
 // Math helpers
@@ -68,6 +73,14 @@ const DM_CAP = 2.5;
 const MV_MEAN_SHRINK = 0.75;          // shrink sleeve means 75% toward cross-sleeve mean
 const MV_COV_SHRINK = 0.5;            // shrink covariance toward diagonal
 const MV_WEIGHT_BOUNDS: [number, number] = [0.10, 0.60];
+
+// Risk-hardening governance (Task 6). All computed strictly from data BEFORE the
+// bar and on the (funding-net) book return series — never gross.
+const KELLY_FRACTION = 0.5;           // half-Kelly: target vol = 0.5*SR_deflated-scaled
+const DSR_TRIAL_COUNT = 4;            // selection-bias trials for the combination DSR
+const NO_TRADE_BAND_ABS = 0.10;       // absolute leverage tolerance
+const NO_TRADE_BAND_REL = 0.20;       // relative (×target) leverage tolerance
+const REBALANCE_COST_BPS = 5;         // ~5 bps charged on book-leverage turnover
 
 // ============================================
 // Data loading & alignment
@@ -320,21 +333,65 @@ function runMethod(
     activeDays++;
   }
 
-  // Portfolio vol-target overlay (EWMA 20d ≈ λ=0.905, scale capped)
+  // Portfolio vol-target overlay (EWMA 20d ≈ λ=0.905, scale capped), HARDENED
+  // with the Task-6 governance layers — every quantity below is computed strictly
+  // from book returns BEFORE day t (no look-ahead) and on the FUNDING-NET book
+  // series (`dailyRaw` carries each sleeve's realized costs), never gross:
+  //   (a) fractional-Kelly: the vol-TARGET LEVEL is 0.5×(rolling deflated Sharpe)-
+  //       scaled — stands down to 0 vol when the deflated Sharpe is non-positive;
+  //   (b) no-trade band: the book leverage only moves when the new target leaves
+  //       the band max(0.10, 0.20×target) — suppresses churn / fee bleed;
+  //   (c) rebalance-cost debit: ~5 bps charged on the actual leverage turnover.
   const dailyVT = new Array<number>(T).fill(0);
   const lam = 0.905;
   let ewmaVar = 0;
   let init = false;
-  const dailyTarget = PORTFOLIO_VOL_TARGET_ANN / Math.sqrt(252);
+  let appliedLev = 0; // book leverage actually held (after the no-trade band)
+  let kellyStandDowns = 0;
+  let bandHolds = 0;
+  let rebalCostDebitTotal = 0;
   for (let t = WARMUP_DAYS; t < T; t++) {
     if (init && ewmaVar > 0) {
-      const scale = Math.min(PORTFOLIO_LEVERAGE_CAP, dailyTarget / Math.sqrt(ewmaVar));
-      dailyVT[t] = scale * dailyRaw[t]!;
+      // (a) Fractional-Kelly target vol off the rolling DEFLATED Sharpe of the
+      // funding-net book up to (but excluding) t — no look-ahead.
+      const past = dailyRaw.slice(WARMUP_DAYS, t);
+      let usedTargetAnn = PORTFOLIO_VOL_TARGET_ANN;
+      if (past.length >= 20) {
+        const dsr = calculateDeflatedSharpe(annSharpe(past), past.length, DSR_TRIAL_COUNT);
+        usedTargetAnn = fractionalKellyVolTarget({
+          deflatedSharpeRolling: dsr.deflatedSharpe,
+          baseTargetVol: PORTFOLIO_VOL_TARGET_ANN,
+          fraction: KELLY_FRACTION,
+        });
+        if (usedTargetAnn === 0) kellyStandDowns++;
+      }
+      const dailyTarget = usedTargetAnn / Math.sqrt(252);
+      const rawLev = Math.min(PORTFOLIO_LEVERAGE_CAP, dailyTarget / Math.sqrt(ewmaVar));
+
+      // (b) No-trade band on the book leverage (suppress churn).
+      const banded = noTradeBand({
+        currentLev: appliedLev,
+        targetLev: rawLev,
+        absTol: NO_TRADE_BAND_ABS,
+        relTol: NO_TRADE_BAND_REL,
+      });
+      if (!banded.rebalance) bandHolds++;
+
+      // (c) Rebalance-cost debit on the realized leverage turnover.
+      const turnover = Math.abs(banded.newLev - appliedLev);
+      const costDebit = (turnover * REBALANCE_COST_BPS) / 1e4;
+      rebalCostDebitTotal += costDebit;
+      appliedLev = banded.newLev;
+
+      dailyVT[t] = appliedLev * dailyRaw[t]! - costDebit;
     }
     const r = dailyRaw[t]!;
     ewmaVar = init ? lam * ewmaVar + (1 - lam) * r * r : r * r;
     init = true;
   }
+  void kellyStandDowns;
+  void bandHolds;
+  void rebalCostDebitTotal;
 
   const evalRaw = dailyRaw.slice(WARMUP_DAYS);
   const evalVT = dailyVT.slice(WARMUP_DAYS);

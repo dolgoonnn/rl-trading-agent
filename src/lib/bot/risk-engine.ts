@@ -26,7 +26,32 @@ import type { Candle } from '@/types/candle';
 import type { PositionTracker } from './position-tracker';
 import { DEFAULT_RISK_CONFIG } from './config';
 import { calculateDeflatedSharpe } from '@/lib/rl/utils/deflated-sharpe';
+import { cppiExposureMultiplier } from '@/lib/risk/sizing';
 import type { KillFlag } from './kill-switch';
+
+/**
+ * CPPI continuous-drawdown exposure multiplier (re-exported as a risk-engine
+ * surface for callers wiring sizing into the bot/allocator path).
+ *
+ *   mult = clamp(1 - (drawdown - eMaxDD)/(hardKillDD - eMaxDD), 0, 1)
+ *
+ * This is a thin pass-through to the pure `src/lib/risk/sizing` math so the
+ * risk-engine module exposes a single sizing surface. CRITICAL: this CPPI cut
+ * is RECOVERABLE (it un-cuts as drawdown recovers from a trailing peak) and is
+ * kept INDEPENDENT of the latched circuit-breaker / kill-switch. Stacking
+ * CPPI×vol-target×retirement-derisk can drive sizing toward 0 transiently, but
+ * because every factor here rises back as conditions recover, the stack cannot
+ * permanently pin the book flat — only the latched kill (manual reset) does that.
+ *
+ * Use the SAME frozen-at-deploy eMaxDD/hardKillDD the retirement layer uses.
+ */
+export function getCppiExposureMultiplier(args: {
+  drawdown: number;
+  eMaxDD: number;
+  hardKillDD: number;
+}): number {
+  return cppiExposureMultiplier(args);
+}
 
 /** Duration constants in milliseconds */
 const HOUR_MS = 3_600_000;

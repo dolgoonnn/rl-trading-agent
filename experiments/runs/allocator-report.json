@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-11T11:41:45.643Z",
+  "generatedAt": "2026-06-14T06:42:51.398Z",
   "capital": 100000,
   "volTarget": 0.12,
   "sizing": {
@@ -10,6 +10,9 @@
     },
     "dm": 1.58,
     "bookScale": 1.2,
+    "liveDrawdown": 5.31,
+    "liveDataAvailable": true,
+    "cppiMult": 1,
     "notional": {
       "crypto": 70604,
       "sessionBookRetail": 38371,
@@ -19,8 +22,8 @@
   "live": [
     {
       "sleeve": "crypto",
-      "days": 1,
-      "cumPnlPct": -5.28,
+      "days": 2,
+      "cumPnlPct": -5.31,
       "sharpe30": null,
       "sharpe60": null,
       "status": "NO DATA"
@@ -28,7 +31,7 @@
     {
       "sleeve": "sessionBookRetail",
       "days": 1,
-      "cumPnlPct": 0.52,
+      "cumPnlPct": 0.15,
       "sharpe30": null,
       "sharpe60": null,
       "status": "NO DATA"
