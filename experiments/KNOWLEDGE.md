@@ -192,4 +192,5 @@ structure beat pattern structure, exactly as the gold CMA-ES weight profile pred
 - **Altcoins**: `pair-validation-report.md`, `pair-validation-results.json`
 - **Validation artifacts**: `pbo-results*.json`, `monte-carlo-results*.json`, `dsr-results.json`
 - **RL**: `ppo-eval-*.json`
+- **Microstructure**: `microstructure-pipeline.md` — grounded OFI feature pipeline (`src/lib/microstructure/`, Cont-Kukanov-Stoikov 2014); built + unit-tested on real 1s snapshots, predictive study DEFERRED to ≥30–60d (prior: OBI/CVD scalp OOS Sharpe 0.12)
 - **Specs**: `docs/superpowers/specs/` (design docs for newer tracks)
