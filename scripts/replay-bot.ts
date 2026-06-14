@@ -93,7 +93,32 @@ interface ReplayConfig {
   verbose: boolean;
   startDate: number | null; // epoch ms
   fresh: boolean;
+  confirmWipe: boolean; // required to actually wipe a NON-EMPTY shared forward DB
   compare: boolean; // Run backtest sim in parallel and compare divergences
+}
+
+/**
+ * Guard the destructive --fresh wipe. resetBotTables() clears bot_trades in the
+ * SHARED dev DB (data/ict-trading.db) — the same DB the forward paper bot writes
+ * its real track record into. A `--fresh` replay would silently erase that
+ * record. So: a wipe of a NON-EMPTY table requires explicit `--confirm-wipe`.
+ * Pure + testable (no DB/IO).
+ */
+export function resetWipeGuard(
+  fresh: boolean,
+  confirmWipe: boolean,
+  existingTradeCount: number,
+): { allowed: boolean; reason?: string } {
+  if (!fresh) return { allowed: true }; // no wipe requested
+  if (existingTradeCount === 0) return { allowed: true }; // nothing to lose
+  if (confirmWipe) return { allowed: true }; // explicit consent
+  return {
+    allowed: false,
+    reason:
+      `--fresh would WIPE ${existingTradeCount} bot_trades rows in the SHARED DB ` +
+      `(data/ict-trading.db) — this erases the forward paper track record. ` +
+      `Re-run with --confirm-wipe if you really mean it, or back up the DB first.`,
+  };
 }
 
 function parseArgs(): ReplayConfig {
@@ -106,6 +131,7 @@ function parseArgs(): ReplayConfig {
     verbose: false,
     startDate: null,
     fresh: false,
+    confirmWipe: false,
     compare: false,
   };
 
@@ -133,6 +159,9 @@ function parseArgs(): ReplayConfig {
       }
       case '--fresh':
         config.fresh = true;
+        break;
+      case '--confirm-wipe':
+        config.confirmWipe = true;
         break;
       case '--compare':
         config.compare = true;
@@ -738,13 +767,23 @@ async function main(): Promise<void> {
   }
 
   if (config.fresh) {
+    const existingTradeCount = db.select().from(botTrades).all().length;
+    const guard = resetWipeGuard(config.fresh, config.confirmWipe, existingTradeCount);
+    if (!guard.allowed) {
+      console.error(`\n⛔ ${guard.reason}\n`);
+      process.exit(1);
+    }
     resetBotTables();
   }
 
   await runReplay(config);
 }
 
-main().catch((err) => {
-  console.error('Fatal error:', err);
-  process.exit(1);
-});
+// Guard: only run when invoked directly (so tests can import resetWipeGuard
+// without executing a replay). Matches the pattern in run-allocator.ts.
+if (require.main === module) {
+  main().catch((err) => {
+    console.error('Fatal error:', err);
+    process.exit(1);
+  });
+}
