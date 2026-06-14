@@ -78,7 +78,7 @@ Commits ffc3676(checkpoint) → 7e638c2 → 9ce61e5 → f14241d → 66227c8 → 
 
 ## Research queue (after Task 9; ground each in a reputable source first)
 - [DONE `86dac43`] Funding/basis carry (BIS WP 1087) — NULL net-of-cost; funding family CLOSED (stays a cost, not harvested).
-- [IN PROGRESS] Pre-FOMC drift US500 candidate (+16.8bp/event t=2.61) re-validation per fomc-drift.md — ground in Lucca & Moench 2015.
+- [DONE `2f3dfa8`] Pre-FOMC drift US500 — CLOSED (grounded Lucca-Moench 2015 + Kurov 2021): decayed to 1/3, vol-gate fails Harvey-Liu, 82% redundant with leg J. No new leg.
 - [BLOCKED — needs ≥30–60d L2 collection via collect-btc-orderflow.ts] Net-of-cost predictive OFI/CVD probe (prior OOS Sharpe 0.12).
 - [BLOCKED — needs ≥30–60d collection + 2-vintage holdout] Liquidation-cascade-fade event study.
 
@@ -98,3 +98,10 @@ _(append one line per loop iteration: timestamp · task · result · commit)_
 - 2026-06-14 · Task 8 Funding-cost PROBE · funding wired into backtest (default off) via Task-4a ledger; Run-20 SURVIVES (net WF 64.9% > 60%, +262.4% PnL, drag −1.96bps/trade); maker/taker split; 25 cost tests · `1100e5a`
 - 2026-06-14 · Task 9 ATR-stop arms PROBE · chandelier + vertical-barrier + per-arm funding debit on Run-20 log; NULL (no arm beats baseline net-of-funding); 8 tests · `87e65c8`
 - 2026-06-14 · RESEARCH funding-carry · grounded BIS WP1087 + arXiv replication; reproduced 7.6% net APY + 2024→2025 decay; NULL tradeable alpha (gated harvest net-negative, Sharpe is illusion); funding family closed; 5 tests · `86dac43`
+- 2026-06-14 · RESEARCH pre-FOMC drift · grounded Lucca-Moench 2015 + Kurov 2021; CLOSED (decayed 1/3, vol-gate fails Harvey-Liu deflation, 82% redundant w/ leg J); placebo confirms FOMC-specificity; 9 tests · `2f3dfa8`
+
+## 🛑 LOOP STATUS (2026-06-14): feasible work EXHAUSTED — disciplined idle, NOT spinning
+All 9 build tasks done + 2 grounded research items closed. Remaining work is genuinely gated, NOT skipped lazily:
+- Research queue: OFI/CVD predictive probe + liquidation-fade are BLOCKED on ≥30–60d Bybit L2 collection (collect-btc-orderflow.ts must accumulate first) — attempting now = underpowered/premature, forbidden by the loop's own rules.
+- Carried TODOs (consumeRegimeCause regime-decay detector, bootstrapP5DD-from-MC, live funding-series wiring, charter p5-path feed) are deferred-by-design: the regime-decay detector is a NEW signal component (preference: queue for review, never auto-add to live book), bootstrapP5DD is non-binding (eMaxDD 0.194 > placeholder 0.10), live-funding wiring needs a source/cadence decision best made with the user awake.
+- Per the loop's "mark blocked, never spin" rule, the loop now IDLES rather than manufacture low-value work. Awaiting user wake / STOP. To resume productive autonomous work, unblock L2 collection or greenlight a carried TODO.
