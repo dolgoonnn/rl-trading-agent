@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   countFundingSettlements,
   fundingSettlementTimestamps,
@@ -115,8 +115,8 @@ describe('fundingReturn — sign convention (long pays positive funding)', () =>
   });
 });
 
-describe('decomposeReturn — additive audit invariant', () => {
-  it('net = gross + friction + funding and the invariant holds', () => {
+describe('decomposeReturn — additive net', () => {
+  it('net = gross + friction + funding and the sum holds', () => {
     const d = decomposeReturn({
       grossReturn: 0.02,
       frictionReturn: -0.0014,
@@ -128,9 +128,74 @@ describe('decomposeReturn — additive audit invariant', () => {
     expect(d.netReturn).toBeCloseTo(0.018, 12);
   });
 
-  it('does not throw for components that sum cleanly within epsilon', () => {
+  it('does not throw for components that sum cleanly (no expectedNet)', () => {
     expect(() =>
       decomposeReturn({ grossReturn: 0.05, frictionReturn: -0.0007, fundingReturn: 0 }),
     ).not.toThrow();
+  });
+});
+
+describe('decomposeReturn — de-tautologized net reconciliation', () => {
+  // The OLD invariant recomputed `net` from the same sum it asserted against, so
+  // the residual was identically 0 and it could never catch a mis-decomposition.
+  // The new check compares the additive sum against an INDEPENDENT `expectedNet`.
+
+  it('passes when the additive sum agrees with the independent expectedNet', () => {
+    // gross + friction + funding = 0.018; independent net derived as pnl+funding.
+    const pnlPercent = 0.0194; // pnl already net-of-friction
+    const funding = -0.0006;
+    const grossReturn = pnlPercent - -0.0014; // gross = pnl − friction
+    expect(() =>
+      decomposeReturn({
+        grossReturn,
+        frictionReturn: -0.0014,
+        fundingReturn: funding,
+        expectedNet: pnlPercent + funding, // 0.0188
+        strict: true,
+      }),
+    ).not.toThrow();
+  });
+
+  it('FLAGS a deliberately-inconsistent decomposition (strict ⇒ throws)', () => {
+    // Mis-decomposition: gross is wrong by 0.01, so additiveNet (0.028) diverges
+    // from the independent expectedNet (0.018). The OLD tautological check would
+    // have PASSED here because it recomputed net from this same wrong sum.
+    expect(() =>
+      decomposeReturn({
+        grossReturn: 0.03, // WRONG (inflated by 0.01)
+        frictionReturn: -0.0014,
+        fundingReturn: -0.0006,
+        expectedNet: 0.018, // independently-known true net
+        strict: true,
+      }),
+    ).toThrow(/net reconciliation failed/);
+  });
+
+  it('NON-strict (production) logs a warning instead of throwing on divergence', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(() =>
+      decomposeReturn({
+        grossReturn: 0.03, // WRONG
+        frictionReturn: -0.0014,
+        fundingReturn: -0.0006,
+        expectedNet: 0.018,
+      }),
+    ).not.toThrow();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('net reconciliation failed'));
+    warn.mockRestore();
+  });
+
+  it('still returns the additive net even when divergence is only logged', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const d = decomposeReturn({
+      grossReturn: 0.03,
+      frictionReturn: -0.0014,
+      fundingReturn: -0.0006,
+      expectedNet: 0.018,
+    });
+    // netReturn is the additive sum (0.028), NOT the expectedNet — the function
+    // reports what the legs actually sum to so the drift is visible downstream.
+    expect(d.netReturn).toBeCloseTo(0.028, 12);
+    warn.mockRestore();
   });
 });

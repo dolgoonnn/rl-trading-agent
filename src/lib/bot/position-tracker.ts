@@ -308,7 +308,18 @@ export class PositionTracker {
       }
     }
 
-    const decomposed = decomposeReturn({ grossReturn, frictionReturn, fundingReturn });
+    // Independently-computed realized net for the de-tautologized audit. Net is
+    // realized PnL (already net-of-friction) plus the signed funding leg; this
+    // is derived from `pnlPercent` directly, NOT from the gross/friction split,
+    // so a mis-attribution between gross and friction can no longer pass
+    // silently. Non-strict in production (logs a warning, never crashes a close).
+    const expectedNet = (position.pnlPercent ?? 0) + fundingReturn;
+    const decomposed = decomposeReturn({
+      grossReturn,
+      frictionReturn,
+      fundingReturn,
+      expectedNet,
+    });
     // fundingPaidUsdt: sign-correct USDT funding (negative = paid, positive = received).
     const fundingPaidUsdt = decomposed.fundingReturn * position.positionSizeUSDT;
 

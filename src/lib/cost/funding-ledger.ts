@@ -111,26 +111,53 @@ export function fundingReturn(args: {
 }
 
 /**
- * Combine the three return components and assert the additive audit invariant
- * `netReturn === grossReturn + frictionReturn + fundingReturn` (within a float
- * epsilon). Throws if the invariant is violated — that can only happen from a
- * programming error since `netReturn` is computed here, but the assertion
- * documents and locks the contract for every downstream consumer.
+ * Combine the three return components into a decomposition whose `netReturn`
+ * is `grossReturn + frictionReturn + fundingReturn`, then CROSS-CHECK that sum
+ * against an INDEPENDENTLY-computed net.
+ *
+ * De-tautologization (the fix): the old invariant recomputed `net` from the
+ * very same sum it then asserted against, so the residual was identically zero
+ * and the check could never catch a real decomposition error. Here the audit
+ * compares the additive sum against `expectedNet` — a net the CALLER derived a
+ * DIFFERENT way (e.g. `pnlPercent + fundingReturn`). If the decomposition legs
+ * are mis-attributed (gross/friction don't reconcile to the realized net), the
+ * two nets diverge and the check fires.
+ *
+ * @param expectedNet An independently-computed realized net to reconcile the
+ *        additive sum against. When omitted, no cross-check is performed (the
+ *        sum is still returned as `netReturn`) — preserves the back-compat
+ *        contract for the existing 3-arg callers.
+ * @param strict When true (tests), a reconciliation failure THROWS. When false
+ *        (production / default), it logs a warning and returns the additive
+ *        sum so a close is never crashed by an accounting drift.
  */
 export function decomposeReturn(args: {
   grossReturn: number;
   frictionReturn: number;
   fundingReturn: number;
+  expectedNet?: number;
+  strict?: boolean;
 }): ReturnDecomposition {
-  const { grossReturn, frictionReturn, fundingReturn: funding } = args;
+  const { grossReturn, frictionReturn, fundingReturn: funding, expectedNet, strict } = args;
+  // The additive net — the decomposition contract `net = gross + friction + funding`.
   const netReturn = grossReturn + frictionReturn + funding;
 
-  const residual = Math.abs(netReturn - (grossReturn + frictionReturn + funding));
-  if (residual > AUDIT_EPSILON) {
-    throw new Error(
-      `funding-ledger: additive audit invariant violated (residual=${residual}). ` +
-        `gross=${grossReturn} friction=${frictionReturn} funding=${funding} net=${netReturn}`,
-    );
+  // Cross-check the additive net against an independently-derived net. This is
+  // the NON-tautological audit: `expectedNet` is computed by the caller via a
+  // different path, so a genuine mis-decomposition makes the residual non-zero.
+  if (expectedNet !== undefined) {
+    const residual = Math.abs(netReturn - expectedNet);
+    if (residual > AUDIT_EPSILON) {
+      const msg =
+        `funding-ledger: net reconciliation failed (residual=${residual}). ` +
+        `gross=${grossReturn} friction=${frictionReturn} funding=${funding} ` +
+        `additiveNet=${netReturn} expectedNet=${expectedNet}`;
+      if (strict) {
+        throw new Error(msg);
+      }
+      // Production: never crash a close on an accounting drift — log and proceed.
+      console.warn(`[funding-ledger] ${msg}`);
+    }
   }
 
   return { grossReturn, frictionReturn, fundingReturn: funding, netReturn };

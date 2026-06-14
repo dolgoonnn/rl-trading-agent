@@ -7,7 +7,7 @@
  */
 
 import { RestClientV5 } from 'bybit-api';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import type { Candle } from '@/types/candle';
 import type { BotSymbol, OrderbookSnapshot } from '@/types/bot';
 import { db } from '@/lib/data/db';
@@ -35,12 +35,37 @@ const ORDERBOOK_CACHE_MS = 5_000;
 /** Top-N order-book levels summed for the tradeability depth check. */
 const ORDERBOOK_DEPTH_LEVELS = 10;
 
+/** Max rows per Bybit funding-history request (API hard cap is 200). */
+const BYBIT_FUNDING_MAX_LIMIT = 200;
+
+/** Funding-history cache TTL (ms) — short, since realized settlements are stable once published. */
+const FUNDING_HISTORY_CACHE_MS = 30_000;
+
+/**
+ * One realized funding settlement: the UTC instant it settled and the rate
+ * (fraction, e.g. 0.0001 = 1bp) that applied. `settlementMs` is the canonical
+ * 00:00 / 08:00 / 16:00 UTC instant the funding-ledger keys on.
+ */
+export interface FundingSettlement {
+  settlementMs: number;
+  fundingRate: number;
+}
+
 export class DataFeed {
   private client: RestClientV5;
   private lastTimestamps: Map<string, number> = new Map();
   private markPriceCache: Map<string, { price: number; fetchedAt: number }> = new Map();
   private orderbookCache: Map<string, { snapshot: OrderbookSnapshot; fetchedAt: number }> =
     new Map();
+  /**
+   * Funding-history cache keyed by `symbol|startMs|endMs`. Realized funding is
+   * immutable once published, so a short TTL is plenty to avoid re-paging the
+   * same window on consecutive closes within a tick.
+   */
+  private fundingHistoryCache: Map<
+    string,
+    { settlements: FundingSettlement[]; fetchedAt: number }
+  > = new Map();
 
   /**
    * Wall-clock timestamp (ms) of the last successful feed update from the
@@ -479,5 +504,96 @@ export class DataFeed {
 
     this.orderbookCache.set(symbol, { snapshot, fetchedAt: nowMs });
     return snapshot;
+  }
+
+  /**
+   * Fetch REALIZED funding settlements for `symbol` over the window
+   * `[startMs, endMs]` via Bybit `/v5/market/funding/history` (category=linear).
+   *
+   * Returns the settlements (UTC settlement instant + realized rate) in
+   * ASCENDING order, covering the window. Bybit caps each request at 200 rows
+   * and returns newest-first; we page BACKWARDS from `endMs` until we pass
+   * `startMs` (or run out of rows), then sort ascending.
+   *
+   * FAIL-SAFE: on ANY error (network, bad payload, rate limit) this returns `[]`
+   * and logs — the caller then books 0 funding rather than crashing a close.
+   * Short-cached (30s) per `symbol|startMs|endMs` to avoid re-paging the same
+   * window across consecutive closes within a tick.
+   *
+   * @param symbol Linear-perp symbol (e.g. BTCUSDT).
+   * @param startMs Window start (inclusive), UTC ms.
+   * @param endMs Window end (inclusive), UTC ms.
+   * @param nowMs Injected clock for the cache TTL (defaults to Date.now()).
+   */
+  async getFundingHistory(
+    symbol: BotSymbol,
+    startMs: number,
+    endMs: number,
+    nowMs: number = Date.now(),
+  ): Promise<FundingSettlement[]> {
+    if (!(endMs >= startMs)) return [];
+
+    const cacheKey = `${symbol}|${startMs}|${endMs}`;
+    const cached = this.fundingHistoryCache.get(cacheKey);
+    if (cached && nowMs - cached.fetchedAt < FUNDING_HISTORY_CACHE_MS) {
+      return cached.settlements;
+    }
+
+    try {
+      const byInstant = new Map<number, number>();
+      // Page backwards from endMs: Bybit returns newest-first, so we walk the
+      // `endTime` cursor down to the oldest published settlement >= startMs.
+      let endTime = endMs;
+
+      // Guard against an unbounded loop on a misbehaving endpoint.
+      for (let page = 0; page < 50; page++) {
+        const response = await this.client.getFundingRateHistory({
+          category: BYBIT_CATEGORY,
+          symbol,
+          startTime: startMs,
+          endTime,
+          limit: BYBIT_FUNDING_MAX_LIMIT,
+        });
+
+        if (response.retCode !== 0) {
+          throw new Error(
+            `Bybit API error (funding/history): ${response.retMsg} (code: ${response.retCode})`,
+          );
+        }
+
+        const rows = response.result.list;
+        if (!rows || rows.length === 0) break;
+
+        let oldestTs = Number.POSITIVE_INFINITY;
+        for (const row of rows) {
+          const ts = parseInt(row.fundingRateTimestamp, 10);
+          const rate = parseFloat(row.fundingRate);
+          if (!Number.isFinite(ts) || !Number.isFinite(rate)) continue;
+          oldestTs = Math.min(oldestTs, ts);
+          // Keep only settlements inside the requested window.
+          if (ts >= startMs && ts <= endMs) byInstant.set(ts, rate);
+        }
+
+        // Done once we've reached rows older than the window or got a short page.
+        if (rows.length < BYBIT_FUNDING_MAX_LIMIT) break;
+        if (!Number.isFinite(oldestTs) || oldestTs <= startMs) break;
+        // Step the cursor just before the oldest row seen so the next page is older.
+        endTime = oldestTs - 1;
+      }
+
+      const settlements: FundingSettlement[] = [...byInstant.entries()]
+        .map(([settlementMs, fundingRate]) => ({ settlementMs, fundingRate }))
+        .sort((a, b) => a.settlementMs - b.settlementMs);
+
+      this.fundingHistoryCache.set(cacheKey, { settlements, fetchedAt: nowMs });
+      return settlements;
+    } catch (err) {
+      // Fail-safe: never crash a close on a funding-history fetch error.
+      console.warn(
+        `[data-feed] getFundingHistory failed for ${symbol} [${startMs}, ${endMs}]; returning []:`,
+        err,
+      );
+      return [];
+    }
   }
 }

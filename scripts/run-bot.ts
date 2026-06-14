@@ -53,6 +53,7 @@ import { db } from '../src/lib/data/db';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import type { BotConfig, BotSymbol, BotPosition, LTFConfig } from '../src/types/bot';
 import type { Candle } from '../src/types/candle';
+import type { FundingSettlementSeries } from '../src/lib/cost/funding-ledger';
 
 // ============================================
 // Parse CLI arguments
@@ -386,7 +387,10 @@ class TradingBot {
           continue;
         }
         const result = this.orderManager.forceClose(position, price, 'shutdown');
-        this.tracker.closePosition(result.position);
+        // Same realized-funding wiring as the live exit path: book the real
+        // signed funding leg (fail-safe ⇒ 0 + log if history is empty/errors).
+        const fundingSeries = await this.buildFundingSeries(result.position);
+        this.tracker.closePosition(result.position, fundingSeries);
         await this.alerts.positionClosed(result.position);
       } catch (err) {
         console.error(`Failed to close ${position.symbol} position on shutdown:`, err);
@@ -1053,6 +1057,62 @@ class TradingBot {
     }
   }
 
+  /**
+   * Build a realized-funding series for a position about to close, so
+   * `PositionTracker.closePosition` debits the SAME signed funding leg the
+   * funding-charged backtest charges (zero sim/live mismatch — Task 4 keystone).
+   *
+   * Fetches Bybit's realized funding over the position's holding window
+   * `(entryTimestamp, exitTimestamp]` and returns a `rateAt(settlementMs)` lookup
+   * that maps each crossed 00/08/16 UTC settlement instant to its realized rate.
+   *
+   * FAIL-SAFE: if the position has no exit timestamp, or the exchange returns no
+   * settlements (empty history / fetch error → DataFeed already returns []), this
+   * returns `undefined` so the close books 0 funding — and we log it. Never
+   * throws: a funding lookup must not be able to crash a position close.
+   */
+  private async buildFundingSeries(
+    position: BotPosition,
+  ): Promise<FundingSettlementSeries | undefined> {
+    const exitMs = position.exitTimestamp;
+    if (exitMs === undefined || !(exitMs > position.entryTimestamp)) {
+      return undefined;
+    }
+
+    let settlements: { settlementMs: number; fundingRate: number }[] = [];
+    try {
+      settlements = await this.dataFeed.getFundingHistory(
+        position.symbol,
+        position.entryTimestamp,
+        exitMs,
+      );
+    } catch (err) {
+      // DataFeed is already fail-safe ([] on error), but belt-and-suspenders:
+      // never let a funding fetch crash a close.
+      console.warn(
+        `  ${position.symbol}: funding history fetch threw for ${position.id}; booking 0 funding:`,
+        err,
+      );
+      return undefined;
+    }
+
+    if (settlements.length === 0) {
+      console.log(
+        `  ${position.symbol}: no realized funding for ${position.id} ` +
+          `[${new Date(position.entryTimestamp).toISOString()} → ${new Date(exitMs).toISOString()}] — booking 0 funding`,
+      );
+      return undefined;
+    }
+
+    // Map each settlement instant to its realized rate. The funding-ledger asks
+    // for rates at the canonical 00/08/16 UTC instants it crosses; an instant
+    // with no published rate resolves to 0 (no charge for that settlement).
+    const rateByInstant = new Map<number, number>();
+    for (const s of settlements) rateByInstant.set(s.settlementMs, s.fundingRate);
+
+    return { rateAt: (settlementMs: number): number => rateByInstant.get(settlementMs) ?? 0 };
+  }
+
   private async manageOpenPosition(
     position: BotPosition,
     candle: { timestamp: number; open: number; high: number; low: number; close: number; volume: number },
@@ -1071,9 +1131,13 @@ class TradingBot {
 
     if (!exitResult) return; // Still open
 
-    // Position closed
+    // Position closed. Fetch the realized funding over the holding window and
+    // pass it so closePosition debits a REAL signed funding leg (−long/+short),
+    // matching the funding-charged backtest. Empty/failed history ⇒ undefined ⇒
+    // 0 funding booked + logged (fail-safe, never crashes the close).
     const closedPos = exitResult.position;
-    this.tracker.closePosition(closedPos);
+    const fundingSeries = await this.buildFundingSeries(closedPos);
+    this.tracker.closePosition(closedPos, fundingSeries);
     await this.alerts.positionClosed(closedPos);
 
     const pnlStr = (closedPos.pnlUSDT ?? 0) >= 0 ? '+' : '';

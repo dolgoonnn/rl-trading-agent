@@ -2,12 +2,12 @@
 
 ## ⚠️ AUDIT CORRECTION (2026-06-14) — overnight "9/9 built" was ~50% scaffolding
 Deep adversarial audit (run-it-and-trace-it) found several layers TESTED-but-UNWIRED. The "tests pass" gate during the loop did NOT prove live-path wiring. Fixing with TDD + call-site verification:
-- [ ] FIX-1 per-cell review actively misleading (all-zero cells over 1728 trades, false DECAYING on ~20/21 cohorts, append-without-dedup doubled 238→476). Fix: read real P&L + per-weekOf dedup.
-- [ ] FIX-2 wire checkPreTradeGuards (mark collar + stale-candle + crossed-candle) + L2 tradeability into openPosition — currently ZERO live callers (only computePositionSize runs).
-- [ ] FIX-3 inert halt legs: consumeRegimeCause()=false, charterBreachConsecutive never incremented → 2 legs can never fire. Make honest (explicit-disable + assert live set) or wire.
+- [x] FIX-1 per-cell review ✅ `2ebe81e` — reads real P&L (legacy pnl_percent fallback), per-weekOf dedup (476→119, idempotent), cold-cohort no false-decay; ALSO cleaned a NUL key-delimiter that made review.ts a BINARY blob since c7f7544.
+- [x] FIX-2 entry guards ✅ `d40c6b5` — checkPreTradeGuards (mark collar/stale/crossed) + L2 tradeability now invoked at all 4 live entry sites (verified call-sites); limit-order qty capped; fail-safe on fetch.
+- [x] FIX-3 inert halt legs ✅ `cfe4e28` — gated behind disabled-by-default flags + assert active set = {abs-DD, sustained-DSR}; honest startup log (no faked inputs).
 - [ ] FIX-4 live closePosition gets no funding series → live fundingReturn=0 (sim/live mismatch); de-tautologize ledger invariant.
 - [ ] FIX-5 replay-bot db.delete(botTrades) runs in DEFAULT paper mode against the forward DB — guard it.
-- [ ] FIX-6 failing test retirement-halt.test.ts:398 (getRollingDeflatedSharpe -Infinity not null on cold).
+- [x] FIX-6 failing test ✅ `2106fc2` — getRollingDeflatedSharpe(Obs) returns null on cold/degenerate (<2 obs or non-finite) not -Infinity; suite green 246/246.
 - [ ] FIX-7 gold F2F sleeve has zero safety wiring (kill/halt) — wire or document unguarded.
 WHAT GENUINELY WORKS (verified): boot→migrate→tick→persist; latched kill-switch; absolute-DD (29.93%) + sustained-DSR halts; computePositionSize notional cap+stop floor; migration 0004; append-only decision-log; hourly snapshots.
 
