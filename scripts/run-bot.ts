@@ -293,6 +293,10 @@ class TradingBot {
     for (const position of openPositions) {
       try {
         const price = await this.dataFeed.getLatestPrice(position.symbol);
+        if (price === null) {
+          console.error(`No price available to close ${position.symbol} on shutdown`);
+          continue;
+        }
         const result = this.orderManager.forceClose(position, price, 'shutdown');
         this.tracker.closePosition(result.position);
         await this.alerts.positionClosed(result.position);

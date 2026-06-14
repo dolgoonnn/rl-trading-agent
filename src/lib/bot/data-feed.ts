@@ -26,9 +26,13 @@ const MIN_CANDLES_FOR_ANALYSIS = 2500;
 /** Max candles per Bybit API request */
 const BYBIT_MAX_LIMIT = 200;
 
+/** Mark-price cache TTL (ms) — avoid hammering the tickers endpoint on each tick */
+const MARK_PRICE_CACHE_MS = 5_000;
+
 export class DataFeed {
   private client: RestClientV5;
   private lastTimestamps: Map<string, number> = new Map();
+  private markPriceCache: Map<string, { price: number; fetchedAt: number }> = new Map();
 
   constructor(
     apiKey?: string,
@@ -321,12 +325,66 @@ export class DataFeed {
 
   /**
    * Get latest price for a symbol (from last candle close).
+   *
+   * Optional freshness guard: when BOTH `nowMs` and `maxAgeMs` are provided,
+   * returns `null` if the latest candle is older than `maxAgeMs` (instead of
+   * blindly returning a stale close). When omitted, behaves exactly as before
+   * and returns the close so existing callers are unaffected.
    */
-  async getLatestPrice(symbol: BotSymbol): Promise<number> {
+  async getLatestPrice(
+    symbol: BotSymbol,
+    nowMs?: number,
+    maxAgeMs?: number,
+  ): Promise<number | null> {
     const { candles } = await this.fetchCandles(symbol, 1);
     if (candles.length === 0) {
       throw new Error(`No candle data for ${symbol}`);
     }
-    return candles[candles.length - 1]!.close;
+    const latest = candles[candles.length - 1]!;
+
+    // Freshness guard only when both args are supplied.
+    if (nowMs !== undefined && maxAgeMs !== undefined) {
+      if (nowMs - latest.timestamp > maxAgeMs) {
+        return null;
+      }
+    }
+
+    return latest.close;
+  }
+
+  /**
+   * Get the current MARK price for a symbol via Bybit /v5/market/tickers.
+   *
+   * The mark price (not last-traded) is Bybit's dual-price / liquidation
+   * reference and is the correct anchor for a pre-trade mark collar. Cached
+   * in-memory for 5s to avoid hammering the tickers endpoint each tick.
+   */
+  async getMarkPrice(symbol: BotSymbol, nowMs: number = Date.now()): Promise<number> {
+    const cached = this.markPriceCache.get(symbol);
+    if (cached && nowMs - cached.fetchedAt < MARK_PRICE_CACHE_MS) {
+      return cached.price;
+    }
+
+    const response = await this.client.getTickers({
+      category: BYBIT_CATEGORY,
+      symbol,
+    });
+
+    if (response.retCode !== 0) {
+      throw new Error(`Bybit API error (tickers): ${response.retMsg} (code: ${response.retCode})`);
+    }
+
+    const ticker = response.result.list[0];
+    if (!ticker) {
+      throw new Error(`No ticker data for ${symbol}`);
+    }
+
+    const markPrice = parseFloat(ticker.markPrice);
+    if (!Number.isFinite(markPrice) || markPrice <= 0) {
+      throw new Error(`Invalid mark price for ${symbol}: ${ticker.markPrice}`);
+    }
+
+    this.markPriceCache.set(symbol, { price: markPrice, fetchedAt: nowMs });
+    return markPrice;
   }
 }

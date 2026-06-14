@@ -19,7 +19,8 @@ import type {
 } from '@/types/bot';
 import type { ScoredSignal } from '@/lib/rl/strategies/confluence-scorer';
 import type { StrategyConfig } from '@/types/bot';
-import { SYMBOL_ALLOCATION } from './config';
+import { SYMBOL_ALLOCATION, SAFETY_GATE_CONFIG } from './config';
+import { computePositionSize } from './guards';
 
 // ============================================
 // Position Manager
@@ -72,12 +73,26 @@ export class OrderManager {
 
     if (riskDistance <= 0) return null;
 
-    // Position sizing: risk-based with symbol allocation
+    // Position sizing through the pre-trade safety gate: floors riskDistance
+    // (so a tiny stop can't explode size) AND caps notional. Hard-rejects.
     const symbolAlloc = SYMBOL_ALLOCATION[symbol] ?? 0.33;
+    const sizing = computePositionSize({
+      equity,
+      riskPerTrade,
+      symbolAlloc,
+      riskDistance,
+      entryPrice: adjustedEntry,
+      maxNotionalPctEquity: SAFETY_GATE_CONFIG.maxNotionalPctEquity,
+      minStopPct: SAFETY_GATE_CONFIG.minStopPct,
+    });
+    if (!sizing.ok) {
+      // TODO(Task 4): persist a skipped_signal row once that table exists.
+      // For now, warn so the reject is visible in logs.
+      console.warn(`[guards] openPosition rejected ${symbol}: ${sizing.reason}`);
+      return null;
+    }
     const riskAmount = equity * riskPerTrade * symbolAlloc;
-    const riskPerUnit = riskDistance;
-    const positionSize = riskAmount / riskPerUnit;
-    const positionSizeUSDT = positionSize * adjustedEntry;
+    const positionSizeUSDT = sizing.notionalUsdt;
 
     const position: BotPosition = {
       id: uuidv4(),
@@ -136,11 +151,24 @@ export class OrderManager {
 
     if (riskDistance <= 0) return null;
 
-    // Position sizing: same risk-based approach
+    // Position sizing through the pre-trade safety gate (same as openPosition).
     const symbolAlloc = SYMBOL_ALLOCATION[symbol] ?? 0.33;
+    const sizing = computePositionSize({
+      equity,
+      riskPerTrade,
+      symbolAlloc,
+      riskDistance,
+      entryPrice: adjustedEntry,
+      maxNotionalPctEquity: SAFETY_GATE_CONFIG.maxNotionalPctEquity,
+      minStopPct: SAFETY_GATE_CONFIG.minStopPct,
+    });
+    if (!sizing.ok) {
+      // TODO(Task 4): persist a skipped_signal row once that table exists.
+      console.warn(`[guards] openLTFPosition rejected ${symbol}: ${sizing.reason}`);
+      return null;
+    }
     const riskAmount = equity * riskPerTrade * symbolAlloc;
-    const positionSize = riskAmount / riskDistance;
-    const positionSizeUSDT = positionSize * adjustedEntry;
+    const positionSizeUSDT = sizing.notionalUsdt;
 
     const position: BotPosition = {
       id: uuidv4(),

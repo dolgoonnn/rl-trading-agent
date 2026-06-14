@@ -14,6 +14,7 @@ import type {
   DrawdownTier,
   RiskConfig,
   LTFConfig,
+  SafetyGateConfig,
 } from '@/types/bot';
 import type { FundingArbConfig } from '@/types/funding-arb';
 
@@ -166,6 +167,24 @@ export const DEFAULT_FUNDING_ARB_CONFIG: FundingArbConfig = {
   arbSymbols: ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'],
   commissionPerSide: 0.00055, // Bybit taker
   pollIntervalMinutes: 60, // Hourly
+};
+
+// ============================================
+// Pre-Trade Safety Gate (live/paper bot only)
+// ============================================
+
+/**
+ * Hard-reject thresholds for the pre-trade safety gate.
+ * - maxNotionalPctEquity 2.0  → cap a single position at 200% of equity
+ * - minStopPct 0.001 (0.10%)  → floor riskDistance so a tiny stop can't blow up size
+ * - maxDeviationBps 50 (0.50%) → mark collar, start loose, tighten via skipped-signal log
+ * - maxCandleAgeMs 5_400_000 (90 min = 1.5× a 1h bar) → reject acting on a stale bar
+ */
+export const SAFETY_GATE_CONFIG: SafetyGateConfig = {
+  maxNotionalPctEquity: 2.0,
+  minStopPct: 0.001,
+  maxDeviationBps: 50,
+  maxCandleAgeMs: 5_400_000,
 };
 
 // ============================================

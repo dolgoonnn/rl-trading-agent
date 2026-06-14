@@ -98,6 +98,38 @@ export interface StrategyConfig {
 }
 
 // ============================================
+// Pre-Trade Safety Gate (live-only)
+// ============================================
+
+/**
+ * Configuration for the pre-trade safety gate (live/paper bot only).
+ * Hard REJECTS, no clamping. Lives outside the backtest path.
+ */
+export interface SafetyGateConfig {
+  /** Max position notional as a multiple of equity (e.g. 2.0 = 200% of equity) */
+  maxNotionalPctEquity: number;
+  /** Minimum stop distance as a fraction of entry price (floors riskDistance) */
+  minStopPct: number;
+  /** Max allowed |signalEntry - markPrice| deviation in basis points */
+  maxDeviationBps: number;
+  /** Max allowed age of the signal candle in milliseconds */
+  maxCandleAgeMs: number;
+}
+
+/** Reason a pre-trade guard rejected an order */
+export type RejectReason =
+  | 'unbounded_size'
+  | 'max_notional'
+  | 'mark_deviation'
+  | 'stale_candle'
+  | 'crossed_candle';
+
+/** Result of a sizing/guard computation — discriminated on `ok` */
+export type GuardResult =
+  | { ok: true; size: number; notionalUsdt: number }
+  | { ok: false; reason: RejectReason };
+
+// ============================================
 // Position Types
 // ============================================
 
