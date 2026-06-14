@@ -335,8 +335,13 @@ export class OrderManager {
     };
   }
 
+  /** True when fills are simulated (paper or paper-forward) vs live exchange fills. */
+  private get simulatesFills(): boolean {
+    return this.mode === 'paper' || this.mode === 'paper-forward';
+  }
+
   private applyEntrySlippage(price: number, direction: 'long' | 'short', config?: StrategyConfig): number {
-    if (this.mode === 'paper') {
+    if (this.simulatesFills) {
       const friction = (config ?? this.defaultConfig).frictionPerSide;
       return direction === 'long'
         ? price * (1 + friction)
@@ -346,7 +351,7 @@ export class OrderManager {
   }
 
   private applyExitSlippage(price: number, direction: 'long' | 'short', config?: StrategyConfig): number {
-    if (this.mode === 'paper') {
+    if (this.simulatesFills) {
       const friction = (config ?? this.defaultConfig).frictionPerSide;
       return direction === 'long'
         ? price * (1 - friction)

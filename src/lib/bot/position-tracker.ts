@@ -10,7 +10,6 @@ import { eq, desc } from 'drizzle-orm';
 import type {
   BotPosition,
   BotTradeRecord,
-  EquitySnapshot,
   BotState,
   CircuitBreakerState,
 } from '@/types/bot';
@@ -21,6 +20,7 @@ import {
   botTrades,
   botEquitySnapshots,
 } from '@/lib/data/schema';
+import { markToMarketEquity } from './snapshot';
 
 export class PositionTracker {
   private state: BotState;
@@ -219,17 +219,34 @@ export class PositionTracker {
   // Equity Snapshots
   // ============================================
 
-  /** Record an equity snapshot */
-  recordSnapshot(): void {
-    const drawdown = this.state.peakEquity > 0
-      ? (this.state.peakEquity - this.state.equity) / this.state.peakEquity
-      : 0;
-    const cumulativePnl = this.state.equity - this.getInitialCapital();
+  /**
+   * Mark-to-market equity: realized equity + Σ unrealized PnL of all open
+   * positions valued at the supplied latest prices. With no prices (or no
+   * open positions) this equals realized equity.
+   */
+  markToMarketEquity(latestPrices: Partial<Record<string, number>> = {}): number {
+    return markToMarketEquity(this.state.equity, this.state.openPositions, latestPrices);
+  }
+
+  /**
+   * Record an equity snapshot.
+   *
+   * @param latestPrices Latest close per symbol — when provided, the snapshot
+   *        equity is MARK-TO-MARKET (realized + unrealized of open positions).
+   *        Omitting it records realized equity only (e.g. shutdown/trade-close
+   *        where positions are already booked).
+   * @param nowMs Snapshot timestamp (defaults to Date.now()).
+   */
+  recordSnapshot(latestPrices: Partial<Record<string, number>> = {}, nowMs: number = Date.now()): void {
+    const equity = this.markToMarketEquity(latestPrices);
+    const peakEquity = Math.max(this.state.peakEquity, equity);
+    const drawdown = peakEquity > 0 ? (peakEquity - equity) / peakEquity : 0;
+    const cumulativePnl = equity - this.getInitialCapital();
 
     db.insert(botEquitySnapshots).values({
-      timestamp: Date.now(),
-      equity: this.state.equity,
-      peakEquity: this.state.peakEquity,
+      timestamp: nowMs,
+      equity,
+      peakEquity,
       drawdown,
       openPositions: this.state.openPositions.length,
       dailyPnl: this.state.dailyPnl,

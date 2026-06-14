@@ -39,6 +39,9 @@ import {
   DEFAULT_FUNDING_ARB_CONFIG,
 } from '../src/lib/bot';
 import { LTFConfirmation } from '../src/lib/bot/ltf-confirmation';
+import { shouldSnapshot } from '../src/lib/bot/snapshot';
+import { db } from '../src/lib/data/db';
+import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import type { BotConfig, BotSymbol, BotPosition, LTFConfig } from '../src/types/bot';
 import type { Candle } from '../src/types/candle';
 
@@ -128,6 +131,14 @@ class TradingBot {
   private running = false;
   private tickInterval: ReturnType<typeof setInterval> | null = null;
   private dailyResetInterval: ReturnType<typeof setInterval> | null = null;
+
+  // Hourly equity-snapshot checkpoint. We snapshot ONCE per UTC hour (deduped
+  // by floor(now/3_600_000)); this stores the last recorded hour bucket so a
+  // 30s tick that lands in the same hour does not re-snapshot.
+  private lastSnapshotHourBucket: number | null = null;
+  // Latest close per symbol, updated each tick — used to mark-to-market the
+  // hourly snapshot (realized equity + unrealized PnL of open positions).
+  private latestPrices: Partial<Record<BotSymbol, number>> = {};
 
   // LTF entry timing
   private ltfConfirmation: LTFConfirmation | null = null;
@@ -325,6 +336,9 @@ class TradingBot {
       for (const symbol of this.config.symbols) {
         await this.processSymbol(symbol);
       }
+
+      // Hourly mark-to-market equity snapshot (deduped by UTC hour bucket).
+      this.recordHourlySnapshot();
     } catch (err) {
       console.error('Tick error:', err);
       this.tracker.recordError();
@@ -338,6 +352,23 @@ class TradingBot {
         }
       }
     }
+  }
+
+  /**
+   * Record an equity snapshot at most once per UTC hour.
+   *
+   * The tick fires every 30s but snapshots are HOURLY — deduped by
+   * floor(now/3_600_000). Equity is MARK-TO-MARKET: realized equity plus the
+   * unrealized PnL of every open position valued at the latest candle close.
+   * This is what makes the equity curve dense enough for getRollingSharpe to
+   * annualize correctly (one snapshot per hour, not 2 lifetime rows).
+   */
+  private recordHourlySnapshot(): void {
+    const nowMs = Date.now();
+    const decision = shouldSnapshot(this.lastSnapshotHourBucket, nowMs);
+    if (!decision.snapshot) return;
+    this.lastSnapshotHourBucket = decision.bucket;
+    this.tracker.recordSnapshot(this.latestPrices, nowMs);
   }
 
   private async processSymbol(symbol: BotSymbol): Promise<void> {
@@ -357,6 +388,9 @@ class TradingBot {
     const { allCandles, latestCandle, isNew } = await this.dataFeed.processNewCandle(symbol);
 
     if (!latestCandle || !isNew) return;
+
+    // Record latest close for mark-to-market hourly snapshots.
+    this.latestPrices[symbol] = latestCandle.close;
 
     // Skip if already processed
     const lastProcessed = this.tracker.getLastProcessedTimestamp(symbol);
@@ -735,6 +769,12 @@ const HOUR_MS = 3_600_000;
 // ============================================
 
 async function main(): Promise<void> {
+  // Migrate-on-startup: apply any pending migrations before the loop runs so
+  // it never trades against a stale schema. The dev DB already records
+  // migrations 0000–0004, so this is a clean no-op there; on a fresh DB it
+  // creates every table. Relies on a non-empty __drizzle_migrations table.
+  migrate(db, { migrationsFolder: './drizzle' });
+
   const { config, resume, ltfEnabled, fundingArbEnabled, arbOnly, limitOrdersEnabled } = parseArgs();
   const bot = new TradingBot(config, resume, ltfEnabled, fundingArbEnabled, arbOnly, limitOrdersEnabled);
 

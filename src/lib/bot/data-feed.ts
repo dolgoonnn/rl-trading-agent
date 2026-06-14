@@ -34,6 +34,15 @@ export class DataFeed {
   private lastTimestamps: Map<string, number> = new Map();
   private markPriceCache: Map<string, { price: number; fetchedAt: number }> = new Map();
 
+  /**
+   * Wall-clock timestamp (ms) of the last successful feed update from the
+   * exchange. Used by the future heartbeat (Task 5) to detect a wedged feed:
+   * if `now - lastFeedUpdate` exceeds the heartbeat timeout the bot is no
+   * longer receiving fresh data and should escalate. Null until the first
+   * successful fetch.
+   */
+  private lastFeedUpdateMs: number | null = null;
+
   constructor(
     apiKey?: string,
     apiSecret?: string,
@@ -64,6 +73,9 @@ export class DataFeed {
     if (response.retCode !== 0) {
       throw new Error(`Bybit API error: ${response.retMsg} (code: ${response.retCode})`);
     }
+
+    // Successful exchange round-trip — record the heartbeat timestamp.
+    this.lastFeedUpdateMs = Date.now();
 
     const rawCandles = response.result.list;
     if (!rawCandles || rawCandles.length === 0) {
@@ -263,6 +275,15 @@ export class DataFeed {
    */
   getLastTimestamp(symbol: BotSymbol): number {
     return this.lastTimestamps.get(symbol) ?? 0;
+  }
+
+  /**
+   * Wall-clock ms of the last successful feed update from the exchange,
+   * or null if no successful fetch has happened yet. Consumed by the
+   * heartbeat (Task 5) to detect a stale/wedged feed.
+   */
+  get lastFeedUpdate(): number | null {
+    return this.lastFeedUpdateMs;
   }
 
   /**

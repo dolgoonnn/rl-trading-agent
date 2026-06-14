@@ -32,6 +32,33 @@ import {
 } from '../src/lib/bot';
 import { db } from '../src/lib/data/db';
 import { botState, botPositions, botTrades, botEquitySnapshots, botCandles } from '../src/lib/data/schema';
+import type { BotMode } from '../src/types/bot';
+
+// ============================================
+// Backtest-dump hard gate (Knight dead-code lesson)
+// ============================================
+
+/**
+ * replay-bot bulk-inserts historical (backtest) trades into bot_trades. That is
+ * fine for a `paper` sandbox, but a FORWARD run (`paper-forward`) or a `live`
+ * run must NEVER have its real-time track record re-polluted by replayed
+ * backtest trades. This gate hard-refuses to run under those modes.
+ *
+ * Mode is read from BOT_MODE (defaults to 'paper'); the forward daemon
+ * (`bot:start`) sets BOT_MODE=paper-forward, so accidentally pointing the
+ * replayer at the same DB while a forward run is live aborts loudly.
+ */
+function assertBacktestDumpAllowed(): void {
+  const mode = (process.env.BOT_MODE ?? 'paper') as BotMode;
+  if (mode === 'live' || mode === 'paper-forward') {
+    console.error(
+      `replay-bot is a backtest-dump path and is DISABLED in mode '${mode}'. ` +
+      `It would re-pollute bot_trades for a forward/live track record. ` +
+      `Run it only with BOT_MODE=paper (or unset).`,
+    );
+    process.exit(1);
+  }
+}
 
 // ============================================
 // Data Loading
@@ -689,6 +716,9 @@ async function runReplay(config: ReplayConfig): Promise<void> {
 // ============================================
 
 async function main(): Promise<void> {
+  // Hard-gate: refuse to dump backtest trades into a forward/live track record.
+  assertBacktestDumpAllowed();
+
   const config = parseArgs();
 
   console.log('='.repeat(70));

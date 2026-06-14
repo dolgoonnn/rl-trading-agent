@@ -11,8 +11,15 @@ import type { Candle } from './candle';
 // Bot Configuration
 // ============================================
 
-/** Execution mode: paper simulates fills, live sends orders to exchange */
-export type BotMode = 'paper' | 'live';
+/**
+ * Execution mode.
+ * - `paper`: simulates fills (default; backtest-dump scripts may run).
+ * - `live`: sends real orders to the exchange (never used here — paper only).
+ * - `paper-forward`: a forward paper run that accumulates a real-time track
+ *   record. Like `paper` for fills, but the backtest-dump path is HARD-GATED
+ *   off so a forward run can never re-pollute bot_trades.
+ */
+export type BotMode = 'paper' | 'live' | 'paper-forward';
 
 /** Supported exchanges */
 export type Exchange = 'bybit';
