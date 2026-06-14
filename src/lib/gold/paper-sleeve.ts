@@ -31,6 +31,65 @@ export const F2F_GOLD_STRATEGY = 'f2f_gold' as const;
 export const F2F_GOLD_SYMBOL = 'XAUTUSDT' as const;
 
 /**
+ * Peak-to-current drawdown at which the gold sleeve STOPS opening new positions.
+ *
+ * Chosen at 25%: F2F is a LONG-ONLY gold strategy whose validated forward profile
+ * has 15.3% MaxDD (improved WF) on the paper config, and whose 5th-pct bootstrap
+ * drawdown sits below that. 25% leaves headroom above the expected envelope so the
+ * breaker only fires on a genuine out-of-distribution drawdown (regime break),
+ * not on normal in-sample dips — while still capping a runaway losing streak well
+ * before total ruin. This is REDUCE-ONLY: it blocks NEW entries; any open position
+ * is still managed/closed by the exit path.
+ */
+export const GOLD_MAX_DRAWDOWN = 0.25;
+
+/** Resolved new-entry decision from the pure gold safety gate. */
+export interface GoldEntryGate {
+  allowed: boolean;
+  /** Present only when blocked — why the new entry was refused. */
+  reason?: string;
+}
+
+/**
+ * PURE reduce-only NEW-ENTRY gate for the gold sleeve.
+ *
+ * Blocks opening a NEW position when EITHER:
+ *   1. the SHARED global kill switch is tripped (`halted` — the caller passes the
+ *      result of `isKilled(db)` so the same `data/KILL` / `KILL_SWITCH` /
+ *      `bot_kill_switch` stop halts gold too), OR
+ *   2. the sleeve's own peak drawdown `(1 - equity/peakEquity)` has reached
+ *      `maxDrawdown` (boundary inclusive: `>=` halts).
+ *
+ * It NEVER closes a position — a `false` result only means "do not open"; the
+ * caller still runs its exit/management logic for any open position. Kept pure
+ * (all inputs injected) so it is unit-testable with no DB, fs, or daemon.
+ *
+ * Precedence: the kill check wins over drawdown so operators see the global stop.
+ */
+export function goldEntryAllowed(args: {
+  halted: boolean;
+  equity: number;
+  peakEquity: number;
+  maxDrawdown?: number;
+}): GoldEntryGate {
+  const { halted, equity, peakEquity, maxDrawdown = GOLD_MAX_DRAWDOWN } = args;
+
+  if (halted) {
+    return { allowed: false, reason: 'global kill switch halted — new gold entries blocked' };
+  }
+
+  const drawdown = peakEquity > 0 ? (peakEquity - equity) / peakEquity : 0;
+  if (drawdown >= maxDrawdown) {
+    return {
+      allowed: false,
+      reason: `gold sleeve drawdown ${(drawdown * 100).toFixed(1)}% >= max ${(maxDrawdown * 100).toFixed(1)}% — new entries blocked`,
+    };
+  }
+
+  return { allowed: true };
+}
+
+/**
  * Map a closed F2F paper trade into a `bot_trades` row.
  *
  * The F2F trade returns are already net of friction (pnlPercent = weight ×

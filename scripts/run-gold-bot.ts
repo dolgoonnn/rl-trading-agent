@@ -29,10 +29,12 @@ import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { RestClientV5 } from 'bybit-api';
 import type { Candle } from '../src/types/candle';
 import { AlertManager } from '../src/lib/bot/alerts';
+import { isKilled, type KillDb } from '../src/lib/bot/kill-switch';
 import * as dbSchema from '../src/lib/data/schema';
 import {
   generateSignals,
   computePositionWeight,
+  goldEntryAllowed,
   persistGoldPaperTrade,
   persistGoldEquitySnapshot,
   F2F_FIXED_PARAMS,
@@ -408,23 +410,40 @@ function processTick(
     }
   }
 
-  // Check entry
+  // Check entry — gated by the shared kill switch + the sleeve's drawdown breaker.
+  // REDUCE-ONLY: a halt/DD breach only blocks OPENING here; any open position was
+  // already managed/closed above. We never force-liquidate.
   if (state.position === null && signal.isLongEntry && !opts.dryRun) {
-    const weight = computePositionWeight(signal);
+    // Shared global stop: data/KILL sentinel, KILL_SWITCH env, or bot_kill_switch row.
+    const killFlag = db ? isKilled(db as KillDb, { nowMs: Date.now() }) : { halted: false };
+    // Pure gate: halted OR drawdown >= GOLD_MAX_DRAWDOWN blocks new entries.
+    const gate = goldEntryAllowed({
+      halted: killFlag.halted,
+      equity: state.equity,
+      peakEquity: state.peakEquity ?? state.equity,
+    });
 
-    if (weight > 0.01) {
-      state.position = {
-        entryPrice: signal.close,
-        entryTimestamp: signal.timestamp,
-        weight,
-        hardStop: signal.close - fp.hardStopAtrMultiple * signal.atr,
-        trailingStop: signal.close - fp.trailingStopAtrMultiple * signal.atr,
-        peakPrice: signal.close,
-        daysHeld: 0,
-        pBullAtEntry: signal.pBull,
-        atrAtEntry: signal.atr,
-      };
-      action = 'entry_long';
+    if (!gate.allowed) {
+      // Log once per blocked tick; do NOT crash, do NOT close the (absent) position.
+      console.log(`  [SAFETY] new gold entry skipped — ${gate.reason}${killFlag.reason ? ` (${killFlag.reason})` : ''}`);
+      action = 'entry_blocked';
+    } else {
+      const weight = computePositionWeight(signal);
+
+      if (weight > 0.01) {
+        state.position = {
+          entryPrice: signal.close,
+          entryTimestamp: signal.timestamp,
+          weight,
+          hardStop: signal.close - fp.hardStopAtrMultiple * signal.atr,
+          trailingStop: signal.close - fp.trailingStopAtrMultiple * signal.atr,
+          peakPrice: signal.close,
+          daysHeld: 0,
+          pBullAtEntry: signal.pBull,
+          atrAtEntry: signal.atr,
+        };
+        action = 'entry_long';
+      }
     }
   } else if (state.position === null && signal.isLongEntry && opts.dryRun) {
     action = 'dry_entry_long';
@@ -687,7 +706,11 @@ function printSummary(state: GoldBotState): void {
   }
 }
 
-main().catch((err) => {
-  console.error('Fatal error:', err);
-  process.exit(1);
-});
+// Only launch the daemon when run directly — importing this module (e.g. for tests)
+// must NOT start the loop (matches run-allocator.ts / replay-bot.ts).
+if (require.main === module) {
+  main().catch((err) => {
+    console.error('Fatal error:', err);
+    process.exit(1);
+  });
+}

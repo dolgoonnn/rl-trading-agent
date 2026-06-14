@@ -61,8 +61,11 @@ export {
 export {
   F2F_GOLD_STRATEGY,
   F2F_GOLD_SYMBOL,
+  GOLD_MAX_DRAWDOWN,
+  goldEntryAllowed,
   goldTradeToBotTradeRow,
   goldEquitySnapshotRow,
   persistGoldPaperTrade,
   persistGoldEquitySnapshot,
+  type GoldEntryGate,
 } from './paper-sleeve';
