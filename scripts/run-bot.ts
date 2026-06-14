@@ -40,6 +40,7 @@ import {
 } from '../src/lib/bot';
 import { LTFConfirmation } from '../src/lib/bot/ltf-confirmation';
 import { shouldSnapshot } from '../src/lib/bot/snapshot';
+import { logSkippedSignal } from '../src/lib/bot/decision-log';
 import { db } from '../src/lib/data/db';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import type { BotConfig, BotSymbol, BotPosition, LTFConfig } from '../src/types/bot';
@@ -168,6 +169,23 @@ class TradingBot {
     this.orderManager = new OrderManager(
       config.mode,
       RUN20_STRATEGY_CONFIG,
+      // Persist guard rejects to skipped_signals. Non-crashing: logSkippedSignal
+      // is wrapped by OrderManager.emitSkip, and we also guard here so a DB
+      // hiccup can never break the order path.
+      (info) => {
+        try {
+          logSkippedSignal(db, {
+            ts: info.ts,
+            symbol: info.symbol,
+            reason: info.reason,
+            signalEntry: info.signalEntry,
+            score: info.score,
+            detail: info.detail,
+          });
+        } catch (err) {
+          console.warn('[run-bot] failed to persist skipped_signal:', err);
+        }
+      },
     );
     this.tracker = new PositionTracker(config.initialCapital);
     this.riskEngine = new RiskEngine({

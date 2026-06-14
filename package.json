@@ -15,7 +15,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "bot:start": "BOT_MODE=paper-forward tsx scripts/run-bot.ts --mode paper-forward --resume",
-    "bot:gold": "tsx scripts/run-gold-bot.ts --regime-filter zscore50"
+    "bot:gold": "tsx scripts/run-gold-bot.ts --regime-filter zscore50",
+    "review:weekly": "tsx scripts/run-weekly-review.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",

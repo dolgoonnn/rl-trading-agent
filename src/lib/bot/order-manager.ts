@@ -21,21 +21,63 @@ import type { ScoredSignal } from '@/lib/rl/strategies/confluence-scorer';
 import type { StrategyConfig } from '@/types/bot';
 import { SYMBOL_ALLOCATION, SAFETY_GATE_CONFIG } from './config';
 import { computePositionSize } from './guards';
+import type { RejectReason } from '@/types/bot';
 
 // ============================================
 // Position Manager
 // ============================================
 
+/**
+ * Sink for guard-rejected signals. The caller (run-bot) wires this to
+ * `logSkippedSignal(db, …)` so rejects are persisted to `skipped_signals`. It is
+ * intentionally NOT a DB handle — OrderManager stays DB-free and this seam keeps
+ * the observability concern at the wiring layer. Must never throw (it is invoked
+ * from the hot order path); the wired implementation swallows its own errors.
+ */
+export interface SkipSignalSink {
+  (info: {
+    ts: number;
+    symbol: BotSymbol;
+    reason: RejectReason;
+    signalEntry: number;
+    score: number;
+    detail?: unknown;
+  }): void;
+}
+
 export class OrderManager {
   private mode: BotMode;
   private defaultConfig: StrategyConfig;
+  /** Optional skipped-signal sink (e.g. persist to skipped_signals). */
+  private onSkip?: SkipSignalSink;
 
   constructor(
     mode: BotMode,
     defaultConfig: StrategyConfig,
+    onSkip?: SkipSignalSink,
   ) {
     this.mode = mode;
     this.defaultConfig = defaultConfig;
+    this.onSkip = onSkip;
+  }
+
+  /**
+   * Emit a skipped-signal record through the wired sink, if any. Never throws —
+   * observability must not break the order path even if the table/db is absent.
+   */
+  private emitSkip(info: {
+    symbol: BotSymbol;
+    reason: RejectReason;
+    signalEntry: number;
+    score: number;
+    detail?: unknown;
+  }): void {
+    if (!this.onSkip) return;
+    try {
+      this.onSkip({ ts: Date.now(), ...info });
+    } catch (err) {
+      console.warn(`[order-manager] skipped-signal sink threw (ignored):`, err);
+    }
   }
 
   /** Get the strategy config (single config path for crypto-only) */
@@ -86,9 +128,15 @@ export class OrderManager {
       minStopPct: SAFETY_GATE_CONFIG.minStopPct,
     });
     if (!sizing.ok) {
-      // TODO(Task 4): persist a skipped_signal row once that table exists.
-      // For now, warn so the reject is visible in logs.
+      // Warn for log visibility AND persist a skipped_signal via the wired sink.
       console.warn(`[guards] openPosition rejected ${symbol}: ${sizing.reason}`);
+      this.emitSkip({
+        symbol,
+        reason: sizing.reason,
+        signalEntry: adjustedEntry,
+        score: signal.totalScore,
+        detail: { path: 'openPosition', riskDistance },
+      });
       return null;
     }
     const riskAmount = equity * riskPerTrade * symbolAlloc;
@@ -163,8 +211,15 @@ export class OrderManager {
       minStopPct: SAFETY_GATE_CONFIG.minStopPct,
     });
     if (!sizing.ok) {
-      // TODO(Task 4): persist a skipped_signal row once that table exists.
+      // Warn for log visibility AND persist a skipped_signal via the wired sink.
       console.warn(`[guards] openLTFPosition rejected ${symbol}: ${sizing.reason}`);
+      this.emitSkip({
+        symbol,
+        reason: sizing.reason,
+        signalEntry: adjustedEntry,
+        score: signal.totalScore,
+        detail: { path: 'openLTFPosition', riskDistance },
+      });
       return null;
     }
     const riskAmount = equity * riskPerTrade * symbolAlloc;
