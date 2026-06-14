@@ -77,10 +77,10 @@ Commits ffc3676(checkpoint) → 7e638c2 → 9ce61e5 → f14241d → 66227c8 → 
 9. No-trade-band + CPPI + vol-target can stack to ~0 exposure at a DD bottom → bound each multiplier; keep circuit-breaker independent.
 
 ## Research queue (after Task 9; ground each in a reputable source first)
-- Net-of-cost predictive OFI/CVD probe on the collected Bybit L2 (the one untested data axis; prior: OBI/CVD scalp OOS Sharpe 0.12 — must beat ~11bp round-trip).
-- Liquidation-cascade-fade event study (needs ≥30–60d collection + 2-vintage holdout; harness-only for now).
-- Pre-FOMC drift US500 candidate (+16.8bp/event t=2.61) re-validation per fomc-drift.md.
-- Funding/basis carry sleeve as a structural risk-premium (BIS WP 1087) — net-of-cost feasibility.
+- [DONE `86dac43`] Funding/basis carry (BIS WP 1087) — NULL net-of-cost; funding family CLOSED (stays a cost, not harvested).
+- [IN PROGRESS] Pre-FOMC drift US500 candidate (+16.8bp/event t=2.61) re-validation per fomc-drift.md — ground in Lucca & Moench 2015.
+- [BLOCKED — needs ≥30–60d L2 collection via collect-btc-orderflow.ts] Net-of-cost predictive OFI/CVD probe (prior OOS Sharpe 0.12).
+- [BLOCKED — needs ≥30–60d collection + 2-vintage holdout] Liquidation-cascade-fade event study.
 
 ## Iteration log
 _(append one line per loop iteration: timestamp · task · result · commit)_
@@ -97,3 +97,4 @@ _(append one line per loop iteration: timestamp · task · result · commit)_
 - 2026-06-14 · Task 7 Tradeability+regime · checkTradeability L2 reject + getOrderbook, charter-cadence refit proposal (no auto-apply), score-reliability diagnostic (sizing-isolation proven), 15 tests · `e2581e7`
 - 2026-06-14 · Task 8 Funding-cost PROBE · funding wired into backtest (default off) via Task-4a ledger; Run-20 SURVIVES (net WF 64.9% > 60%, +262.4% PnL, drag −1.96bps/trade); maker/taker split; 25 cost tests · `1100e5a`
 - 2026-06-14 · Task 9 ATR-stop arms PROBE · chandelier + vertical-barrier + per-arm funding debit on Run-20 log; NULL (no arm beats baseline net-of-funding); 8 tests · `87e65c8`
+- 2026-06-14 · RESEARCH funding-carry · grounded BIS WP1087 + arXiv replication; reproduced 7.6% net APY + 2024→2025 decay; NULL tradeable alpha (gated harvest net-negative, Sharpe is illusion); funding family closed; 5 tests · `86dac43`
