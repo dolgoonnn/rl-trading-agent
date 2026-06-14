@@ -101,7 +101,7 @@
 - [ ] **Step 5 — typecheck + lint.**
 - [ ] **Step 6 — Commit:** `gmp "add migration 0004: kill-switch, decision-log, skipped-signals, pnl-cells, bot_trades cost columns" feat db`
 
-## Task 3: Forward Trading Loop + hourly equity snapshots
+## Task 3: Forward Trading Loop + hourly equity snapshots — ✅ DONE (`f14241d`, 13/13 tests)
 
 **Plan group:** PLAN-B. **Depends on:** Task 2.
 

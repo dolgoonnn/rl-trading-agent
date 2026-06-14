@@ -20,12 +20,12 @@
 - If a task is genuinely blocked (needs a human decision or external resource), mark it `BLOCKED` with the reason, skip to the next task — do not spin.
 
 ## Pointer
-**NEXT:** Task 3 (Forward Trading Loop + hourly snapshots) — Step 1 (write failing snapshot-cadence + forward-loop tests).
+**NEXT:** Task 3b (Gold/XAU paper sleeve) — Step 1 (read `src/lib/gold/*` + `scripts/run-{gold,metals}-bot.ts`, write design note naming exact strategy+symbol, then TDD).
 
 ## Task status
 - [x] Task 1 — Safety Gate ✅ `7e638c2` (12/12 tests, 0 new typecheck errors)
 - [x] Task 2 — Migration 0004 ✅ `9ce61e5` (10/10 tests; also fixed pre-existing empty `__drizzle_migrations` drift that blocked all migrations; gitignored `.claude/`)
-- [ ] Task 3 — Forward Loop + hourly snapshots
+- [x] Task 3 — Forward Loop + hourly snapshots ✅ `f14241d` (13/13 tests; pure snapshot.ts helpers, mark-to-market equity, migrate-on-startup, replay-bot.ts dump gate, paper-forward mode + PM2 app)
 - [ ] Task 3b — Gold/XAU paper sleeve
 - [ ] Task 4 — Review Loop + funding-ledger keystone
 - [ ] Task 5 — Kill-Switch
@@ -63,3 +63,4 @@ _(append one line per loop iteration: timestamp · task · result · commit)_
 - 2026-06-14 · setup · branch + checkpoint `ffc3676`, plan + PROGRESS written · —
 - 2026-06-14 · Task 1 Safety Gate · guards.ts (computePositionSize + checkPreTradeGuards), wired order-manager/data-feed/config, 12/12 vitest pass, 0 new typecheck errors · `7e638c2`
 - 2026-06-14 · Task 2 Migration 0004 · 4 new tables + 5 bot_trades cost cols, additive-only SQL, 10/10 tests; fixed empty __drizzle_migrations drift; gitignored .claude/ · `9ce61e5`
+- 2026-06-14 · Task 3 Forward Loop · hourly mark-to-market snapshots (pure snapshot.ts), migrate-on-startup, backtest-dump gated to non-forward modes, paper-forward mode + PM2 app, 13/13 tests · `f14241d`
