@@ -220,10 +220,11 @@ async function tick(state: BotState): Promise<void> {
         closePosition(state, pos, q.price);
       }
     }
-    // NFP momentum: exit 12:00 ET
+    // NFP momentum: exit ticks ≥12:12 ET (delayed feed then shows ~12:02,
+    // matching the backtest's 12:00 exit mark)
     if (pos.leg === 'nfp-mom') {
       const nyx = nyHour(now);
-      if (nyx.h >= 12) {
+      if (nyx.h * 60 + nyx.m >= 12 * 60 + 12) {
         closePosition(state, pos, q.price);
       }
     }
@@ -288,8 +289,12 @@ async function tick(state: BotState): Promise<void> {
   }
 
   // Gold NFP momentum (book leg F): first Friday of the month.
-  // 08:30–08:35 ET: record the pre-print mark; 09:00–09:10 ET: enter in the
-  // direction of the 08:30→09:00 move; exit 12:00 ET (handled above).
+  // DELAY-AWARE windows (research-nfp-bot-sim.ts): the Yahoo feed lags ~10min,
+  // so reading at the backtest's own timestamps destroys the signal (132-event
+  // replay: direction match 67%, edge +8.2%→+0.4%). Shifted windows — mark
+  // ticks 08:30–08:35 (feed shows ≤08:25, pre-release), signal ticks
+  // 09:12–09:22 (feed shows ≥~09:02, the true post-print move) — keep the
+  // edge intact with real late fills (replay: t=1.98, +13.7%, 58% WR).
   if (dow === 5 && isFirstFriday(d)) {
     const q = quotes.gold;
     const today = d.toISOString().slice(0, 10);
@@ -297,7 +302,7 @@ async function tick(state: BotState): Promise<void> {
       state.nfpSignal = { date: today, price0830: q.price };
       log(`NFP signal mark @ ${q.price.toFixed(2)}`);
     }
-    if (q && nyMin >= 9 * 60 && nyMin <= 9 * 60 + 10
+    if (q && nyMin >= 9 * 60 + 12 && nyMin <= 9 * 60 + 22
       && state.nfpSignal?.date === today
       && !state.positions.find((p) => p.leg === 'nfp-mom')) {
       const dir = q.price > state.nfpSignal.price0830 ? 'long' : q.price < state.nfpSignal.price0830 ? 'short' : null;

@@ -54,6 +54,24 @@ const REGIME_LABELS = [
   'downtrend+normal', 'downtrend+low',
 ];
 
+// Run 21 warm start = Run 20's solution (data refreshed to 2026-06-11;
+// Run 20 measured 64.9% WF on the new window, ETH 56.8% — re-optimize per
+// the Run 18→20 window-sensitivity lesson).
+// NOTE these are MULTIPLIERS over DEFAULT_WEIGHTS (decodeParams multiplies),
+// i.e. Run20 absolute weight ÷ DEFAULT_WEIGHTS[name].
+const RUN20_WEIGHT_MULTS: Record<string, number> = {
+  structureAlignment: 0.0964,  // 0.1928 / 2.0
+  killZoneActive: 2.5316,      // 1.2658 / 0.5
+  liquiditySweep: 0.7448,      // 1.4896 / 2.0
+  obProximity: 2.7262,
+  fvgAtCE: 2.3162,
+  recentBOS: 2.2229,
+  rrRatio: 0.3711,             // 0.5567 / 1.5
+  oteZone: 2.1242,             // 1.0621 / 0.5
+  obFvgConfluence: 1.0892,
+  momentumConfirmation: 0.0,   // default weight is 0 — multiplier inert
+};
+
 function buildParamSpecs(strategy: string = 'ob'): ParamSpec[] {
   const specs: ParamSpec[] = [];
 
@@ -63,18 +81,18 @@ function buildParamSpecs(strategy: string = 'ob'): ParamSpec[] {
       name: `w_${name}`,
       min: 0.0,
       max: 3.0,
-      initial: 1.0,
+      initial: RUN20_WEIGHT_MULTS[name] ?? 1.0,
       type: 'weight_mult',
     });
   }
 
-  // 5 regime threshold overrides [2.5, 6.5]
+  // 5 regime threshold overrides [2.5, 6.5] — Run 20 values
   const regimeDefaults: Record<string, number> = {
-    'uptrend+high': 3.5,
-    'uptrend+normal': 5.0,
-    'uptrend+low': 3.5,
-    'downtrend+normal': 4.5,
-    'downtrend+low': 5.0,
+    'uptrend+high': 3.14,
+    'uptrend+normal': 5.74,
+    'uptrend+low': 5.49,
+    'downtrend+normal': 4.38,
+    'downtrend+low': 6.50,
   };
   for (const label of REGIME_LABELS) {
     specs.push({
@@ -91,7 +109,7 @@ function buildParamSpecs(strategy: string = 'ob'): ParamSpec[] {
     name: 'baseThreshold',
     min: 3.0,
     max: 5.5,
-    initial: 4.15,
+    initial: 4.048,
     type: 'hyperparameter',
   });
 
@@ -100,7 +118,7 @@ function buildParamSpecs(strategy: string = 'ob'): ParamSpec[] {
     name: 'obFreshnessHalfLife',
     min: 2,
     max: 30,
-    initial: 15,
+    initial: 12,
     type: 'hyperparameter',
   });
 
@@ -109,7 +127,7 @@ function buildParamSpecs(strategy: string = 'ob'): ParamSpec[] {
     name: 'atrExtensionBands',
     min: 1.5,
     max: 7.0,
-    initial: 3.0,
+    initial: 5.79,
     type: 'hyperparameter',
   });
 
@@ -118,7 +136,7 @@ function buildParamSpecs(strategy: string = 'ob'): ParamSpec[] {
     name: 'partialFraction',
     min: 0.2,
     max: 0.7,
-    initial: 0.45,
+    initial: 0.50,
     type: 'hyperparameter',
   });
 
@@ -127,7 +145,7 @@ function buildParamSpecs(strategy: string = 'ob'): ParamSpec[] {
     name: 'partialTriggerR',
     min: 0.5,
     max: 1.5,
-    initial: 0.85,
+    initial: 1.41,
     type: 'hyperparameter',
   });
 
@@ -136,7 +154,7 @@ function buildParamSpecs(strategy: string = 'ob'): ParamSpec[] {
     name: 'partialBeBuffer',
     min: 0.0,
     max: 0.3,
-    initial: 0.1,
+    initial: 0.20,
     type: 'hyperparameter',
   });
 
@@ -145,7 +163,7 @@ function buildParamSpecs(strategy: string = 'ob'): ParamSpec[] {
     name: 'maxBars',
     min: 50,
     max: 250,
-    initial: 100,
+    initial: 160,
     type: 'hyperparameter',
   });
 
@@ -154,7 +172,7 @@ function buildParamSpecs(strategy: string = 'ob'): ParamSpec[] {
     name: 'cooldownBars',
     min: 2,
     max: 12,
-    initial: 6,
+    initial: 7,
     type: 'hyperparameter',
   });
 

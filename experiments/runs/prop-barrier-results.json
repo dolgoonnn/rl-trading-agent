@@ -1,0 +1,59 @@
+{
+  "generatedAt": "2026-06-11T14:01:42.279Z",
+  "stressF": 0,
+  "rules": {
+    "ACCOUNT": 50000,
+    "TARGET": 3000,
+    "TRAIL": 2000,
+    "DAILY_LOSS": 1000,
+    "FEE": 165,
+    "CUSHION": 2000
+  },
+  "sweep": [
+    {
+      "notional": 25000,
+      "passRatePct": 58.04794520547946,
+      "blowEverPct": 100,
+      "medianEvalDays": 119,
+      "medianFundedMonths": 25,
+      "meanWithdrawn": 9687.873916090453,
+      "evPerAttempt": 5458.611742388123
+    },
+    {
+      "notional": 50000,
+      "passRatePct": 45.37671232876712,
+      "blowEverPct": 100,
+      "medianEvalDays": 39,
+      "medianFundedMonths": 3,
+      "meanWithdrawn": 5111.923626945082,
+      "evPerAttempt": 2154.6228786651486
+    },
+    {
+      "notional": 75000,
+      "passRatePct": 46.4041095890411,
+      "blowEverPct": 100,
+      "medianEvalDays": 24,
+      "medianFundedMonths": 2,
+      "meanWithdrawn": 5910.5341188273105,
+      "evPerAttempt": 2577.7307297982898
+    },
+    {
+      "notional": 100000,
+      "passRatePct": 39.21232876712329,
+      "blowEverPct": 100,
+      "medianEvalDays": 14,
+      "medianFundedMonths": 1,
+      "meanWithdrawn": 2653.0687470008575,
+      "evPerAttempt": 875.3300394917746
+    },
+    {
+      "notional": 150000,
+      "passRatePct": 35.1027397260274,
+      "blowEverPct": 100,
+      "medianEvalDays": 8,
+      "medianFundedMonths": 0,
+      "meanWithdrawn": 1717.2106585287954,
+      "evPerAttempt": 437.7879880109642
+    }
+  ]
+}

@@ -1,0 +1,85 @@
+{
+  "generatedAt": "2026-06-11T16:20:00.375Z",
+  "universe": "D",
+  "method": "handcraft",
+  "days": 681,
+  "bootstrap": {
+    "sharpe5": 1.5891221081585567,
+    "sharpe50": 2.6345252506923162,
+    "pnl5": 53.17496317539092,
+    "probNegative": 0
+  },
+  "skip": {
+    "skip20": {
+      "profitablePct": 100,
+      "medianSharpe": 2.340435997837003
+    },
+    "skip30": {
+      "profitablePct": 100,
+      "medianSharpe": 2.1915833000139253
+    }
+  },
+  "correlationStress": [
+    {
+      "rho": 0,
+      "sharpe": 2.635004370051524,
+      "dm": 1.7320508075688774,
+      "vtAnnRetPct": 31.620052440618288
+    },
+    {
+      "rho": 0.1,
+      "sharpe": 2.4081696547043565,
+      "dm": 1.5811388300841895,
+      "vtAnnRetPct": 28.898035856452278
+    },
+    {
+      "rho": 0.3,
+      "sharpe": 2.088525415060962,
+      "dm": 1.3693063937629153,
+      "vtAnnRetPct": 25.06230498073154
+    },
+    {
+      "rho": 0.5,
+      "sharpe": 1.8696436856485403,
+      "dm": 1.224744871391589,
+      "vtAnnRetPct": 22.435724227782483
+    },
+    {
+      "rho": 0.7,
+      "sharpe": 1.7077251537168368,
+      "dm": 1.1180339887498951,
+      "vtAnnRetPct": 20.492701844602042
+    }
+  ],
+  "tailCoincidence": {
+    "daily": {
+      "observedPct": 0,
+      "independencePct": 0.059872793673177924,
+      "ratio": 0
+    },
+    "weekly": {
+      "observedPct": 0.24330900243309003,
+      "independencePct": 0.1367503152361163,
+      "ratio": 1.779220779220779
+    }
+  },
+  "dsr": {
+    "originalSharpe": 2.619615780494154,
+    "deflatedSharpe": 2.2387021403072622,
+    "haircut": 0.3809136401868914,
+    "sharpeVariance": 0.052332031836015064,
+    "numTrials": 4,
+    "isSignificant": true
+  },
+  "worstRolling": {
+    "m6": {
+      "sharpe": -0.12836026243195692,
+      "retPct": -0.661173434427087
+    },
+    "m12": {
+      "sharpe": 0.5216513112797249,
+      "retPct": 5.776726571659818
+    }
+  },
+  "verdict": "5/5"
+}

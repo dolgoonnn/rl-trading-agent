@@ -24,6 +24,9 @@ const book = { bids: {} as BookSide, asks: {} as BookSide };
 let buyVol = 0;
 let sellVol = 0;
 let tradeCount = 0;
+let liqBuyVol = 0;
+let liqSellVol = 0;
+let liqCount = 0;
 let haveSnapshot = false;
 
 function log(msg: string): void {
@@ -68,8 +71,14 @@ function snapshotLine(): string | null {
     buyVol: Math.round(buyVol * 1000) / 1000,
     sellVol: Math.round(sellVol * 1000) / 1000,
     tradeCount,
+    // forced-flow fields (liquidation-fade test, practitioner-mechanisms #3):
+    // liqBuy = shorts force-bought, liqSell = longs force-sold (BTC units)
+    liqBuy: Math.round(liqBuyVol * 1000) / 1000,
+    liqSell: Math.round(liqSellVol * 1000) / 1000,
+    liqCount,
   });
   buyVol = 0; sellVol = 0; tradeCount = 0;
+  liqBuyVol = 0; liqSellVol = 0; liqCount = 0;
   return line;
 }
 
@@ -96,6 +105,13 @@ async function main(): Promise<void> {
         if (t.S === 'Buy') buyVol += v; else sellVol += v;
         tradeCount++;
       }
+    } else if (msg.topic.startsWith('allLiquidation')) {
+      const liqs = msg.data as Array<{ S: 'Buy' | 'Sell'; v: string }>;
+      for (const l of liqs) {
+        const v = parseFloat(l.v);
+        if (l.S === 'Buy') liqBuyVol += v; else liqSellVol += v;
+        liqCount++;
+      }
     }
   });
 
@@ -103,7 +119,7 @@ async function main(): Promise<void> {
   (ws as unknown as { on(event: 'error', cb: (e: unknown) => void): void })
     .on('error', (err) => log(`ws error: ${JSON.stringify(err).slice(0, 200)}`));
 
-  ws.subscribeV5([`orderbook.50.${SYMBOL}`, `publicTrade.${SYMBOL}`], 'linear');
+  ws.subscribeV5([`orderbook.50.${SYMBOL}`, `publicTrade.${SYMBOL}`, `allLiquidation.${SYMBOL}`], 'linear');
 
   setInterval(() => {
     if (!haveSnapshot) return;

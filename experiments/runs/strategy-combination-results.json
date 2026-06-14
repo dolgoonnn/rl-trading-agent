@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-11T11:35:41.334Z",
+  "generatedAt": "2026-06-11T16:19:59.649Z",
   "universes": [
     {
       "label": "UNIVERSE A — all three sleeves",
@@ -116,17 +116,17 @@
         "handcraft": {
           "meanDiff": 0.02,
           "pct5": -0.12,
-          "probAWins": 61.6
+          "probAWins": 62.5
         },
         "erc": {
-          "meanDiff": -0.05,
-          "pct5": -0.19,
-          "probAWins": 25.2
+          "meanDiff": -0.06,
+          "pct5": -0.2,
+          "probAWins": 22.9
         },
         "mvshrunk": {
           "meanDiff": -0.05,
           "pct5": -0.23,
-          "probAWins": 34.4
+          "probAWins": 33.5
         }
       }
     },
@@ -235,17 +235,17 @@
         "handcraft": {
           "meanDiff": 0.05,
           "pct5": -0.01,
-          "probAWins": 90.5
+          "probAWins": 91.9
         },
         "erc": {
           "meanDiff": -0.05,
           "pct5": -0.1,
-          "probAWins": 4.4
+          "probAWins": 5.2
         },
         "mvshrunk": {
           "meanDiff": -0.04,
           "pct5": -0.09,
-          "probAWins": 9.3
+          "probAWins": 10.5
         }
       }
     },
@@ -362,19 +362,148 @@
       ],
       "bootstrapVsEW": {
         "handcraft": {
-          "meanDiff": 0.01,
-          "pct5": -0.12,
-          "probAWins": 58
+          "meanDiff": 0.02,
+          "pct5": -0.11,
+          "probAWins": 58.2
         },
         "erc": {
-          "meanDiff": -0.02,
-          "pct5": -0.14,
-          "probAWins": 37.4
+          "meanDiff": -0.03,
+          "pct5": -0.15,
+          "probAWins": 35.5
         },
         "mvshrunk": {
           "meanDiff": -0.04,
+          "pct5": -0.22,
+          "probAWins": 39
+        }
+      }
+    },
+    {
+      "label": "UNIVERSE D — review-preview upgraded book",
+      "names": [
+        "crypto",
+        "sessionBookUpgraded",
+        "f2f"
+      ],
+      "window": {
+        "start": "2023-05-29",
+        "end": "2026-01-08",
+        "days": 933
+      },
+      "sleeveStats": {
+        "crypto": {
+          "annRetPct": 18.8,
+          "sharpe": 1.88,
+          "maxDDPct": 12.6
+        },
+        "sessionBookUpgraded": {
+          "annRetPct": 17.6,
+          "sharpe": 1.64,
+          "maxDDPct": 12
+        },
+        "f2f": {
+          "annRetPct": 14.4,
+          "sharpe": 1.15,
+          "maxDDPct": 6
+        }
+      },
+      "methods": [
+        {
+          "name": "ew",
+          "raw": {
+            "annRetPct": 28.9,
+            "sharpe": 2.62,
+            "maxDDPct": 7.1
+          },
+          "volTargeted": {
+            "annRetPct": 40.2,
+            "sharpe": 2.58,
+            "maxDDPct": 9.2
+          },
+          "avgWeights": [
+            0.333,
+            0.333,
+            0.333
+          ],
+          "avgDM": 1.71,
+          "rebalances": 24
+        },
+        {
+          "name": "handcraft",
+          "raw": {
+            "annRetPct": 27.9,
+            "sharpe": 2.62,
+            "maxDDPct": 8
+          },
+          "volTargeted": {
+            "annRetPct": 38.9,
+            "sharpe": 2.61,
+            "maxDDPct": 9.4
+          },
+          "avgWeights": [
+            0.377,
+            0.308,
+            0.315
+          ],
+          "avgDM": 1.7,
+          "rebalances": 24
+        },
+        {
+          "name": "erc",
+          "raw": {
+            "annRetPct": 29.4,
+            "sharpe": 2.59,
+            "maxDDPct": 7
+          },
+          "volTargeted": {
+            "annRetPct": 42.4,
+            "sharpe": 2.51,
+            "maxDDPct": 9
+          },
+          "avgWeights": [
+            0.331,
+            0.318,
+            0.351
+          ],
+          "avgDM": 1.7,
+          "rebalances": 24
+        },
+        {
+          "name": "mvshrunk",
+          "raw": {
+            "annRetPct": 28.9,
+            "sharpe": 2.56,
+            "maxDDPct": 8
+          },
+          "volTargeted": {
+            "annRetPct": 42.1,
+            "sharpe": 2.5,
+            "maxDDPct": 9.4
+          },
+          "avgWeights": [
+            0.372,
+            0.294,
+            0.335
+          ],
+          "avgDM": 1.68,
+          "rebalances": 24
+        }
+      ],
+      "bootstrapVsEW": {
+        "handcraft": {
+          "meanDiff": 0,
+          "pct5": -0.13,
+          "probAWins": 46.9
+        },
+        "erc": {
+          "meanDiff": -0.03,
+          "pct5": -0.16,
+          "probAWins": 33.1
+        },
+        "mvshrunk": {
+          "meanDiff": -0.07,
           "pct5": -0.24,
-          "probAWins": 37.1
+          "probAWins": 26.6
         }
       }
     }

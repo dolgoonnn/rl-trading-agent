@@ -1,0 +1,69 @@
+{
+  "generatedAt": "2026-06-11T12:36:40.796Z",
+  "results": [
+    {
+      "window": "W1 long Tokyo 00-06 UTC",
+      "n": 2974,
+      "grossT": -1.56,
+      "at02bp": {
+        "sharpe": -0.68
+      },
+      "at035bp": {
+        "sharpe": -0.86
+      },
+      "halves": {
+        "h1Pct": -20.2,
+        "h2Pct": -3.2
+      },
+      "suitable": false
+    },
+    {
+      "window": "W2 long Tokyo 00-03 UTC",
+      "n": 2974,
+      "grossT": -1.38,
+      "at02bp": {
+        "sharpe": -0.7
+      },
+      "at035bp": {
+        "sharpe": -0.92
+      },
+      "halves": {
+        "h1Pct": -18.1,
+        "h2Pct": 1.8
+      },
+      "suitable": false
+    },
+    {
+      "window": "W3 short NY 09-16 local",
+      "n": 2976,
+      "grossT": -1.49,
+      "at02bp": {
+        "sharpe": -0.63
+      },
+      "at035bp": {
+        "sharpe": -0.78
+      },
+      "halves": {
+        "h1Pct": 9.7,
+        "h2Pct": -35.4
+      },
+      "suitable": false
+    },
+    {
+      "window": "W4 short NY 09-12 local",
+      "n": 2976,
+      "grossT": 0.16,
+      "at02bp": {
+        "sharpe": -0.2
+      },
+      "at035bp": {
+        "sharpe": -0.39
+      },
+      "halves": {
+        "h1Pct": 17.4,
+        "h2Pct": -15.1
+      },
+      "suitable": false
+    }
+  ]
+}

@@ -26,6 +26,8 @@ module.exports = {
       args: 'scripts/run-bot.ts --symbols BTCUSDT,ETHUSDT,SOLUSDT --resume --verbose',
       cwd: __dirname,
       instances: 1,
+      exec_mode: 'fork', // tsx interpreter cannot run under cluster mode
+      interpreter: 'none', // exec the tsx bin directly; do not require() it
       autorestart: true,
       watch: false,
       max_memory_restart: '512M',
@@ -50,6 +52,8 @@ module.exports = {
       args: 'scripts/run-gold-bot.ts --verbose --regime-filter zscore50',
       cwd: __dirname,
       instances: 1,
+      exec_mode: 'fork', // tsx interpreter cannot run under cluster mode
+      interpreter: 'none', // exec the tsx bin directly; do not require() it
       autorestart: true,
       watch: false,
       max_memory_restart: '256M',
@@ -74,6 +78,8 @@ module.exports = {
       args: 'scripts/run-metals-bot.ts --verbose',
       cwd: __dirname,
       instances: 1,
+      exec_mode: 'fork', // tsx interpreter cannot run under cluster mode
+      interpreter: 'none', // exec the tsx bin directly; do not require() it
       autorestart: true,
       watch: false,
       max_memory_restart: '256M',

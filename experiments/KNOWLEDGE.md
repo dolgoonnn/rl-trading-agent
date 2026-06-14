@@ -4,7 +4,7 @@ Consolidated index of every experiment track in this repo (Feb–Jun 2026, ~250
 documented experiments). Read this before testing a new idea — most idea families
 have already been falsified, and the methodology lessons here are paid for.
 
-**Last updated**: 2026-06-11 (after strategy-combination study)
+**Last updated**: 2026-06-12 (overnight research loop — 10 verdicts, see graveyard additions + Universe D)
 
 ---
 
@@ -22,6 +22,11 @@ have already been falsified, and the methodology lessons here are paid for.
 | **Crypto altcoin transfer** | 17 alts on Run 18 config | Only LINKUSDT passed (60.6% WF) | ⚠️ BTC/ETH-dominant | `pair-validation-report.md` |
 | **RL (PPO/DDQN)** | Weight optimizer, signal filter, funding rate | All negative or zero-trade | ❌ DEAD | `ppo-eval-*.json`, MEMORY.md |
 | **Strategy combination** | crypto Run 20 + session book + F2F as one book; EW/handcraft/ERC/shrunk-MV, all walk-forward | Sharpe 2.16 → **2.94** (+36% vs best sleeve, ρ≈0, DM 1.72); handcraft only method to beat EW (P=99.1%, 11yr universe); **deployable at venue-realistic costs: Sharpe 2.53, 37%/yr @12% vol target, 5/5 stress gates** | ✅ EDGE (combination layer) | `strategy-combination.md` |
+| **Review-preview book (Universe D)** | fix-short with validated no-sweep gate, recombined with crypto+F2F | book sleeve 1.34→1.58; **combined Sharpe 2.61, ~39%/yr @12% vol, 9.4% maxDD, 5/5 gates** (vs 2.46 current) — the Sept review package | ✅ READY FOR REVIEW | `runs/combined-daily-D.json`, `ict-execution-layer.md` |
+| **Pre-FOMC drift (US500)** | 90 events; overlap decomposition vs US500-overnight leg | +16.8bp/event t=2.61 BUT 82% is the overnight segment (corr 0.78) and the remainder is t=0.29 — **already harvested by leg J** | ❌ CLOSED (redundant — confirms leg J is event-flow anchored) | `fomc-drift.md` |
+| **ICT execution layer on gold** | Entry-timing A/B on overnight leg (n=2949) + fix-short sweep gate (n=2950); external validation research first | Timing layer **−0.99bp/day t=−3.97** (opportunity cost of drift dominates); sweeps = CONTINUATION info (Osler confirmed in-house) — avoid-after-sweep fix gate = post-hoc candidate (+2.22bp t=2.83 no-sweep days) | ❌ DEAD as timing / ⚠️ 1 inverted-filter candidate | `ict-execution-layer.md`, `ict-validation-research.md` |
+| **Prop-firm barrier option** | Session book through Topstep-style trailing-DD rules, all historical starts | Pass rate 2–3× population base; EV +$2–5k/attempt at $25–50k notional — but contract granularity forces ≥$100k where EV ≈ 0; 100% eventually blow (extract-then-re-evaluate model) | ⚠️ SHELVED (rule-check + paper results first) | `prop-barrier-sim.md` |
+| **Practitioner mechanisms 2026** | 5-thread verified web research: what pays at retail size | flow-anchored + slow survives; OBI/MM/DEX-LP/x-exchange-arb/SPX-short-vol all measured dead; liquidation-fade + crypto VRP = next test queue | 📚 KNOWLEDGE | `practitioner-mechanisms.md` |
 | **Execution audit** | All 9 session-book legs re-priced at researched 2026 venue costs (MGC/SIL/MES/ECN/Bybit) | 7/9 legs survive; EUR-h22 dead (−4.0 Sharpe at real rollover costs), Au-AM-fix cut; gold 0.3bp assumption → 0.45–0.55bp real; **22:00 UTC overnight entry sits on CME maintenance break (DST bug) — re-anchor to 18:05 ET before deploy** | ⚠️ GATING ITEMS | `execution-audit.md` |
 
 ---
@@ -59,6 +64,17 @@ have already been falsified, and the methodology lessons here are paid for.
 | Per-regime SL/TP multipliers, vol-scaled sizing, streak sizing, drawdown limits | all rejected, iter 24-31 | iteration-24-27, -28-31 |
 | Circuit breaker (consecutive-loss pause) | never fires at 1H trade frequency | iteration-12 |
 | Crypto-tuned config on forex | 36.5% WF aggregate, EURUSD/GBPUSD 15.4% | forex-gold-feasibility |
+| Breedon-Ranaldo session effect on USDJPY | 4 pre-registered windows, all gross-negative (t −1.6…+0.2), no halves stability — effect is EUR-specific | runs/jpy-session-results.json |
+| Turn-of-month US500 | in-window 5.6bp/d vs out-window 4.0bp/d, diff t=0.36 — no excess over unconditional drift on 2015–26; literature Sharpe-1.0 claims don't replicate | runs/tom-us500-results.json |
+| KMW Tokyo-fix W-pattern USDJPY | into-fix leg exactly 0bp; post-fix short +0.07bp t=0.43 at 0.35bp/side — paper's near-interbank-spread caveat confirmed; month-end-only post-fix +1.29bp t=1.80 (n=138) = watchlist footnote, not bankable | (JF 2024 spec, runs in /tmp replay 2026-06-12) |
+| Melvin-Prins month-end fix reversal (EUR+JPY) | fade pre-fix hour from 16:03 Ldn, exit next noon: EUR +3.0bp t=0.88 (h1 NEGATIVE), JPY +0.2bp t=0.04 — the 2004-12 '72% retrace' does not survive post-2015; pre-hedging erosion consumed it; conditional Test 1 skipped per pre-registration | overnight loop 2026-06-12 |
+| Dash-for-cash conditional reversal (RFS 2020) | worked in h1 (+89bp/event t=2.69!) then decayed EXACTLY along settlement-cycle changes: post-T+2 +27bp t=0.79, post-T+1 −10bp t=−0.12; corr −0.15 vs paper −0.39 — mechanism structurally removed by faster settlement | overnight loop 2026-06-12 |
+| OpEx expiration-week long (JBF 2013) | h1 +33bp t=1.42, h2 −4bp t=−0.15 — 0DTE dilution of monthly gamma confirmed; vendor 'unclenching' short never tested (zero peer-reviewed support) | overnight loop 2026-06-12 |
+| Funding-rate arb as a SLEEVE | mechanism real (77% WR, 18% APY deployed) but funding rarely clears threshold: ~3.4%/yr on capital — idle-cash overlay only | funding-arb-backtest-results.json |
+| Funding-EXTREME conditioning (BIS WP1087 reversal read) | 99th-pct funding -> short 24h LOSES −12…−32bp net on BTC/ETH/SOL (continuation, not reversal); extreme-negative->long t≈0.1-0.4 noise — 3rd confirmation funding has no directional value for us | overnight loop 2026-06-12 |
+| Crypto VRP (Deribit DVOL−RV30 measurement) | premium COLLAPSED: 7.6 vol pts 2023 → 6.7 → 5.1 → **0.8 in 2026** (latest 2.7) — arXiv 14%/yr was a 2017-22 artifact; options-engine project killed at measurement stage | overnight loop 2026-06-12 |
+| CPI-day gold (both windows) | drift diff t=0.33 (1h) / t=1.08 (full day); only vol bump (|move| 30 vs 21bp) — 4th intraday-gold event null; Fed-note waning confirmed | data/cpi-calendar.json, overnight loop 2026-06-12 |
+| Fix-sweep gate on SILVER own-fix | does NOT transfer — sweep days BETTER for the short (+2.72 t=2.77 vs +1.62 t=2.05); fix effects are fix-specific (3rd confirmation); silver own-fix h2 soft (t≈0.5-1.0) = watch item | ict-execution-layer.md |
 | Session-range (Asian) gold intraday at 1H | 100% WF in-sample → failed MC OOS | gold-cmaes-iterations |
 
 ---

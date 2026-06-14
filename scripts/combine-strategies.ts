@@ -475,6 +475,12 @@ function main(): void {
   } catch {
     console.log('\n(Universe C skipped — run scripts/audit-leg-friction.ts first to emit sessionBookRetail)');
   }
+  // Universe D: REVIEW-PREVIEW book (fix-short with validated no-sweep gate — Sept candidate)
+  try {
+    out.push(runUniverse('D', 'UNIVERSE D — review-preview upgraded book', ['crypto', 'sessionBookUpgraded', 'f2f']));
+  } catch {
+    console.log('\n(Universe D skipped — sessionBookUpgraded not present)');
+  }
 
   const outPath = path.resolve(__dirname, '..', 'experiments', 'runs', 'strategy-combination-results.json');
   fs.writeFileSync(outPath, JSON.stringify({ generatedAt: new Date().toISOString(), universes: out }, null, 2));
