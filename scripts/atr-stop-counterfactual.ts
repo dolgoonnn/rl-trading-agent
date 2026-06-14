@@ -1,41 +1,49 @@
 /**
- * ATR-floored stop-loss counterfactual.
+ * Multi-arm ATR-stop counterfactual (Task 9 PROBE).
  *
- * For each closed bot_trade we replay forward from the entry bar using the
- * same entry, direction and original TP distance — but the SL is widened to
- *   SL_new_dist = max(SL_orig_dist, k * ATR_14(at_entry))
- * R:R is preserved (TP is moved symmetrically to keep reward/risk ratio).
+ * Replays every closed bot_trade (Run-20 log) forward over the SAME candle
+ * series under four EXIT rules — never recreating strategy/entry logic:
+ *   ARM A baseline          — current SL/TP as stored.
+ *   ARM B atr_floor         — SL = max(SL_orig, k·ATR14@entry), R:R preserved.
+ *   ARM C chandelier        — trailing stop = highest-high − k·ATR (mirror short).
+ *   ARM D vertical_barrier  — exit at min(SL, TP, N-bar horizon); horizons 40/80/120/160.
+ *                             (Lopez de Prado, Advances in Financial ML, 2018, §3.)
  *
- * Reports current vs counterfactual: win rate, SL-hit rate, mean R-multiple,
- * fast-stop (≤15 bar) rate. Pure analysis — no strategy logic recreated.
+ * PER-ARM FUNDING DEBIT: each arm holds a different length, so each crosses a
+ * different number of 00/08/16 UTC funding settlements. Funding is debited per
+ * arm over THAT arm's actual hold (shared `funding-ledger` keystone). Every
+ * headline metric is NET-of-funding R — comparing arms on gross R would falsely
+ * favor the longest-hold arm.
+ *
+ * DIAGNOSTIC ONLY — a winning arm must survive WF/PBO before any live exit
+ * change (project canon: WF pass-rate decides). Nothing here is auto-wired.
+ *
+ * Emits experiments/runs/atr-stop-arms.json.
  */
 
 import Database from 'better-sqlite3';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import {
+  atrAt,
+  findEntryIndex,
+  rateAtFromSnapshots,
+  simulateAtrFloor,
+  simulateBaseline,
+  simulateChandelier,
+  simulateVerticalBarrier,
+  summarizeArm,
+  type ArmOutcome,
+  type ArmStats,
+  type Candle,
+  type RateAt,
+  type Trade,
+} from '../src/lib/research/atr-stop-arms';
 
-interface Trade {
-  id: string;
-  symbol: string;
-  direction: 'long' | 'short';
-  entry_price: number;
-  exit_price: number;
-  entry_timestamp: number;
-  exit_timestamp: number;
-  stop_loss: number;
-  take_profit: number;
-  bars_held: number;
-  exit_reason: string;
-  pnl_percent: number;
-}
-
-interface Candle {
-  timestamp: number;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-}
+const MAX_BARS = 160;
+const ATR_FLOOR_K = 1.5; // sweep target 1.0–3.0; default per plan
+const CHANDELIER_K = 3.0; // sweep target 2.5–4.0; default per plan
+const VERTICAL_HORIZONS = [40, 80, 120, 160] as const;
 
 function loadCandles(symbol: string): Candle[] {
   const file = path.resolve(`data/${symbol}_1h.json`);
@@ -44,107 +52,43 @@ function loadCandles(symbol: string): Candle[] {
   return raw.sort((a, b) => a.timestamp - b.timestamp);
 }
 
-function findEntryIndex(candles: Candle[], entryTs: number): number {
-  // Binary search — candles are timestamp-sorted ascending.
-  // Bot entries timestamp at bar-close; the entry bar is the one whose
-  // timestamp matches OR the bar that contains entryTs.
-  let lo = 0;
-  let hi = candles.length - 1;
-  while (lo < hi) {
-    const mid = (lo + hi) >>> 1;
-    if (candles[mid]!.timestamp < entryTs) lo = mid + 1;
-    else hi = mid;
-  }
-  if (candles[lo]?.timestamp === entryTs) return lo;
-  // Fall back: the largest index with timestamp <= entryTs
-  if (lo > 0 && candles[lo - 1]!.timestamp <= entryTs) return lo - 1;
-  return -1;
+function loadRateAt(symbol: string): RateAt {
+  const file = path.resolve(`data/${symbol}_futures_1h.json`);
+  if (!fs.existsSync(file)) return () => 0;
+  const snaps = JSON.parse(fs.readFileSync(file, 'utf-8')) as { timestamp: number; fundingRate: number }[];
+  return rateAtFromSnapshots(snaps);
 }
 
-function atrAt(candles: Candle[], idx: number, period = 14): number {
-  if (idx < period) return 0;
-  let sum = 0;
-  for (let i = idx - period + 1; i <= idx; i++) {
-    const c = candles[i]!;
-    const prev = candles[i - 1]!;
-    const tr = Math.max(c.high - c.low, Math.abs(c.high - prev.close), Math.abs(c.low - prev.close));
-    sum += tr;
-  }
-  return sum / period;
+/**
+ * Baseline outcome from the SAME replay engine (not from stored fields) so all
+ * arms share identical bar-stepping/R semantics. Uses stored SL/TP and the same
+ * MAX_BARS horizon as the alt arms.
+ */
+function baselineOutcome(candles: Candle[], entryIdx: number, t: Trade, rateAt: RateAt): ArmOutcome {
+  return simulateBaseline({
+    candles,
+    entryIdx,
+    direction: t.direction,
+    entry: t.entry_price,
+    sl: t.stop_loss,
+    tp: t.take_profit,
+    maxBars: MAX_BARS,
+    rateAt,
+  });
 }
 
-interface Outcome {
-  exitReason: 'stop_loss' | 'take_profit' | 'max_bars';
-  barsHeld: number;
-  pnlR: number;
-  exitPrice: number;
+interface ArmAccumulator {
+  baseline: ArmOutcome[];
+  atrFloor: ArmOutcome[];
+  chandelier: ArmOutcome[];
+  vertical: Map<number, ArmOutcome[]>;
 }
 
-function simulate(
-  candles: Candle[],
-  entryIdx: number,
-  direction: 'long' | 'short',
-  entry: number,
-  sl: number,
-  tp: number,
-  maxBars = 108,
-): Outcome {
-  const slDist = Math.abs(entry - sl);
-  for (let i = entryIdx + 1; i < Math.min(entryIdx + 1 + maxBars, candles.length); i++) {
-    const c = candles[i]!;
-    const barsHeld = i - entryIdx;
-    if (direction === 'long') {
-      if (c.low <= sl) return { exitReason: 'stop_loss', barsHeld, pnlR: -1, exitPrice: sl };
-      if (c.high >= tp) return { exitReason: 'take_profit', barsHeld, pnlR: Math.abs(tp - entry) / slDist, exitPrice: tp };
-    } else {
-      if (c.high >= sl) return { exitReason: 'stop_loss', barsHeld, pnlR: -1, exitPrice: sl };
-      if (c.low <= tp) return { exitReason: 'take_profit', barsHeld, pnlR: Math.abs(entry - tp) / slDist, exitPrice: tp };
-    }
-  }
-  const exitBarIdx = Math.min(entryIdx + maxBars, candles.length - 1);
-  const exit = candles[exitBarIdx]!.close;
-  const pnl = direction === 'long' ? (exit - entry) : (entry - exit);
-  return { exitReason: 'max_bars', barsHeld: exitBarIdx - entryIdx, pnlR: pnl / slDist, exitPrice: exit };
+function newAccumulator(): ArmAccumulator {
+  const vertical = new Map<number, ArmOutcome[]>();
+  for (const h of VERTICAL_HORIZONS) vertical.set(h, []);
+  return { baseline: [], atrFloor: [], chandelier: [], vertical };
 }
-
-interface Stats {
-  n: number;
-  wins: number;
-  winRate: number;
-  slHits: number;
-  slRate: number;
-  fastStops: number; // SL hit in ≤15 bars
-  fastStopRate: number;
-  meanR: number;
-  totalR: number;
-  meanBars: number;
-}
-
-function summarize(outcomes: Outcome[]): Stats {
-  const n = outcomes.length;
-  if (n === 0) {
-    return { n: 0, wins: 0, winRate: 0, slHits: 0, slRate: 0, fastStops: 0, fastStopRate: 0, meanR: 0, totalR: 0, meanBars: 0 };
-  }
-  const wins = outcomes.filter((o) => o.pnlR > 0).length;
-  const slHits = outcomes.filter((o) => o.exitReason === 'stop_loss').length;
-  const fastStops = outcomes.filter((o) => o.exitReason === 'stop_loss' && o.barsHeld <= 15).length;
-  const totalR = outcomes.reduce((s, o) => s + o.pnlR, 0);
-  const totalBars = outcomes.reduce((s, o) => s + o.barsHeld, 0);
-  return {
-    n,
-    wins,
-    winRate: wins / n,
-    slHits,
-    slRate: slHits / n,
-    fastStops,
-    fastStopRate: fastStops / n,
-    meanR: totalR / n,
-    totalR,
-    meanBars: totalBars / n,
-  };
-}
-
-const ATR_MULTIPLIERS = [1.0, 1.5, 2.0, 2.5];
 
 function main(): void {
   const dbPath = path.resolve('data/ict-trading.db');
@@ -157,117 +101,160 @@ function main(): void {
        FROM bot_trades WHERE exit_price IS NOT NULL ORDER BY entry_timestamp ASC`,
     )
     .all() as Trade[];
+  db.close();
 
   console.log(`\nLoaded ${trades.length} closed trades.\n`);
 
-  // Group by symbol so we only load each symbol's candles once
   const bySymbol = new Map<string, Trade[]>();
   for (const t of trades) {
     if (!bySymbol.has(t.symbol)) bySymbol.set(t.symbol, []);
     bySymbol.get(t.symbol)!.push(t);
   }
 
-  // Compute baseline (actual) outcomes from bot_trades fields
-  const baselineBySymbol = new Map<string, Outcome[]>();
-  // Counterfactual outcomes per multiplier per symbol
-  const cfBySymbol = new Map<string, Map<number, Outcome[]>>();
+  const all = newAccumulator();
+  const perSymbol = new Map<string, ArmAccumulator>();
+  let replayed = 0;
+  let skipped = 0;
 
   for (const [symbol, symbolTrades] of bySymbol) {
     const candles = loadCandles(symbol);
     if (candles.length < 100) {
-      console.log(`  ${symbol}: insufficient candles (${candles.length}), skipping`);
+      console.log(`  ${symbol}: insufficient candles (${candles.length}), skipping ${symbolTrades.length} trades`);
+      skipped += symbolTrades.length;
       continue;
     }
-    const baseline: Outcome[] = [];
-    const cfMap = new Map<number, Outcome[]>();
-    for (const m of ATR_MULTIPLIERS) cfMap.set(m, []);
+    const rateAt = loadRateAt(symbol);
+    const acc = newAccumulator();
 
     for (const t of symbolTrades) {
-      const slDist = Math.abs(t.entry_price - t.stop_loss);
-      const tpDist = Math.abs(t.take_profit - t.entry_price);
-      const rr = slDist > 0 ? tpDist / slDist : 0;
-
-      // Baseline outcome reconstructed from stored fields
-      const baselineR =
-        t.exit_reason === 'stop_loss' ? -1
-        : t.exit_reason === 'take_profit' ? rr
-        : (t.direction === 'long' ? (t.exit_price - t.entry_price) : (t.entry_price - t.exit_price)) / Math.max(slDist, 1e-9);
-      baseline.push({
-        exitReason: t.exit_reason === 'stop_loss' ? 'stop_loss' : t.exit_reason === 'take_profit' ? 'take_profit' : 'max_bars',
-        barsHeld: t.bars_held,
-        pnlR: baselineR,
-        exitPrice: t.exit_price,
-      });
-
-      // Counterfactual: widen SL by ATR; keep R:R constant (move TP proportionally)
       const entryIdx = findEntryIndex(candles, t.entry_timestamp);
-      if (entryIdx < 14) continue; // need ATR window
+      if (entryIdx < 14) {
+        skipped++;
+        continue;
+      } // need ATR window
       const atr = atrAt(candles, entryIdx, 14);
-      if (atr <= 0) continue;
+      if (atr <= 0) {
+        skipped++;
+        continue;
+      }
+      replayed++;
 
-      for (const mult of ATR_MULTIPLIERS) {
-        const newSlDist = Math.max(slDist, atr * mult);
-        if (newSlDist <= slDist + 1e-9) {
-          // No change — copy baseline
-          cfMap.get(mult)!.push(baseline[baseline.length - 1]!);
-          continue;
-        }
-        const newTpDist = newSlDist * rr;
-        const newSl = t.direction === 'long' ? t.entry_price - newSlDist : t.entry_price + newSlDist;
-        const newTp = t.direction === 'long' ? t.entry_price + newTpDist : t.entry_price - newTpDist;
-        const outcome = simulate(candles, entryIdx, t.direction, t.entry_price, newSl, newTp);
-        cfMap.get(mult)!.push(outcome);
+      acc.baseline.push(baselineOutcome(candles, entryIdx, t, rateAt));
+      acc.atrFloor.push(
+        simulateAtrFloor({ candles, entryIdx, direction: t.direction, entry: t.entry_price, sl: t.stop_loss, tp: t.take_profit, k: ATR_FLOOR_K, maxBars: MAX_BARS, rateAt }),
+      );
+      acc.chandelier.push(
+        simulateChandelier({ candles, entryIdx, direction: t.direction, entry: t.entry_price, sl: t.stop_loss, atr, k: CHANDELIER_K, maxBars: MAX_BARS, rateAt }),
+      );
+      for (const h of VERTICAL_HORIZONS) {
+        acc.vertical.get(h)!.push(
+          simulateVerticalBarrier({ candles, entryIdx, direction: t.direction, entry: t.entry_price, sl: t.stop_loss, tp: t.take_profit, horizonBars: h, rateAt }),
+        );
       }
     }
-    baselineBySymbol.set(symbol, baseline);
-    cfBySymbol.set(symbol, cfMap);
+
+    perSymbol.set(symbol, acc);
+    all.baseline.push(...acc.baseline);
+    all.atrFloor.push(...acc.atrFloor);
+    all.chandelier.push(...acc.chandelier);
+    for (const h of VERTICAL_HORIZONS) all.vertical.get(h)!.push(...acc.vertical.get(h)!);
   }
 
-  db.close();
+  console.log(`Replayed ${replayed} trades (${skipped} skipped: pre-ATR-window or missing candles).\n`);
 
-  // Aggregate report
-  const allBaseline: Outcome[] = [];
-  const allCf = new Map<number, Outcome[]>();
-  for (const m of ATR_MULTIPLIERS) allCf.set(m, []);
-  for (const symbol of bySymbol.keys()) {
-    allBaseline.push(...(baselineBySymbol.get(symbol) ?? []));
-    const cfMap = cfBySymbol.get(symbol);
-    if (cfMap) {
-      for (const m of ATR_MULTIPLIERS) {
-        allCf.get(m)!.push(...(cfMap.get(m) ?? []));
-      }
-    }
+  // ── Build the arm → stats record ───────────────────────────────────────────
+  interface ArmRow {
+    arm: string;
+    label: string;
+    stats: ArmStats;
+  }
+  const rows: ArmRow[] = [
+    { arm: 'A_baseline', label: 'A baseline (stored SL/TP)', stats: summarizeArm(all.baseline) },
+    { arm: 'B_atr_floor', label: `B atr_floor (k=${ATR_FLOOR_K})`, stats: summarizeArm(all.atrFloor) },
+    { arm: 'C_chandelier', label: `C chandelier (k=${CHANDELIER_K})`, stats: summarizeArm(all.chandelier) },
+  ];
+  for (const h of VERTICAL_HORIZONS) {
+    rows.push({ arm: `D_vertical_${h}`, label: `D vertical_barrier (N=${h})`, stats: summarizeArm(all.vertical.get(h)!) });
   }
 
-  const printRow = (label: string, s: Stats): void => {
+  const baselineMeanNet = rows[0]!.stats.meanNetR;
+
+  const printRow = (label: string, s: ArmStats): void => {
+    const delta = s.meanNetR - baselineMeanNet;
     console.log(
-      `${label.padEnd(22)} n=${String(s.n).padStart(4)}  WR=${(s.winRate * 100).toFixed(1).padStart(5)}%  ` +
+      `${label.padEnd(28)} n=${String(s.n).padStart(4)}  WR=${(s.winRate * 100).toFixed(1).padStart(5)}%  ` +
         `SL%=${(s.slRate * 100).toFixed(1).padStart(5)}%  fastSL%=${(s.fastStopRate * 100).toFixed(1).padStart(5)}%  ` +
-        `meanR=${s.meanR.toFixed(3).padStart(7)}  totalR=${s.totalR.toFixed(2).padStart(8)}  meanBars=${s.meanBars.toFixed(1)}`,
+        `meanNetR=${s.meanNetR.toFixed(4).padStart(8)}  ΔvsA=${(delta >= 0 ? '+' : '') + delta.toFixed(4)}  ` +
+        `meanGrossR=${s.meanGrossR.toFixed(4).padStart(8)}  meanFundR=${s.meanFundingR.toFixed(5).padStart(9)}  meanBars=${s.meanBars.toFixed(1)}`,
     );
   };
 
-  console.log('═'.repeat(120));
-  console.log('AGGREGATE (all symbols)');
-  console.log('─'.repeat(120));
-  printRow('baseline (actual)', summarize(allBaseline));
-  for (const m of ATR_MULTIPLIERS) {
-    printRow(`ATR-floor ${m.toFixed(1)}x`, summarize(allCf.get(m)!));
+  console.log('═'.repeat(150));
+  console.log('AGGREGATE (all symbols) — headline metric is meanNetR (net of per-arm funding)');
+  console.log('─'.repeat(150));
+  for (const r of rows) printRow(r.label, r.stats);
+
+  // Verdict: does any arm beat baseline on mean net R?
+  const beaters = rows
+    .slice(1)
+    .filter((r) => r.stats.meanNetR > baselineMeanNet + 1e-6)
+    .sort((a, b) => b.stats.meanNetR - a.stats.meanNetR);
+  console.log('\n' + '─'.repeat(150));
+  if (beaters.length === 0) {
+    console.log('VERDICT: NO arm beats baseline on mean net-of-funding R. Run-20 partial_tp exits look near-optimal on this window.');
+  } else {
+    const top = beaters[0]!;
+    console.log(
+      `VERDICT: ${beaters.length} arm(s) beat baseline on mean net R. Top = ${top.label} ` +
+        `(meanNetR=${top.stats.meanNetR.toFixed(4)} vs baseline ${baselineMeanNet.toFixed(4)}, Δ=+${(top.stats.meanNetR - baselineMeanNet).toFixed(4)}). ` +
+        `DIAGNOSTIC ONLY — must clear WF/PBO before any live exit change.`,
+    );
   }
 
-  console.log('\n' + '═'.repeat(120));
+  console.log('\n' + '═'.repeat(150));
   console.log('PER-SYMBOL');
-  for (const symbol of bySymbol.keys()) {
-    console.log('─'.repeat(120));
+  for (const [symbol, acc] of perSymbol) {
+    console.log('─'.repeat(150));
     console.log(symbol);
-    printRow('  baseline', summarize(baselineBySymbol.get(symbol) ?? []));
-    for (const m of ATR_MULTIPLIERS) {
-      printRow(`  ATR-floor ${m.toFixed(1)}x`, summarize(cfBySymbol.get(symbol)?.get(m) ?? []));
-    }
+    printRow('  A baseline', summarizeArm(acc.baseline));
+    printRow(`  B atr_floor (k=${ATR_FLOOR_K})`, summarizeArm(acc.atrFloor));
+    printRow(`  C chandelier (k=${CHANDELIER_K})`, summarizeArm(acc.chandelier));
+    for (const h of VERTICAL_HORIZONS) printRow(`  D vertical (N=${h})`, summarizeArm(acc.vertical.get(h)!));
   }
-  console.log('═'.repeat(120));
-  console.log('\nNote: counterfactual preserves R:R (TP scales with SL).');
-  console.log('"fastSL%" = stop hit within 15 bars — the noise-floor diagnostic.\n');
+  console.log('═'.repeat(150));
+
+  // ── Emit JSON ───────────────────────────────────────────────────────────────
+  const out = {
+    generatedAt: new Date().toISOString(),
+    note: 'DIAGNOSTIC. In-sample replay of Run-20 bot_trades; per-arm funding debited net-of-funding R. A winning arm must clear WF/PBO before any live exit change.',
+    config: { maxBars: MAX_BARS, atrFloorK: ATR_FLOOR_K, chandelierK: CHANDELIER_K, verticalHorizons: VERTICAL_HORIZONS, atrPeriod: 14 },
+    nTradesTotal: trades.length,
+    nReplayed: replayed,
+    nSkipped: skipped,
+    baselineMeanNetR: baselineMeanNet,
+    arms: rows.map((r) => ({ arm: r.arm, label: r.label, deltaNetRvsBaseline: r.stats.meanNetR - baselineMeanNet, ...r.stats })),
+    verdict:
+      beaters.length === 0
+        ? 'NO arm beats baseline on mean net-of-funding R; Run-20 partial_tp exits near-optimal on this window.'
+        : `${beaters.length} arm(s) beat baseline; top=${beaters[0]!.arm}. DIAGNOSTIC — must clear WF/PBO before any live exit change.`,
+    perSymbol: Object.fromEntries(
+      [...perSymbol.entries()].map(([symbol, acc]) => [
+        symbol,
+        {
+          A_baseline: summarizeArm(acc.baseline),
+          B_atr_floor: summarizeArm(acc.atrFloor),
+          C_chandelier: summarizeArm(acc.chandelier),
+          ...Object.fromEntries(VERTICAL_HORIZONS.map((h) => [`D_vertical_${h}`, summarizeArm(acc.vertical.get(h)!)])),
+        },
+      ]),
+    ),
+  };
+
+  const outPath = path.resolve('experiments/runs/atr-stop-arms.json');
+  fs.mkdirSync(path.dirname(outPath), { recursive: true });
+  fs.writeFileSync(outPath, JSON.stringify(out, null, 2));
+  console.log(`\nWrote ${outPath}`);
+  console.log('Headline metric = meanNetR (net of per-arm funding). Comparing arms on gross R would falsely favor the longest-hold arm.\n');
 }
 
 main();
