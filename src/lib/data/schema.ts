@@ -391,6 +391,14 @@ export const botTrades = sqliteTable('bot_trades', {
   equityAfter: real('equity_after').notNull(),
   drawdownFromPeak: real('drawdown_from_peak').notNull(),
 
+  // Cost decomposition (migration 0004). Default 0 so existing rows stay valid.
+  // gross + friction + funding === net (audit invariant, see funding-ledger).
+  grossReturn: real('gross_return').notNull().default(0),
+  frictionReturn: real('friction_return').notNull().default(0),
+  fundingReturn: real('funding_return').notNull().default(0),
+  netReturn: real('net_return').notNull().default(0),
+  fundingPaidUsdt: real('funding_paid_usdt').notNull().default(0),
+
   createdAt: integer('created_at').notNull(),
 });
 
@@ -465,6 +473,62 @@ export const botCandles = sqliteTable('bot_candles', {
   low: real('low').notNull(),
   close: real('close').notNull(),
   volume: real('volume').notNull(),
+});
+
+// ============================================================================
+// BOT SURVIVAL HARDENING TABLES (migration 0004)
+// ============================================================================
+
+// Kill switch — singleton latched halt flag (survives restart, dashboard-flippable).
+// id is always 1; the bot reads row 1 before every trade decision.
+export const botKillSwitch = sqliteTable('bot_kill_switch', {
+  id: integer('id').primaryKey().default(1),
+  halted: integer('halted', { mode: 'boolean' }).notNull().default(false),
+  reason: text('reason'),
+  source: text('source'),
+  haltedAt: integer('halted_at'),
+  manualReview: integer('manual_review', { mode: 'boolean' }).notNull().default(true),
+});
+
+// Decision log — append-only audit trail (no update/delete path at app layer).
+export const decisionLog = sqliteTable('decision_log', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  createdAt: integer('created_at').notNull(),
+  type: text('type').notNull(),
+  symbol: text('symbol'),
+  /** JSON: structured detail payload */
+  detail: text('detail'),
+});
+
+// Skipped signals — every pre-trade reject (guards, funding-filter, regime-suppress, etc).
+export const skippedSignals = sqliteTable('skipped_signals', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  ts: integer('ts').notNull(),
+  symbol: text('symbol').notNull(),
+  reason: text('reason').notNull(),
+  signalEntry: real('signal_entry'),
+  score: real('score'),
+  regime: text('regime'),
+  /** JSON: extra context for the reject */
+  detail: text('detail'),
+});
+
+// P&L cells — per-(week × regime × symbol × confluenceBucket × exitReason) decomposition.
+export const pnlCells = sqliteTable('pnl_cells', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  weekOf: integer('week_of').notNull(),
+  regime: text('regime'),
+  symbol: text('symbol'),
+  confluenceBucket: text('confluence_bucket'),
+  exitReason: text('exit_reason'),
+  n: integer('n'),
+  meanNet: real('mean_net'),
+  sumNet: real('sum_net'),
+  winRate: real('win_rate'),
+  sumGross: real('sum_gross'),
+  sumFunding: real('sum_funding'),
+  sumFriction: real('sum_friction'),
+  fundingPctOfGross: real('funding_pct_of_gross'),
 });
 
 // ============================================================================
@@ -563,3 +627,13 @@ export type BotEquitySnapshotRow = typeof botEquitySnapshots.$inferSelect;
 export type NewBotEquitySnapshotRow = typeof botEquitySnapshots.$inferInsert;
 export type BotCandleRow = typeof botCandles.$inferSelect;
 export type NewBotCandleRow = typeof botCandles.$inferInsert;
+
+// Bot survival hardening types (migration 0004)
+export type BotKillSwitchRow = typeof botKillSwitch.$inferSelect;
+export type NewBotKillSwitchRow = typeof botKillSwitch.$inferInsert;
+export type DecisionLogRow = typeof decisionLog.$inferSelect;
+export type NewDecisionLogRow = typeof decisionLog.$inferInsert;
+export type SkippedSignalRow = typeof skippedSignals.$inferSelect;
+export type NewSkippedSignalRow = typeof skippedSignals.$inferInsert;
+export type PnlCellRow = typeof pnlCells.$inferSelect;
+export type NewPnlCellRow = typeof pnlCells.$inferInsert;

@@ -70,3 +70,6 @@ data/orderflow/
 data/metals-bot-state.json
 data/gold-bot-state.json
 logs/
+
+# Local agent state (Claude Code, Ralph loop) — never commit
+.claude/
