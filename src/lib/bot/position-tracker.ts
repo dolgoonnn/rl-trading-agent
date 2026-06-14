@@ -58,8 +58,14 @@ export class PositionTracker {
   // State Management
   // ============================================
 
-  /** Load state from DB (returns false if no saved state) */
-  loadState(): boolean {
+  /**
+   * Load state from DB (returns false if no saved state).
+   *
+   * @param nowMs Injected clock for the per-symbol entry-window rebuild (Issue 3).
+   *        Defaults to Date.now(); tests pass a fixed clock so the 24h window
+   *        lines up with the timestamps they seeded.
+   */
+  loadState(nowMs: number = Date.now()): boolean {
     const row = db.select().from(botState).where(eq(botState.id, 1)).get();
     if (!row) return false;
 
@@ -83,7 +89,59 @@ export class PositionTracker {
       totalTrades: row.totalTrades,
     };
 
+    // Rebuild the per-symbol entry-cap window from durable rows (Issue 3) so the
+    // 24h cap survives a restart. Both open positions (bot_positions) and closed
+    // trades (bot_trades) count as entries — the cap is about how many times a
+    // symbol was ENTERED in the window, regardless of whether it has since
+    // closed. We pull every entryTimestamp inside the last 24h and seed the
+    // in-memory map; getEntriesInWindow then prunes lazily on read.
+    this.rebuildEntryWindow(nowMs);
+
     return true;
+  }
+
+  /**
+   * Rebuild `entryTimestamps` from durable DB rows (bot_positions + bot_trades)
+   * whose entryTimestamp falls inside the last 24h. Idempotent; ordered
+   * chronologically per symbol. Called from loadState() on restart.
+   */
+  private rebuildEntryWindow(nowMs: number): void {
+    const cutoff = nowMs - 24 * 3_600_000;
+    // De-dupe by position id: a CLOSED position survives as a row in BOTH
+    // bot_positions (status='closed') AND bot_trades (same id + entryTimestamp),
+    // so a naive union would double-count it. Keying on id collapses the pair to
+    // one entry. Each position id is exactly one entry event.
+    const byId = new Map<string, { symbol: string; ts: number }>();
+
+    const consider = (id: string, symbol: string, ts: number): void => {
+      if (ts <= cutoff || ts > nowMs) return;
+      if (!byId.has(id)) byId.set(id, { symbol, ts });
+    };
+
+    const posRows = db.select({
+      id: botPositions.id,
+      symbol: botPositions.symbol,
+      entryTimestamp: botPositions.entryTimestamp,
+    }).from(botPositions).all();
+    for (const r of posRows) consider(r.id, r.symbol, r.entryTimestamp);
+
+    const tradeRows = db.select({
+      id: botTrades.id,
+      symbol: botTrades.symbol,
+      entryTimestamp: botTrades.entryTimestamp,
+    }).from(botTrades).all();
+    for (const r of tradeRows) consider(r.id, r.symbol, r.entryTimestamp);
+
+    const bySymbol = new Map<string, number[]>();
+    for (const { symbol, ts } of byId.values()) {
+      const list = bySymbol.get(symbol) ?? [];
+      list.push(ts);
+      bySymbol.set(symbol, list);
+    }
+    for (const [symbol, list] of bySymbol) {
+      list.sort((a, b) => a - b);
+      this.entryTimestamps.set(symbol, list);
+    }
   }
 
   /** Save state to DB */
@@ -571,6 +629,13 @@ export class PositionTracker {
    * deflated for `trials` selection-bias. Returns null when the rolling Sharpe
    * is null (insufficient snapshot history) so the caller can treat a cold start
    * as "not enough data" rather than a failing edge.
+   *
+   * NOTE (Issue D): this uses the ANNUALIZED rolling Sharpe with T = totalTrades,
+   * which mixes scales (annualized magnitude vs per-trade variance count). It is
+   * retained for backward compatibility, but the retirement gate should use the
+   * SCALE-CONSISTENT pair below (`getRollingPerObservationSharpe` +
+   * `getRollingDeflatedSharpeObs`), which deflate a per-OBSERVATION Sharpe with
+   * T = the number of return OBSERVATIONS that produced it.
    */
   getRollingDeflatedSharpe(trials: number, windowDays = 30): number | null {
     const sharpe = this.getRollingSharpe(windowDays);
@@ -581,6 +646,94 @@ export class PositionTracker {
       Math.max(1, trials),
     );
     return dsr.deflatedSharpe;
+  }
+
+  /**
+   * Per-OBSERVATION rolling Sharpe (NOT annualized) plus the observation count.
+   *
+   * Issue D — DSR scale fix. The deflated-Sharpe variance estimator
+   * `Var(SR) ≈ (1 + 0.5·SR²)/T` is defined on a PER-OBSERVATION Sharpe and
+   * T = number of return observations. Feeding it an annualized Sharpe (≈√252×
+   * larger) and `totalTrades` (a different count) is a scale mismatch that makes
+   * the deflated value coarse. This returns the raw `mean/std` of the
+   * snapshot-to-snapshot returns with `n` = the count of those returns, so the
+   * caller can deflate consistently.
+   *
+   * Returns null under the same data-sufficiency rules as `getRollingSharpe`.
+   */
+  getRollingPerObservationSharpe(
+    windowDays = 30,
+  ): { sharpe: number; n: number } | null {
+    const cutoff = Date.now() - windowDays * 24 * 3_600_000;
+
+    const snapshots = db.select()
+      .from(botEquitySnapshots)
+      .orderBy(botEquitySnapshots.timestamp)
+      .all()
+      .filter((s) => s.timestamp >= cutoff);
+
+    if (snapshots.length < 7) return null; // Need at least a week of data
+
+    const returns: number[] = [];
+    for (let i = 1; i < snapshots.length; i++) {
+      const prev = snapshots[i - 1]!.equity;
+      const curr = snapshots[i]!.equity;
+      if (prev > 0) {
+        returns.push((curr - prev) / prev);
+      }
+    }
+
+    if (returns.length < 5) return null;
+
+    const mean = returns.reduce((s, r) => s + r, 0) / returns.length;
+    const variance = returns.reduce((s, r) => s + (r - mean) ** 2, 0) / returns.length;
+    const stdDev = Math.sqrt(variance);
+
+    if (stdDev === 0) return { sharpe: mean > 0 ? Infinity : 0, n: returns.length };
+
+    // PER-OBSERVATION Sharpe: mean/std of the per-return observations, NOT annualized.
+    return { sharpe: mean / stdDev, n: returns.length };
+  }
+
+  /**
+   * Scale-consistent rolling DEFLATED Sharpe for the retirement gate (Issue D).
+   *
+   * Deflates the PER-OBSERVATION Sharpe with T = the number of return
+   * OBSERVATIONS that produced it (NOT totalTrades) and `trials` selection-bias.
+   * Returns the deflated per-observation Sharpe and the same `n`, or null on a
+   * cold start. Compare the deflated value against `minAcceptableSharpe` ON THE
+   * SAME per-observation scale (the gate's benchmark `c` is interpreted likewise).
+   */
+  getRollingDeflatedSharpeObs(
+    trials: number,
+    windowDays = 30,
+  ): { deflatedSharpe: number; n: number } | null {
+    const obs = this.getRollingPerObservationSharpe(windowDays);
+    if (obs === null) return null;
+    const dsr = calculateDeflatedSharpe(obs.sharpe, Math.max(1, obs.n), Math.max(1, trials));
+    return { deflatedSharpe: dsr.deflatedSharpe, n: obs.n };
+  }
+
+  /**
+   * Per-symbol consecutive-loss count (Issue 4) — the length of the current
+   * losing streak for `symbol`, counting back from its most-recent closed trade.
+   * A win (or no trades) ⇒ 0. Independent of the global `consecutiveLosses`
+   * (which mixes symbols); this pauses ONE symbol without halting the book.
+   */
+  getSymbolConsecutiveLosses(symbol: string): number {
+    const rows = db.select({ pnlUSDT: botTrades.pnlUSDT })
+      .from(botTrades)
+      .where(eq(botTrades.symbol, symbol))
+      .orderBy(desc(botTrades.createdAt))
+      .limit(50)
+      .all();
+
+    let streak = 0;
+    for (const r of rows) {
+      if (r.pnlUSDT < 0) streak++;
+      else break;
+    }
+    return streak;
   }
 
   // ============================================

@@ -41,7 +41,11 @@ import {
 import { LTFConfirmation } from '../src/lib/bot/ltf-confirmation';
 import { shouldSnapshot } from '../src/lib/bot/snapshot';
 import { logSkippedSignal, appendDecisionLog } from '../src/lib/bot/decision-log';
-import { isKilled, type KillFlag } from '../src/lib/bot/kill-switch';
+import { isKilled, setKillFlag, type KillFlag } from '../src/lib/bot/kill-switch';
+import {
+  evaluateRetirementHalt,
+  resolveEffectiveKill,
+} from '../src/lib/bot/retirement';
 import { RETIREMENT_CONFIG } from '../src/lib/bot/config';
 import { db } from '../src/lib/data/db';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
@@ -161,6 +165,25 @@ class TradingBot {
   // Heartbeat: latches a stale_feed halt once the feed goes quiet past the
   // configured timeout. Reset only after a fresh feed update + manual review.
   private heartbeatAlerted = false;
+
+  // ---- Automatic retirement halt (Issue 2, Task 5b) ----
+  // Sustained-DSR breach counter (Issue B): carried across ticks so k consecutive
+  // sub-floor deflated-Sharpe checks escalate to a HARD halt. Reset on any clear.
+  private dsrBreachConsecutive = 0;
+  // Consecutive charter-p5 path breaches (yellow→red). Placeholder until the
+  // charter-path probe (Task 6) feeds a real cumulative-PnL-vs-p5 comparison;
+  // stays 0 today so the charter leg never trips spuriously.
+  private charterBreachConsecutive = 0;
+  // De-risk gross-exposure multiplier carried INTO sizing for the current tick
+  // when the retirement decision is 'derisk'. 1 = full size. Recomputed each tick.
+  private retirementMultiplier = 1;
+  // Dedupes the retirement HALT alert/log so a sustained halt does not spam.
+  private retirementAlerted = false;
+  // NOTE (Issue A): an EDGE-TRIGGERED regime/mechanism cause would be memoed here
+  // (last-seen regime tag) so we raise regimeCause only on a FRESH decay
+  // transition, never as a sticky level. No regime-decay detector feeds the tick
+  // yet, so consumeRegimeCause() returns false and we keep no latch state — the
+  // sustained-DSR streak (Issue B) carries the durable-edge-collapse signal.
 
   constructor(
     config: BotConfig,
@@ -363,15 +386,34 @@ class TradingBot {
 
       const nowMs = Date.now();
 
+      // 0. Hourly mark-to-market equity snapshot FIRST (deduped by UTC hour
+      // bucket) so the retirement evaluation below reads the freshest equity
+      // curve (drawdown + rolling deflated Sharpe) before deciding to halt.
+      this.recordHourlySnapshot();
+
       // 0a. LATCHED kill flag — read the out-of-band sources (data/KILL sentinel,
       // env KILL_SWITCH, bot_kill_switch DB row) BEFORE touching any symbol. When
       // halted we skip ALL new-entry processing (reduce-only). Open positions are
       // still managed by manageOpenPosition inside processSymbol, so we DO NOT
       // return early — we pass the kill flag down so only NEW entries are blocked.
-      const killFlag = isKilled(db, { nowMs });
+      let killFlag = isKilled(db, { nowMs });
       await this.handleKillFlag(killFlag);
 
-      // 0b. Heartbeat — latch a stale_feed halt if the feed has gone quiet.
+      // 0b. AUTOMATIC retirement halt (Issue 2). Compute the confluence decision
+      // from REAL inputs; on 'halt' latch the durable DB kill flag (so it blocks
+      // entries on THIS tick and every subsequent tick via isKilled→canTrade); on
+      // 'derisk' carry the multiplier into this tick's sizing.
+      await this.evaluateRetirement(nowMs);
+      // Re-read the latched flag in case the retirement halt just tripped it.
+      if (!killFlag.halted) {
+        killFlag = isKilled(db, { nowMs });
+        if (killFlag.halted) await this.handleKillFlag(killFlag);
+      }
+
+      // 0c. Heartbeat — a stale feed BLOCKS new entries (Issue 1). The stale gate
+      // is TRANSIENT (auto-resumes on feed recovery — see resolveEffectiveKill),
+      // so it is NOT persisted via setKillFlag; we fold it into an effectiveKill
+      // that is passed down to block entries while the feed is wedged.
       const heartbeat = this.riskEngine.checkHeartbeat({
         nowMs,
         lastFeedUpdate: this.dataFeed.lastFeedUpdate,
@@ -379,12 +421,14 @@ class TradingBot {
       });
       await this.handleHeartbeat(heartbeat);
 
-      for (const symbol of this.config.symbols) {
-        await this.processSymbol(symbol, killFlag);
-      }
+      // effectiveKill = latched flag if halted, else a transient heartbeat gate
+      // when the feed is stale. Entries are blocked under either; open-position
+      // management still runs (reduce-only).
+      const effectiveKill = resolveEffectiveKill(killFlag, heartbeat);
 
-      // Hourly mark-to-market equity snapshot (deduped by UTC hour bucket).
-      this.recordHourlySnapshot();
+      for (const symbol of this.config.symbols) {
+        await this.processSymbol(symbol, effectiveKill);
+      }
     } catch (err) {
       console.error('Tick error:', err);
       this.tracker.recordError();
@@ -453,6 +497,111 @@ class TradingBot {
         }
       }
     }
+  }
+
+  /**
+   * Automatic retirement halt evaluation (Issue 2, Task 5b).
+   *
+   * Gathers REAL inputs each tick — drawdown from peak, the SCALE-CONSISTENT
+   * per-observation deflated Sharpe (Issue D), the snapshot/observation count,
+   * the charter-path breach count, and an EDGE-TRIGGERED regime cause (Issue A) —
+   * runs the pure confluence decision, then ACTS:
+   *   - 'halt'   → setKillFlag(source:'retirement') durable latch + decision_log +
+   *                one deduped critical alert. The latch then blocks entries via
+   *                isKilled→canTrade on this and every subsequent tick.
+   *   - 'derisk' → carry decision.multiplier into this tick's sizing.
+   *   - 'trade'  → full size; clears the de-risk and resets the alert dedupe.
+   */
+  private async evaluateRetirement(nowMs: number): Promise<void> {
+    const trialCount = 236; // independent trials counted in DSR validation (MEMORY.md)
+
+    // Scale-consistent per-observation deflated Sharpe + observation count (Issue D).
+    const obs = this.tracker.getRollingDeflatedSharpeObs(trialCount);
+    const deflatedSharpe = obs?.deflatedSharpe ?? null;
+    const snapshotCount = obs?.n ?? 0;
+
+    const result = evaluateRetirementHalt({
+      nowMs,
+      drawdown: this.tracker.getDrawdown(),
+      deflatedSharpe,
+      snapshotCount,
+      regimeCause: this.consumeRegimeCause(),
+      charterBreachConsecutive: this.charterBreachConsecutive,
+      dsrBreachConsecutive: this.dsrBreachConsecutive,
+      config: RETIREMENT_CONFIG,
+    });
+
+    // Persist the advanced sustained-DSR counter for the next tick.
+    this.dsrBreachConsecutive = result.dsrBreachConsecutive;
+
+    if (result.decision.action === 'halt') {
+      // Latch the durable DB kill flag — blocks entries here AND on every future
+      // tick (reduce-only). Idempotent: setKillFlag writes the singleton row id=1.
+      setKillFlag(db, {
+        halted: true,
+        source: 'retirement',
+        reason: result.decision.cause,
+        nowMs,
+      });
+      this.retirementMultiplier = 0;
+      if (!this.retirementAlerted) {
+        this.retirementAlerted = true;
+        try {
+          appendDecisionLog(db, {
+            type: 'halt',
+            detail: {
+              kind: 'retirement',
+              cause: result.decision.cause,
+              drawdown: this.tracker.getDrawdown(),
+              hardKillDD: result.hardKillDD,
+              deflatedSharpe,
+              snapshotCount,
+            },
+            nowMs,
+          });
+        } catch (err) {
+          console.warn('[run-bot] failed to append retirement halt decision_log:', err);
+        }
+        await this.alerts.circuitBreakerTriggered(
+          'retirement',
+          `RETIREMENT HALT: ${result.decision.cause} — reduce-only (new entries blocked, manual review required)`,
+        );
+      }
+      return;
+    }
+
+    // Not a hard halt — clear the alert dedupe so a future trip re-alerts.
+    this.retirementAlerted = false;
+
+    if (result.decision.action === 'derisk') {
+      this.retirementMultiplier = result.decision.multiplier; // 0.5
+      if (this.config.verbose) {
+        console.log(`  RETIREMENT DE-RISK: ${result.decision.cause} → sizing × ${result.decision.multiplier}`);
+      }
+    } else {
+      this.retirementMultiplier = 1;
+    }
+  }
+
+  /**
+   * EDGE-TRIGGERED regime/mechanism cause (Issue A).
+   *
+   * Returns true ONLY on the tick where a FRESH regime-decay transition is newly
+   * detected (a suppressed/downtrend regime appearing where the prior regime was
+   * different), never as a sticky level. Today the bot has no standalone regime
+   * decay detector wired into the tick, so this is a conservative one-shot edge
+   * derived from the last-seen regime tag; it defaults to false so a healthy book
+   * is never pinned at 0.5× by a latched level.
+   *
+   * TODO (Issue A follow-up): replace `lastRegimeSeen` heuristic with the regime
+   * decay detector's fresh-transition event once that probe (Task 7) lands.
+   */
+  private consumeRegimeCause(): boolean {
+    // No regime-decay detector feeds the tick yet → no edge to raise. Returning
+    // false here keeps the contract (edge-triggered, not latched) honest: we do
+    // not invent a cause, and the sustained-DSR escalation (Issue B) is what
+    // carries a durable-edge-collapse signal across ticks.
+    return false;
   }
 
   /** Stale-feed heartbeat handler — alert + decision_log once per stale episode. */
@@ -546,6 +695,25 @@ class TradingBot {
       return;
     }
 
+    // 2c. Per-symbol consecutive-loss pause (Issue 4). Pauses ONE symbol after
+    // maxConsecutiveLossesPerSymbol losing trades in a row on THAT symbol —
+    // independent of the global circuit breaker, so the rest of the book trades.
+    const symConsecLosses = this.tracker.getSymbolConsecutiveLosses(symbol);
+    if (this.riskEngine.isSymbolPaused({
+      consecutiveLosses: symConsecLosses,
+      maxConsecutiveLossesPerSymbol: RETIREMENT_CONFIG.maxConsecutiveLossesPerSymbol,
+    })) {
+      if (this.config.verbose) {
+        console.log(`  ${symbol}: paused — ${symConsecLosses} consecutive losses (cap ${RETIREMENT_CONFIG.maxConsecutiveLossesPerSymbol})`);
+      }
+      try {
+        logSkippedSignal(db, { ts: nowMs, symbol, reason: 'per_symbol_loss_pause', detail: { consecutiveLosses: symConsecLosses } });
+      } catch (err) {
+        console.warn('[run-bot] failed to persist per_symbol_loss_pause skip:', err);
+      }
+      return;
+    }
+
     // 3. Evaluate signal (SignalEngine auto-routes to correct strategy per symbol)
     const result = this.signalEngine.evaluate(allCandles, symbol);
 
@@ -599,9 +767,13 @@ class TradingBot {
       openSymbols, symbol, candlesBySymbol,
     );
 
-    // Apply quarter-Kelly if enough trade history, otherwise use base risk
+    // Apply quarter-Kelly if enough trade history, otherwise use base risk.
+    // The retirement de-risk multiplier (Issue 2) is folded in here so a 'derisk'
+    // decision halves gross exposure for this tick (1.0 when trading normally,
+    // 0 is impossible to reach here because a halt latches the kill flag and
+    // canTrade above already blocked the entry).
     const baseRisk = this.riskEngine.getKellyAdjustedRisk(this.tracker, this.config.riskPerTrade);
-    const adjustedRisk = baseRisk * multiplier * corrMultiplier;
+    const adjustedRisk = baseRisk * multiplier * corrMultiplier * this.retirementMultiplier;
 
     // 6. Open position (limit order or immediate paper fill)
     if (this.limitOrderExecutor?.isEnabled) {

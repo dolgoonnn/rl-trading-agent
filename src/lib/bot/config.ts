@@ -200,6 +200,13 @@ export const SAFETY_GATE_CONFIG: SafetyGateConfig = {
  *   hardKillDD = 1.5·max(E[MaxDD], bootstrapP5DD)             (≈0.291 here)
  * Both are far below the raw in-sample 63.3% — we do NOT cut at that depth.
  *
+ * NOTE (Issue C): `bootstrapP5DD = 0.10` is a PLACEHOLDER. The real value is the
+ * bootstrap MaxDD 5th-percentile produced by the Monte-Carlo validation run
+ * (`scripts/validate-monte-carlo.ts` → `src/lib/rl/utils/monte-carlo.ts`). Today
+ * E[MaxDD] (≈0.194) dominates the `max()` so hardKillDD is insensitive to this
+ * placeholder, but it MUST be wired from the funding-net MC bootstrap before the
+ * bootstrap leg can ever bind. TODO: replace 0.10 with the MC bootstrap p5 MaxDD.
+ *
  * - minAcceptableSharpe 0.5 → the deflated-Sharpe benchmark `c` (NOT zero): a
  *   0.3 rolling Sharpe at 100 trials must reduce sizing where raw-Sharpe didn't.
  * - minTrackRecordLength 50 → until this many live observations accrue, the DSR
@@ -221,6 +228,10 @@ export const RETIREMENT_CONFIG: RetirementConfig = {
   maxConsecutiveLossesPerSymbol: 4,
   heartbeatTimeoutMs: 7_200_000,
   charterBreachK: 3,
+  // dsrBreachK 3 → three consecutive sub-floor deflated-Sharpe checks (each with
+  // n >= MinTRL) escalate the DSR layer to a HARD halt even without a regime
+  // cause. One reading is noise; three sustained breaches are an edge collapse.
+  dsrBreachK: 3,
 };
 
 // ============================================

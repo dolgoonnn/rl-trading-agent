@@ -87,13 +87,37 @@ export interface RetirementHaltInputs {
   /** PSR threshold (e.g. 0.95). Kept for config symmetry; DSR>c is the gate. */
   psr: number;
 
-  /** A corroborating regime/mechanism cause is present (e.g. regime decay). */
+  /**
+   * A corroborating regime/mechanism cause is present (e.g. regime decay).
+   *
+   * CONTRACT (Issue A): this MUST be an EDGE-TRIGGERED signal — i.e. true ONLY on
+   * the tick where a FRESH regime-decay / mechanism-break is newly detected, NOT
+   * a level-latched boolean that stays true for the whole episode. A latched
+   * level would pin an otherwise-healthy book at 0.5× (or hard-halt under a
+   * confluence) forever after a single transient regime blip. The caller derives
+   * it from a recent detection (a one-shot transition), and the sustained-DSR
+   * escalation below (dsrBreachConsecutive) is what carries the "this is durable"
+   * signal across ticks — NOT a sticky regimeCause.
+   */
   regimeCause: boolean;
 
   /** Consecutive checks the cumulative PnL has been below the charter p5 path. */
   charterBreachConsecutive: number;
   /** k — consecutive breaches that escalate yellow → red (hard halt). */
   charterBreachK: number;
+
+  /**
+   * Consecutive checks the deflated Sharpe has been below `minAcceptableSharpe`
+   * WHILE the track record is long enough (snapshotCount >= MinTRL). Counts the
+   * CURRENT check too. Defaults to 0 when the caller does not track it (back-compat).
+   */
+  dsrBreachConsecutive?: number;
+  /**
+   * k — consecutive sub-floor DSR breaches (n >= MinTRL each) that escalate the
+   * DSR layer to a HARD halt even WITHOUT a regime cause. <= 0 disables the
+   * sustained-DSR escalation (back-compat default).
+   */
+  dsrBreachK?: number;
 }
 
 /**
@@ -123,6 +147,8 @@ export function checkRetirementHalt(inputs: RetirementHaltInputs): RetirementDec
     regimeCause,
     charterBreachConsecutive,
     charterBreachK,
+    dsrBreachConsecutive = 0,
+    dsrBreachK = 0,
   } = inputs;
 
   // 1. ABSOLUTE drawdown stop — unconditional HARD (ignores MinTRL).
@@ -157,6 +183,25 @@ export function checkRetirementHalt(inputs: RetirementHaltInputs): RetirementDec
     return {
       action: 'halt',
       cause: `DSR conclusive: deflated Sharpe < c=${minAcceptableSharpe} (n=${snapshotCount} >= MinTRL=${minTRL}) + regime cause`,
+      multiplier: 0,
+    };
+  }
+
+  // 3b. SUSTAINED-DSR hard halt (Issue B) — k consecutive sub-floor DSR checks,
+  // each with n >= MinTRL, escalate to RED even WITHOUT a regime cause. This
+  // mirrors the charter-path yellow→red escalation: one sub-floor reading is
+  // noise (handled as a single Layer-2 de-risk below), but a SUSTAINED breach is
+  // a conclusive edge collapse. We still require the MinTRL gate so we never
+  // hard-cut on a short, noisy track record.
+  if (
+    dsrInsignificant &&
+    snapshotCount >= minTRL &&
+    dsrBreachK > 0 &&
+    dsrBreachConsecutive >= dsrBreachK
+  ) {
+    return {
+      action: 'halt',
+      cause: `sustained DSR breach: deflated Sharpe < c=${minAcceptableSharpe} for ${dsrBreachConsecutive} consecutive checks (>= dsrBreachK=${dsrBreachK}, n=${snapshotCount} >= MinTRL=${minTRL})`,
       multiplier: 0,
     };
   }
@@ -203,4 +248,149 @@ export function checkRetirementHalt(inputs: RetirementHaltInputs): RetirementDec
 
   // 5. All clear.
   return { action: 'trade', cause: 'all clear', multiplier: 1 };
+}
+
+// ===========================================================================
+// Runtime wiring helpers (PURE / DI) — called once per live tick.
+// ===========================================================================
+
+import type { KillFlag } from './kill-switch';
+
+/**
+ * EFFECTIVE kill flag for a tick (Issue 1, PRIORITY 2).
+ *
+ * A LATCHED kill flag (file/env/DB, incl. the retirement latch) always wins. If
+ * nothing is latched but the data feed is STALE, we synthesize a TRANSIENT
+ * heartbeat kill that blocks NEW entries while the feed is wedged. This transient
+ * gate is NOT persisted via setKillFlag: a stale feed is an operational condition
+ * that auto-resumes the moment fresh data arrives (the next tick recomputes
+ * `heartbeat.stale = false` and entries resume). Open-position management is
+ * unaffected — the gate only blocks opening, never closing (reduce-only).
+ *
+ * Rationale for transient (documented decision): unlike an edge collapse, a wedged
+ * feed is self-clearing. Latching it would force a manual reset after every
+ * exchange hiccup. The latched sources remain the durable halts; heartbeat is the
+ * one acceptable transient gate.
+ */
+export function resolveEffectiveKill(
+  killFlag: KillFlag,
+  heartbeat: { stale: boolean; reason: string },
+): KillFlag {
+  if (killFlag.halted) return killFlag;
+  if (heartbeat.stale) {
+    return { halted: true, source: 'heartbeat', reason: heartbeat.reason };
+  }
+  return killFlag;
+}
+
+/**
+ * Advance the sustained-DSR breach counter (Issue B, PRIORITY 5).
+ *
+ * Increments while the deflated Sharpe is conclusively below the floor (with the
+ * MinTRL gate satisfied); resets to 0 the moment a check clears (or the track
+ * record is too short). Edge-triggered escalation lives in `checkRetirementHalt`
+ * via `dsrBreachConsecutive >= dsrBreachK`.
+ */
+export function nextDsrBreachCounter(args: {
+  prev: number;
+  dsrInsignificant: boolean;
+  snapshotCount: number;
+  minTrackRecordLength: number;
+}): number {
+  const { prev, dsrInsignificant, snapshotCount, minTrackRecordLength } = args;
+  if (dsrInsignificant && snapshotCount >= minTrackRecordLength) {
+    return prev + 1;
+  }
+  return 0;
+}
+
+/** Per-tick retirement evaluation inputs (REAL values, gathered by the caller). */
+export interface RetirementTickInputs {
+  nowMs: number;
+  /** Current drawdown from peak (fraction). */
+  drawdown: number;
+  /** Rolling DEFLATED Sharpe on a PER-OBSERVATION scale (null ⇒ cold start). */
+  deflatedSharpe: number | null;
+  /** Number of live return observations backing the deflated Sharpe. */
+  snapshotCount: number;
+  /** Edge-triggered regime/mechanism cause (fresh detection only — see contract). */
+  regimeCause: boolean;
+  /** Consecutive charter-p5 breaches (caller-tracked). */
+  charterBreachConsecutive: number;
+  /** Prior sustained-DSR breach counter (caller-tracked, persisted in memory). */
+  dsrBreachConsecutive: number;
+  /** Frozen-at-deploy retirement parameters. */
+  config: {
+    sigmaAnnual: number;
+    sharpe: number;
+    horizonYears: number;
+    bootstrapP5DD: number;
+    minAcceptableSharpe: number;
+    psr: number;
+    minTrackRecordLength: number;
+    charterBreachK: number;
+    dsrBreachK: number;
+  };
+}
+
+export interface RetirementTickResult {
+  decision: RetirementDecision;
+  /** Updated sustained-DSR breach counter to carry into the next tick. */
+  dsrBreachConsecutive: number;
+  /** Derived hard-kill drawdown threshold (for logging/alerting). */
+  hardKillDD: number;
+}
+
+/**
+ * One-shot per-tick retirement evaluation (Issue 2, PRIORITY 1).
+ *
+ * Takes a PRE-DEFLATED, per-observation Sharpe (Issue D — the caller deflates on
+ * the observation scale and passes T = observation count via `snapshotCount`),
+ * derives the frozen hardKillDD, advances the sustained-DSR counter, and returns
+ * the confluence halt decision. PURE: no DB, no clock, no fetch — the live tick
+ * does the IO (read drawdown/snapshots, then setKillFlag / apply multiplier).
+ */
+export function evaluateRetirementHalt(inputs: RetirementTickInputs): RetirementTickResult {
+  const { config } = inputs;
+  const eMaxDD = expectedMaxDD({
+    sigmaAnnual: config.sigmaAnnual,
+    sharpe: config.sharpe,
+    horizonYears: config.horizonYears,
+  });
+  const hkDD = hardKillDD({ eMaxDD, bootstrapP5DD: config.bootstrapP5DD });
+
+  const dsrInsignificant =
+    inputs.deflatedSharpe !== null && inputs.deflatedSharpe < config.minAcceptableSharpe;
+
+  const dsrBreachConsecutive = nextDsrBreachCounter({
+    prev: inputs.dsrBreachConsecutive,
+    dsrInsignificant,
+    snapshotCount: inputs.snapshotCount,
+    minTrackRecordLength: config.minTrackRecordLength,
+  });
+
+  // The per-observation deflated Sharpe is computed by the caller. We pass it
+  // straight through as `rollingSharpe` and zero the trialCount so the internal
+  // deflation (which would haircut a second time) is a no-op: with numTrials <= 1
+  // `calculateHaircut` returns 0, so `deflatedSharpe === rollingSharpe`. This is
+  // how `checkRetirementHalt` consumes an already-deflated input on one scale.
+  const decision = checkRetirementHalt({
+    nowMs: inputs.nowMs,
+    drawdown: inputs.drawdown,
+    eMaxDD,
+    hardKillDD: hkDD,
+    rollingSharpe: inputs.deflatedSharpe,
+    trialCount: 1, // already deflated by the caller — no second haircut
+    snapshotCount: inputs.snapshotCount,
+    minTrackRecordLength: config.minTrackRecordLength,
+    minAcceptableSharpe: config.minAcceptableSharpe,
+    psr: config.psr,
+    regimeCause: inputs.regimeCause,
+    charterBreachConsecutive: inputs.charterBreachConsecutive,
+    charterBreachK: config.charterBreachK,
+    dsrBreachConsecutive,
+    dsrBreachK: config.dsrBreachK,
+  });
+
+  return { decision, dsrBreachConsecutive, hardKillDD: hkDD };
 }

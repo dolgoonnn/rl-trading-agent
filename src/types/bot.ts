@@ -168,6 +168,13 @@ export interface RetirementConfig {
   heartbeatTimeoutMs: number;
   /** Consecutive charter-p5 breaches that escalate yellow → red (hard halt). */
   charterBreachK: number;
+  /**
+   * Consecutive DSR-below-floor checks (with n >= MinTRL) that escalate the
+   * deflated-Sharpe layer to a HARD halt even WITHOUT a corroborating regime
+   * cause (mirrors the charter-path yellow→red escalation). A single sub-floor
+   * DSR reading is noisy; `dsrBreachK` sustained breaches make it conclusive.
+   */
+  dsrBreachK: number;
 }
 
 // ============================================
