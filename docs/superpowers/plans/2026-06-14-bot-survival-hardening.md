@@ -80,7 +80,7 @@
 - [ ] **Step 5 — `pnpm typecheck && pnpm lint`.**
 - [ ] **Step 6 — Commit:** `gmp "add pre-trade safety gate: notional cap, stop floor, mark collar, stale-candle guard" feat backend`
 
-## Task 2: Migration 0004 — additive schema (shared keystone)
+## Task 2: Migration 0004 — additive schema (shared keystone) — ✅ DONE (`9ce61e5`, 10/10 tests)
 
 **Plan group:** PLAN-B/C/D shared. **Depends on:** none structurally (build before Tasks 3–9 that persist).
 
