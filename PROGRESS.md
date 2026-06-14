@@ -20,8 +20,12 @@
 - If a task is genuinely blocked (needs a human decision or external resource), mark it `BLOCKED` with the reason, skip to the next task — do not spin.
 
 ## Pointer
-**NEXT:** Task 9 (PROBE: extend ATR-stop counterfactual with chandelier + vertical-barrier arms + PER-ARM funding debit on the same Run-20 trade log). DIAGNOSTIC only — a winning arm must survive WF/PBO before any live exit change. Then → RESEARCH phase.
+**NEXT:** RESEARCH PHASE (all 9 build tasks done). First item: funding/basis carry sleeve net-of-cost feasibility, grounded in BIS WP 1087 (structural risk-premium = strongest mechanism prior). Ground in the paper FIRST, then backtest on data/*_futures_1h.json, save knowledge to experiments/ even on null.
 **Task 8 result:** GATE PASS — Run-20 survives funding (net WF 64.9%, +262.4% PnL, drag −1.96bps/trade). Risk #2 closed.
+**Task 9 result:** NULL — no exit arm (chandelier/vertical-barrier) beats Run-20 partial_tp net-of-funding → exits already near-optimal.
+
+## 🏁 MILESTONE: survival-hardening plan complete (9/9 tasks, branch ftr/overnight-bot-hardening)
+Commits ffc3676(checkpoint) → 7e638c2 → 9ce61e5 → f14241d → 66227c8 → 954a03d → c7f7544 → fc6b283 → 6c87f39 → 31346c6 → e2581e7 → 1100e5a → 87e65c8 (+ doc commits). Adversarial review caught 3 real defects single-pass would have shipped: frictionReturn=0; kill-switch automatic halts unwired (dead code); CPPI fed backtest not live equity. All TDD, ~all green, 0 net-new typecheck errors (baseline 228).
 **Carried TODOs into Task 7+:** `consumeRegimeCause()` returns false until a regime-decay detector feeds it (Task 7); `bootstrapP5DD=0.10` placeholder → wire from validate-monte-carlo; `charterBreachConsecutive` needs a real charter p5-path feed.
 **Task 5b spec (from 2-lens adversarial review of 5a):**
 - HIGH: `checkRetirementHalt`/`setKillFlag` are never called at runtime → wire into run-bot tick: on `halt` → `setKillFlag(source:'retirement')` + decision_log + alert; on `derisk` → apply sizing multiplier. (Issue 2)
@@ -46,8 +50,8 @@
 - [x] Task 6 — Risk Hardening ✅ `31346c6` (38 risk tests; adversarial review confirmed no look-ahead + caught CPPI fed backtest-equity → fixed to LIVE equity, + band stand-down-to-zero fix)
 - [x] Task 7 — Tradeability + regime re-fit ✅ `e2581e7` (15 tests; L2 checkTradeability reject, getOrderbook, charter-cadence refit proposal (no auto-apply), score-reliability diagnostic with isolation guardrail)
 - [x] Task 8 — PROBE funding-charged backtest ✅ `1100e5a` (GATE PASS: Run-20 survives funding, net WF 64.9%, +262.4% PnL, −1.96bps/trade; grounded in Bybit funding mechanics; experiments/funding-cost.md)
-- [ ] Task 9 — PROBE ATR-stop arms
-- [ ] Research phase (continuous after Task 9)
+- [x] Task 9 — PROBE ATR-stop arms ✅ `87e65c8` (NULL: no arm beats baseline net-of-funding; Run-20 exits near-optimal; 8 tests, cites LdP triple-barrier)
+- [~] Research phase (continuous) — IN PROGRESS, first: funding-carry feasibility
 
 ## Decisions log
 - Execution mode = **PAPER forward** (live prices, simulated fills). Real-money/testnet is a separate gated decision (assumed; user did not pick live).
@@ -92,3 +96,4 @@ _(append one line per loop iteration: timestamp · task · result · commit)_
 - 2026-06-14 · Task 6 Risk hardening · src/lib/risk/sizing.ts (vol-target, no-trade band, fractional-Kelly off rolling DSR, CPPI); review: no look-ahead, fixed CPPI→live equity + band stand-down; 38 risk tests · `31346c6`
 - 2026-06-14 · Task 7 Tradeability+regime · checkTradeability L2 reject + getOrderbook, charter-cadence refit proposal (no auto-apply), score-reliability diagnostic (sizing-isolation proven), 15 tests · `e2581e7`
 - 2026-06-14 · Task 8 Funding-cost PROBE · funding wired into backtest (default off) via Task-4a ledger; Run-20 SURVIVES (net WF 64.9% > 60%, +262.4% PnL, drag −1.96bps/trade); maker/taker split; 25 cost tests · `1100e5a`
+- 2026-06-14 · Task 9 ATR-stop arms PROBE · chandelier + vertical-barrier + per-arm funding debit on Run-20 log; NULL (no arm beats baseline net-of-funding); 8 tests · `87e65c8`
