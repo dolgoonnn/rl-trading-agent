@@ -20,7 +20,7 @@
 - If a task is genuinely blocked (needs a human decision or external resource), mark it `BLOCKED` with the reason, skip to the next task — do not spin.
 
 ## Pointer
-**NEXT:** Task 7 (Tradeability gate L2 spread/depth reject + charter-cadence regime re-fit script + score-reliability DIAGNOSTIC). Key guardrail: a test must prove sizing is INDEPENDENT of the score-reliability curve (diagnostic only, never wired into sizing).
+**NEXT:** Task 8 (PROBE: charge funding in backtest-confluence via the Task-4a ledger, RE-RUN Run-20 net-of-funding). HARD GATE: WF stays >60% AND net PnL clearly positive. If it FAILS, do NOT patch — flag Run-20 re-opened (this is risk #2). Ground in Bybit funding mechanics; compare net-WF to published 69.7% gross; write up experiments/funding-cost.md.
 **Carried TODOs into Task 7+:** `consumeRegimeCause()` returns false until a regime-decay detector feeds it (Task 7); `bootstrapP5DD=0.10` placeholder → wire from validate-monte-carlo; `charterBreachConsecutive` needs a real charter p5-path feed.
 **Task 5b spec (from 2-lens adversarial review of 5a):**
 - HIGH: `checkRetirementHalt`/`setKillFlag` are never called at runtime → wire into run-bot tick: on `halt` → `setKillFlag(source:'retirement')` + decision_log + alert; on `derisk` → apply sizing multiplier. (Issue 2)
@@ -43,7 +43,7 @@
 - [x] Task 5a — Kill-switch core (manual flag + pure halt logic) ✅ `fc6b283` (46 tests; 2-lens adversarial review confirmed manual flag correct, found automatic-halt wiring missing → 5b)
 - [x] Task 5b — Wire automatic halts + heartbeat into tick loop ✅ `6c87f39` (12 end-to-end tests, 111 bot tests; tick now calls evaluateRetirement→setKillFlag, heartbeat→effectiveKill blocks entries, derisk→sizing mult, durable cap)
 - [x] Task 6 — Risk Hardening ✅ `31346c6` (38 risk tests; adversarial review confirmed no look-ahead + caught CPPI fed backtest-equity → fixed to LIVE equity, + band stand-down-to-zero fix)
-- [ ] Task 7 — Tradeability + regime re-fit
+- [x] Task 7 — Tradeability + regime re-fit ✅ `e2581e7` (15 tests; L2 checkTradeability reject, getOrderbook, charter-cadence refit proposal (no auto-apply), score-reliability diagnostic with isolation guardrail)
 - [ ] Task 8 — PROBE funding-charged backtest
 - [ ] Task 9 — PROBE ATR-stop arms
 - [ ] Research phase (continuous after Task 9)
@@ -89,3 +89,4 @@ _(append one line per loop iteration: timestamp · task · result · commit)_
 - 2026-06-14 · Task 5a Kill-switch core · manual file/DB/env latched flag (reduce-only, restart-durable) + pure retirement-halt logic + per-symbol cap, 46 tests; 2-lens adversarial review caught automatic halts unwired (→5b) · `fc6b283`
 - 2026-06-14 · Task 5b Wire automatic halts · tick→evaluateRetirement→setKillFlag latch, heartbeat→effectiveKill blocks entries, per-obs DSR scale fix, durable per-symbol cap, sustained-DSR escalation; 12 e2e tests, 111 bot tests · `6c87f39`
 - 2026-06-14 · Task 6 Risk hardening · src/lib/risk/sizing.ts (vol-target, no-trade band, fractional-Kelly off rolling DSR, CPPI); review: no look-ahead, fixed CPPI→live equity + band stand-down; 38 risk tests · `31346c6`
+- 2026-06-14 · Task 7 Tradeability+regime · checkTradeability L2 reject + getOrderbook, charter-cadence refit proposal (no auto-apply), score-reliability diagnostic (sizing-isolation proven), 15 tests · `e2581e7`
