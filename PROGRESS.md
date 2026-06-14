@@ -1,5 +1,18 @@
 # Overnight Loop Progress — Bot Survival Hardening
 
+## ⚠️ AUDIT CORRECTION (2026-06-14) — overnight "9/9 built" was ~50% scaffolding
+Deep adversarial audit (run-it-and-trace-it) found several layers TESTED-but-UNWIRED. The "tests pass" gate during the loop did NOT prove live-path wiring. Fixing with TDD + call-site verification:
+- [ ] FIX-1 per-cell review actively misleading (all-zero cells over 1728 trades, false DECAYING on ~20/21 cohorts, append-without-dedup doubled 238→476). Fix: read real P&L + per-weekOf dedup.
+- [ ] FIX-2 wire checkPreTradeGuards (mark collar + stale-candle + crossed-candle) + L2 tradeability into openPosition — currently ZERO live callers (only computePositionSize runs).
+- [ ] FIX-3 inert halt legs: consumeRegimeCause()=false, charterBreachConsecutive never incremented → 2 legs can never fire. Make honest (explicit-disable + assert live set) or wire.
+- [ ] FIX-4 live closePosition gets no funding series → live fundingReturn=0 (sim/live mismatch); de-tautologize ledger invariant.
+- [ ] FIX-5 replay-bot db.delete(botTrades) runs in DEFAULT paper mode against the forward DB — guard it.
+- [ ] FIX-6 failing test retirement-halt.test.ts:398 (getRollingDeflatedSharpe -Infinity not null on cold).
+- [ ] FIX-7 gold F2F sleeve has zero safety wiring (kill/halt) — wire or document unguarded.
+WHAT GENUINELY WORKS (verified): boot→migrate→tick→persist; latched kill-switch; absolute-DD (29.93%) + sustained-DSR halts; computePositionSize notional cap+stop floor; migration 0004; append-only decision-log; hourly snapshots.
+
+
+
 **Session start:** 2026-06-14
 **Branch:** `ftr/overnight-bot-hardening` (checkpoint commit `ffc3676`)
 **Plan:** `docs/superpowers/plans/2026-06-14-bot-survival-hardening.md`
