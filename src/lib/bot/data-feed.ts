@@ -9,7 +9,7 @@
 import { RestClientV5 } from 'bybit-api';
 import { eq, and, desc } from 'drizzle-orm';
 import type { Candle } from '@/types/candle';
-import type { BotSymbol } from '@/types/bot';
+import type { BotSymbol, OrderbookSnapshot } from '@/types/bot';
 import { db } from '@/lib/data/db';
 import { botCandles } from '@/lib/data/schema';
 import { BYBIT_CATEGORY, BYBIT_INTERVAL } from './config';
@@ -29,10 +29,18 @@ const BYBIT_MAX_LIMIT = 200;
 /** Mark-price cache TTL (ms) — avoid hammering the tickers endpoint on each tick */
 const MARK_PRICE_CACHE_MS = 5_000;
 
+/** Orderbook cache TTL (ms) — same 5s pattern as the mark-price cache. */
+const ORDERBOOK_CACHE_MS = 5_000;
+
+/** Top-N order-book levels summed for the tradeability depth check. */
+const ORDERBOOK_DEPTH_LEVELS = 10;
+
 export class DataFeed {
   private client: RestClientV5;
   private lastTimestamps: Map<string, number> = new Map();
   private markPriceCache: Map<string, { price: number; fetchedAt: number }> = new Map();
+  private orderbookCache: Map<string, { snapshot: OrderbookSnapshot; fetchedAt: number }> =
+    new Map();
 
   /**
    * Wall-clock timestamp (ms) of the last successful feed update from the
@@ -407,5 +415,69 @@ export class DataFeed {
 
     this.markPriceCache.set(symbol, { price: markPrice, fetchedAt: nowMs });
     return markPrice;
+  }
+
+  /**
+   * Fetch the current L2 order book for a symbol via Bybit /v5/market/orderbook
+   * and summarize it for the tradeability gate.
+   *
+   * Returns `{ bid, ask, bidDepthUsdt, askDepthUsdt, spreadBps }` where the
+   * depth fields sum the top-N levels' (size × price) into USDT notional and
+   * `spreadBps = (ask - bid) / mid * 1e4`. Cached in-memory for 5s, mirroring
+   * the mark-price cache so a hot order path doesn't hammer the endpoint.
+   */
+  async getOrderbook(
+    symbol: BotSymbol,
+    nowMs: number = Date.now(),
+  ): Promise<OrderbookSnapshot> {
+    const cached = this.orderbookCache.get(symbol);
+    if (cached && nowMs - cached.fetchedAt < ORDERBOOK_CACHE_MS) {
+      return cached.snapshot;
+    }
+
+    const response = await this.client.getOrderbook({
+      category: BYBIT_CATEGORY,
+      symbol,
+      limit: ORDERBOOK_DEPTH_LEVELS,
+    });
+
+    if (response.retCode !== 0) {
+      throw new Error(
+        `Bybit API error (orderbook): ${response.retMsg} (code: ${response.retCode})`,
+      );
+    }
+
+    const book = response.result;
+    const bids = book.b ?? [];
+    const asks = book.a ?? [];
+    const bestBid = bids[0] ? parseFloat(bids[0][0]) : NaN;
+    const bestAsk = asks[0] ? parseFloat(asks[0][0]) : NaN;
+
+    if (!Number.isFinite(bestBid) || !Number.isFinite(bestAsk) || bestBid <= 0 || bestAsk <= 0) {
+      throw new Error(`Invalid orderbook for ${symbol}: bid=${bestBid} ask=${bestAsk}`);
+    }
+
+    const mid = (bestBid + bestAsk) / 2;
+    const spreadBps = ((bestAsk - bestBid) / mid) * 1e4;
+
+    // Depth in USDT: sum (size × price) over the top-N levels on each side.
+    const sumDepthUsdt = (levels: [string, string][]): number =>
+      levels.reduce((acc, [priceStr, sizeStr]) => {
+        const price = parseFloat(priceStr);
+        const size = parseFloat(sizeStr);
+        if (!Number.isFinite(price) || !Number.isFinite(size)) return acc;
+        return acc + price * size;
+      }, 0);
+
+    const snapshot: OrderbookSnapshot = {
+      bid: bestBid,
+      ask: bestAsk,
+      bidDepthUsdt: sumDepthUsdt(bids),
+      askDepthUsdt: sumDepthUsdt(asks),
+      spreadBps,
+    };
+
+    this.orderbookCache.set(symbol, { snapshot, fetchedAt: nowMs });
+    return snapshot;
   }
 }

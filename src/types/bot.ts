@@ -129,7 +129,38 @@ export type RejectReason =
   | 'max_notional'
   | 'mark_deviation'
   | 'stale_candle'
-  | 'crossed_candle';
+  | 'crossed_candle'
+  | 'l2_tradeability';
+
+/**
+ * Configuration for the L2 tradeability gate (live/paper bot only).
+ *
+ * Contract: an order is REJECTED when the order book is illiquid relative to
+ * the intended position. `depthMultiple` is a multiple of intended notional —
+ * we require `depthUsdt >= depthMultiple * intendedNotionalUsdt` of resting
+ * liquidity on the side we'd cross (top-N levels). Defaults are tuned for
+ * majors (BTC/ETH/SOL) where book depth is deep.
+ */
+export interface TradeabilityConfig {
+  /** Max allowed spread in basis points (e.g. 5 = 0.05%). */
+  maxSpreadBps: number;
+  /** Required top-N depth as a multiple of intended notional (e.g. 2 = 2×). */
+  depthMultiple: number;
+}
+
+/** An L2 order-book snapshot summarized for the tradeability gate. */
+export interface OrderbookSnapshot {
+  /** Best bid price. */
+  bid: number;
+  /** Best ask price. */
+  ask: number;
+  /** USDT depth resting on the bid side (sum of top-N levels × price). */
+  bidDepthUsdt: number;
+  /** USDT depth resting on the ask side (sum of top-N levels × price). */
+  askDepthUsdt: number;
+  /** (ask - bid) / mid * 1e4. */
+  spreadBps: number;
+}
 
 /** Result of a sizing/guard computation — discriminated on `ok` */
 export type GuardResult =

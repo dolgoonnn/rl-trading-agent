@@ -18,9 +18,9 @@ import type {
   ExitReason,
 } from '@/types/bot';
 import type { ScoredSignal } from '@/lib/rl/strategies/confluence-scorer';
-import type { StrategyConfig } from '@/types/bot';
-import { SYMBOL_ALLOCATION, SAFETY_GATE_CONFIG } from './config';
-import { computePositionSize } from './guards';
+import type { StrategyConfig, OrderbookSnapshot } from '@/types/bot';
+import { SYMBOL_ALLOCATION, SAFETY_GATE_CONFIG, TRADEABILITY_CONFIG } from './config';
+import { computePositionSize, checkTradeability } from './guards';
 import type { RejectReason } from '@/types/bot';
 
 // ============================================
@@ -93,6 +93,9 @@ export class OrderManager {
    * @param equity Current equity for position sizing
    * @param riskPerTrade Risk fraction per trade
    * @param barIndex Current bar index (for tracking)
+   * @param orderbook Optional L2 snapshot. When provided (LIVE path), the
+   *   tradeability gate runs; when omitted (tests/backtest), it is skipped so the
+   *   Run-20 edge measurement is unaffected.
    * @returns The new position, or null if position cannot be created
    */
   openPosition(
@@ -101,6 +104,7 @@ export class OrderManager {
     equity: number,
     riskPerTrade: number,
     barIndex: number,
+    orderbook?: OrderbookSnapshot,
   ): BotPosition | null {
     const { entryPrice, stopLoss, takeProfit, direction, strategy } = signal.signal;
     const config = this.getConfig(symbol);
@@ -141,6 +145,36 @@ export class OrderManager {
     }
     const riskAmount = equity * riskPerTrade * symbolAlloc;
     const positionSizeUSDT = sizing.notionalUsdt;
+
+    // OPTIONAL L2 tradeability gate (LIVE-only): only runs when a real order-book
+    // snapshot is injected. Cross the ASK on a long, the BID on a short, so the
+    // depth we need is on the side we'd actually take.
+    if (orderbook) {
+      const depthUsdt = direction === 'long' ? orderbook.askDepthUsdt : orderbook.bidDepthUsdt;
+      const tradeable = checkTradeability({
+        spreadBps: orderbook.spreadBps,
+        depthUsdt,
+        intendedNotionalUsdt: positionSizeUSDT,
+        maxSpreadBps: TRADEABILITY_CONFIG.maxSpreadBps,
+        depthMultiple: TRADEABILITY_CONFIG.depthMultiple,
+      });
+      if (!tradeable.ok) {
+        console.warn(`[guards] openPosition rejected ${symbol}: ${tradeable.reason}`);
+        this.emitSkip({
+          symbol,
+          reason: tradeable.reason,
+          signalEntry: adjustedEntry,
+          score: signal.totalScore,
+          detail: {
+            path: 'openPosition',
+            spreadBps: orderbook.spreadBps,
+            depthUsdt,
+            intendedNotionalUsdt: positionSizeUSDT,
+          },
+        });
+        return null;
+      }
+    }
 
     const position: BotPosition = {
       id: uuidv4(),

@@ -72,6 +72,21 @@ export const DEFAULT_REGIME_CONFIG: RegimeDetectorConfig = {
   diPeriod: 14,
 };
 
+/**
+ * The volatility (ATR-percentile) breakpoints currently deployed in the regime
+ * detector, exposed READ-ONLY so the charter-cadence re-fit script can compute a
+ * proposed diff without reaching into the config object. Returns a fresh frozen
+ * copy each call — callers cannot mutate the live thresholds through it.
+ */
+export function getDeployedVolatilityThresholds(
+  config: RegimeDetectorConfig = DEFAULT_REGIME_CONFIG,
+): Readonly<{ lowVolatilityPercentile: number; highVolatilityPercentile: number }> {
+  return Object.freeze({
+    lowVolatilityPercentile: config.lowVolatilityPercentile,
+    highVolatilityPercentile: config.highVolatilityPercentile,
+  });
+}
+
 // ============================================
 // Core Detection
 // ============================================

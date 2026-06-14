@@ -16,6 +16,7 @@ import type {
   LTFConfig,
   SafetyGateConfig,
   RetirementConfig,
+  TradeabilityConfig,
 } from '@/types/bot';
 import type { FundingArbConfig } from '@/types/funding-arb';
 
@@ -186,6 +187,24 @@ export const SAFETY_GATE_CONFIG: SafetyGateConfig = {
   minStopPct: 0.001,
   maxDeviationBps: 50,
   maxCandleAgeMs: 5_400_000,
+};
+
+// ============================================
+// L2 Tradeability Gate (live/paper bot only)
+// ============================================
+
+/**
+ * L2 order-book reject thresholds for majors (BTC/ETH/SOL).
+ * - maxSpreadBps 5 (0.05%) → reject when the bid/ask spread is wider than 5 bps.
+ * - depthMultiple 2        → require 2× the intended notional resting in the
+ *   top-10 levels on the side we'd cross, so a market order can't move the book.
+ *
+ * Live-only: a real L2 snapshot is injected at the order path; tests/backtest
+ * pass no snapshot, so the gate is skipped (it must not shift the Run-20 edge).
+ */
+export const TRADEABILITY_CONFIG: TradeabilityConfig = {
+  maxSpreadBps: 5,
+  depthMultiple: 2,
 };
 
 // ============================================
