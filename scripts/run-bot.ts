@@ -39,6 +39,8 @@ import {
   DEFAULT_FUNDING_ARB_CONFIG,
 } from '../src/lib/bot';
 import { LTFConfirmation } from '../src/lib/bot/ltf-confirmation';
+import type { LiveGuardInputs } from '../src/lib/bot/order-manager';
+import { computePositionSize } from '../src/lib/bot/guards';
 import { shouldSnapshot } from '../src/lib/bot/snapshot';
 import { logSkippedSignal, appendDecisionLog } from '../src/lib/bot/decision-log';
 import { isKilled, setKillFlag, type KillFlag } from '../src/lib/bot/kill-switch';
@@ -46,7 +48,7 @@ import {
   evaluateRetirementHalt,
   resolveEffectiveKill,
 } from '../src/lib/bot/retirement';
-import { RETIREMENT_CONFIG } from '../src/lib/bot/config';
+import { RETIREMENT_CONFIG, SAFETY_GATE_CONFIG, SYMBOL_ALLOCATION } from '../src/lib/bot/config';
 import { db } from '../src/lib/data/db';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import type { BotConfig, BotSymbol, BotPosition, LTFConfig } from '../src/types/bot';
@@ -622,6 +624,57 @@ class TradingBot {
     }
   }
 
+  /**
+   * Fetch the LIVE pre-trade guard inputs (mark price + L2 orderbook) at
+   * INTENDED-ENTRY time — called only right before an entry would open, never
+   * every tick, so the tickers/orderbook endpoints aren't hammered (both feeds
+   * are 5s-cached in DataFeed regardless).
+   *
+   * FAIL SAFE: if either fetch throws or returns a bad value we log + return
+   * `null`, and the caller SKIPS the entry rather than entering blind. The
+   * built signal candle is the latest closed candle (the same bar that produced
+   * the signal), and `nowMs` is injected so the guard is deterministic.
+   */
+  private async fetchLiveGuardInputs(
+    symbol: BotSymbol,
+    signalCandle: Candle,
+    nowMs: number,
+  ): Promise<LiveGuardInputs | null> {
+    try {
+      const markPrice = await this.dataFeed.getMarkPrice(symbol, nowMs);
+      const orderbook = await this.dataFeed.getOrderbook(symbol, nowMs);
+      if (!Number.isFinite(markPrice) || markPrice <= 0 || !orderbook) {
+        console.warn(
+          `[run-bot] ${symbol}: invalid mark/orderbook — skipping entry (mark=${markPrice})`,
+        );
+        return null;
+      }
+      return {
+        orderbook,
+        markGuard: {
+          markPrice,
+          candleHigh: signalCandle.high,
+          candleLow: signalCandle.low,
+          candleClose: signalCandle.close,
+          candleCloseMs: signalCandle.timestamp,
+          nowMs,
+        },
+      };
+    } catch (err) {
+      console.warn(
+        `[run-bot] ${symbol}: mark/orderbook fetch failed — skipping entry (fail-safe):`,
+        err,
+      );
+      return null;
+    }
+  }
+
+  /** Latest cached candle for a symbol, or null if the cache is empty. */
+  private async latestCachedCandle(symbol: BotSymbol): Promise<Candle | null> {
+    const cached = await this.dataFeed.getCachedCandles(symbol);
+    return cached.length > 0 ? cached[cached.length - 1]! : null;
+  }
+
   private async processSymbol(symbol: BotSymbol, killFlag?: KillFlag): Promise<void> {
     // Process pending limit orders first
     if (this.limitOrderExecutor?.hasPendingOrder(symbol)) {
@@ -784,9 +837,37 @@ class TradingBot {
         : result.signal.signal.stopLoss - entryPrice;
       if (riskDistance <= 0) return;
 
-      const symbolAlloc = 0.33; // Will be refined later
-      const riskAmount = this.tracker.getEquity() * adjustedRisk * symbolAlloc;
-      const qty = (riskAmount / riskDistance).toFixed(4);
+      // Route the placed qty through the SAME safety sizing as openPosition so
+      // the limit order is itself notional-capped + stop-floored (no unbounded
+      // qty = riskAmount/riskDistance). Hard-reject (max_notional) → skip + log.
+      const symbolAlloc = SYMBOL_ALLOCATION[symbol] ?? 0.33;
+      const sizing = computePositionSize({
+        equity: this.tracker.getEquity(),
+        riskPerTrade: adjustedRisk,
+        symbolAlloc,
+        riskDistance,
+        entryPrice,
+        maxNotionalPctEquity: SAFETY_GATE_CONFIG.maxNotionalPctEquity,
+        minStopPct: SAFETY_GATE_CONFIG.minStopPct,
+      });
+      if (!sizing.ok) {
+        console.warn(`  ${symbol}: LIMIT ORDER rejected — ${sizing.reason}`);
+        try {
+          logSkippedSignal(db, {
+            ts: nowMs,
+            symbol,
+            reason: sizing.reason,
+            signalEntry: entryPrice,
+            score: result.signal.totalScore,
+            regime: result.regime,
+            detail: { path: 'limitOrder', riskDistance },
+          });
+        } catch (err) {
+          console.warn('[run-bot] failed to persist limit-order sizing skip:', err);
+        }
+        return;
+      }
+      const qty = sizing.size.toFixed(4);
 
       const pending = await this.limitOrderExecutor.placeOrder(
         result.signal, symbol, qty, entryPrice,
@@ -799,17 +880,31 @@ class TradingBot {
       return;
     }
 
-    // Paper mode: immediate fill
+    // Fetch LIVE guard inputs (mark + L2 book) AT intended-entry time. Fail-safe:
+    // on fetch failure we skip the entry rather than enter blind.
+    const liveGuards = await this.fetchLiveGuardInputs(symbol, latestCandle, nowMs);
+    if (!liveGuards) {
+      if (this.config.verbose) {
+        console.log(`  ${symbol}: skipped entry — could not fetch mark/orderbook`);
+      }
+      return;
+    }
+
+    // Immediate fill — pre-trade guards (mark collar + stale/crossed candle) and
+    // the L2 tradeability gate run inside openPosition with these live inputs.
     const position = this.orderManager.openPosition(
       result.signal,
       symbol,
       this.tracker.getEquity(),
       adjustedRisk,
       allCandles.length - 1,
+      liveGuards,
     );
 
     if (!position) {
-      console.log(`  ${symbol}: signal detected but position creation failed`);
+      // Null here may be a guard reject (already logged to skipped_signals) or a
+      // sizing failure — either way, do not open.
+      console.log(`  ${symbol}: signal detected but position not opened (guard/sizing reject)`);
       return;
     }
 
@@ -844,7 +939,21 @@ class TradingBot {
     if (!result) return;
 
     if (result.status === 'confirmed') {
-      // Open position with LTF-tightened entry/SL
+      // Fetch LIVE guard inputs at intended-entry time (fail-safe → skip entry).
+      const nowMs = Date.now();
+      const ltfCandle = await this.latestCachedCandle(symbol);
+      if (!ltfCandle) {
+        console.log(`  ${symbol}: LTF confirmed but no cached candle — skipped`);
+        return;
+      }
+      const liveGuards = await this.fetchLiveGuardInputs(symbol, ltfCandle, nowMs);
+      if (!liveGuards) {
+        console.log(`  ${symbol}: LTF confirmed but could not fetch mark/orderbook — skipped`);
+        return;
+      }
+
+      // Open position with LTF-tightened entry/SL — pre-trade + L2 guards run
+      // inside openLTFPosition with these live inputs.
       const position = this.orderManager.openLTFPosition(
         result.signal,
         symbol,
@@ -853,6 +962,7 @@ class TradingBot {
         0, // barIndex not meaningful for LTF
         result.ltfEntry,
         result.ltfStopLoss,
+        liveGuards,
       );
 
       if (position) {
@@ -881,13 +991,25 @@ class TradingBot {
       }
     } else if (result.status === 'expired') {
       if (this.ltfConfig.onTimeout === 'fallback') {
-        // Fall back to 1H entry
+        // Fall back to 1H entry — fetch LIVE guard inputs (fail-safe → skip).
+        const nowMs = Date.now();
+        const fbCandle = await this.latestCachedCandle(symbol);
+        if (!fbCandle) {
+          console.log(`  ${symbol}: LTF fallback but no cached candle — skipped`);
+          return;
+        }
+        const liveGuards = await this.fetchLiveGuardInputs(symbol, fbCandle, nowMs);
+        if (!liveGuards) {
+          console.log(`  ${symbol}: LTF fallback but could not fetch mark/orderbook — skipped`);
+          return;
+        }
         const position = this.orderManager.openPosition(
           result.signal,
           symbol,
           this.tracker.getEquity(),
           this.config.riskPerTrade,
           0,
+          liveGuards,
         );
         if (position) {
           this.tracker.addPosition(position);
@@ -973,13 +1095,28 @@ class TradingBot {
     const result = await this.limitOrderExecutor.checkOrder(symbol, currentBarIndex);
 
     if (result.status === 'filled' && result.fillPrice) {
-      // Create position from the filled order
+      // Fetch LIVE guard inputs at fill time (fail-safe → skip opening the
+      // position; the maker order already filled so we log loudly).
+      const nowMs = Date.now();
+      const fillCandle = allCandles.length > 0 ? allCandles[allCandles.length - 1]! : null;
+      if (!fillCandle) {
+        console.warn(`  ${symbol}: LIMIT FILLED but no candle to guard — position NOT tracked`);
+        return;
+      }
+      const liveGuards = await this.fetchLiveGuardInputs(symbol, fillCandle, nowMs);
+      if (!liveGuards) {
+        console.warn(`  ${symbol}: LIMIT FILLED but mark/orderbook unavailable — position NOT tracked`);
+        return;
+      }
+
+      // Create position from the filled order — pre-trade + L2 guards run inside.
       const position = this.orderManager.openPosition(
         result.order.signal,
         symbol,
         this.tracker.getEquity(),
         result.order.riskPerTrade,
         currentBarIndex,
+        liveGuards,
       );
 
       if (position) {

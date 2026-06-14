@@ -136,12 +136,14 @@ describe('OrderManager.openPosition — optional L2 tradeability gate', () => {
     });
 
     const pos = om.openPosition(makeSignal(entry), symbol, 10_000, 0.003, 100, {
-      bid: entry - 1,
-      ask: entry + 1,
-      // wide spread → untradeable
-      spreadBps: 50,
-      bidDepthUsdt: 1_000_000,
-      askDepthUsdt: 1_000_000,
+      orderbook: {
+        bid: entry - 1,
+        ask: entry + 1,
+        // wide spread → untradeable
+        spreadBps: 50,
+        bidDepthUsdt: 1_000_000,
+        askDepthUsdt: 1_000_000,
+      },
     });
 
     expect(pos).toBeNull();
@@ -157,11 +159,13 @@ describe('OrderManager.openPosition — optional L2 tradeability gate', () => {
     });
 
     const pos = om.openPosition(makeSignal(entry), symbol, 10_000, 0.003, 100, {
-      bid: entry - 1,
-      ask: entry + 1,
-      spreadBps: 1,
-      bidDepthUsdt: 1_000_000,
-      askDepthUsdt: 1_000_000,
+      orderbook: {
+        bid: entry - 1,
+        ask: entry + 1,
+        spreadBps: 1,
+        bidDepthUsdt: 1_000_000,
+        askDepthUsdt: 1_000_000,
+      },
     });
 
     expect(pos).not.toBeNull();
