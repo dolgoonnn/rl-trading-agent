@@ -21,6 +21,12 @@ import {
   botEquitySnapshots,
 } from '@/lib/data/schema';
 import { markToMarketEquity } from './snapshot';
+import { RUN20_STRATEGY_CONFIG } from './config';
+import {
+  fundingReturn as computeFundingReturn,
+  decomposeReturn,
+  type FundingSettlementSeries,
+} from '@/lib/cost/funding-ledger';
 
 export class PositionTracker {
   private state: BotState;
@@ -148,8 +154,18 @@ export class PositionTracker {
     }).where(eq(botPositions.id, position.id)).run();
   }
 
-  /** Close a position and record the trade */
-  closePosition(position: BotPosition): void {
+  /**
+   * Close a position and record the trade.
+   *
+   * @param position The closed position (pnlPercent/pnlUSDT already computed by
+   *        OrderManager, friction already baked into entry/exit prices).
+   * @param fundingSeries Optional realized-funding source for the symbol. When
+   *        provided, the funding leg is debited via the shared funding-ledger
+   *        keystone (same math as the backtest ⇒ zero sim/live mismatch). When
+   *        omitted (the live ICT bot has no funding series at close time today),
+   *        fundingReturn is 0 — never crash.
+   */
+  closePosition(position: BotPosition, fundingSeries?: FundingSettlementSeries): void {
     // Remove from open positions
     this.state.openPositions = this.state.openPositions.filter((p) => p.id !== position.id);
 
@@ -187,6 +203,50 @@ export class PositionTracker {
       ? (this.state.peakEquity - this.state.equity) / this.state.peakEquity
       : 0;
 
+    // 4-component return decomposition (funding-ledger keystone).
+    //
+    // NOTE on accounting: OrderManager bakes per-side friction directly into
+    // `entryPrice`/`exitPrice` (slippage simulation), so `pnlPercent` is ALREADY
+    // net-of-friction. We do NOT touch pnlPercent/pnlUSDT. Instead we ATTRIBUTE
+    // the friction leg so the per-cell review's `sumFriction` is non-zero (and
+    // consistent with the gold sleeve, which also attributes friction). Friction
+    // sides: entry + final exit always (2); a taken partial TP adds one more
+    // exit fill weighted by the partial fraction (the 3-fill case in
+    // OrderManager). `grossReturn` is then the friction-free, FIRST-ORDER
+    // estimate `pnlPercent − frictionReturn` (friction is multiplicative in
+    // price and the partial blend is fraction-weighted, so this is an estimate,
+    // not an exact reconstruction) — matching the gold sleeve convention. The
+    // additive invariant gross + friction + funding === net stays exact, and
+    // net resolves to pnlPercent + funding (friction cancels by construction).
+    const frictionPerSide = RUN20_STRATEGY_CONFIG.frictionPerSide;
+    const partialTPFraction = RUN20_STRATEGY_CONFIG.partialTP.fraction;
+    const nSides = position.partialTaken ? (2 + partialTPFraction) : 2;
+    const frictionReturn = -(nSides * frictionPerSide);
+    const grossReturn = (position.pnlPercent ?? 0) - frictionReturn; // friction-free, first-order ESTIMATE
+
+    let fundingReturn = 0;
+    if (fundingSeries && position.exitTimestamp !== undefined) {
+      try {
+        fundingReturn = computeFundingReturn({
+          entryMs: position.entryTimestamp,
+          exitMs: position.exitTimestamp,
+          direction: position.direction,
+          rateAt: fundingSeries.rateAt,
+        });
+      } catch (err) {
+        // Funding lookup must never break a close. Fall back to zero + log.
+        console.warn(
+          `[funding-ledger] funding return failed for ${position.symbol} ${position.id}; storing 0:`,
+          err,
+        );
+        fundingReturn = 0;
+      }
+    }
+
+    const decomposed = decomposeReturn({ grossReturn, frictionReturn, fundingReturn });
+    // fundingPaidUsdt: sign-correct USDT funding (negative = paid, positive = received).
+    const fundingPaidUsdt = decomposed.fundingReturn * position.positionSizeUSDT;
+
     db.insert(botTrades).values({
       id: position.id,
       symbol: position.symbol,
@@ -209,6 +269,11 @@ export class PositionTracker {
       pnlUSDT: position.pnlUSDT!,
       equityAfter: this.state.equity,
       drawdownFromPeak: drawdown,
+      grossReturn: decomposed.grossReturn,
+      frictionReturn: decomposed.frictionReturn,
+      fundingReturn: decomposed.fundingReturn,
+      netReturn: decomposed.netReturn,
+      fundingPaidUsdt,
       createdAt: Date.now(),
     }).run();
 
