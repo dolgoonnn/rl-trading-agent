@@ -151,7 +151,7 @@
 - [ ] **Step 5 — typecheck + lint.**
 - [ ] **Step 6 — Commit:** `gmp "review loop: funding ledger keystone, 4-component decomposition, per-cell report, immutable decision log, skipped signals" feat backend`
 
-## Task 5: Retirement Kill-Switch
+## Task 5: Retirement Kill-Switch — ✅ DONE (5a `fc6b283` core + 5b `6c87f39` wiring; 2-lens adversarial review)
 
 **Plan group:** PLAN-C. **Depends on:** Tasks 3 (snapshots), 4 (funding-net returns), 1 (heartbeat escalates stale reject).
 

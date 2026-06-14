@@ -20,7 +20,8 @@
 - If a task is genuinely blocked (needs a human decision or external resource), mark it `BLOCKED` with the reason, skip to the next task — do not spin.
 
 ## Pointer
-**NEXT:** Task 5b — WIRE the automatic halts into the tick loop (adversarial review found they were built-but-dead). End-to-end TDD required. Then re-verify.
+**NEXT:** Task 6 (Risk Hardening — vol-target, no-trade band, fractional-Kelly off rolling DSR, CPPI drawdown cut). Adversarial-review the sizing math (money-path). MUST size off funding-NET returns (Task 4 ledger).
+**Carried TODOs into Task 7+:** `consumeRegimeCause()` returns false until a regime-decay detector feeds it (Task 7); `bootstrapP5DD=0.10` placeholder → wire from validate-monte-carlo; `charterBreachConsecutive` needs a real charter p5-path feed.
 **Task 5b spec (from 2-lens adversarial review of 5a):**
 - HIGH: `checkRetirementHalt`/`setKillFlag` are never called at runtime → wire into run-bot tick: on `halt` → `setKillFlag(source:'retirement')` + decision_log + alert; on `derisk` → apply sizing multiplier. (Issue 2)
 - HIGH: heartbeat stale-feed only alerts, does NOT block entries → gate entries on `heartbeat.stale` (effectiveKill). (Issue 1)
@@ -40,7 +41,7 @@
 - [x] Task 4a — Funding-ledger keystone + 4-component decomposition ✅ `954a03d` (22 tests; adversarial review caught + fixed frictionReturn=0 → real friction attribution consistent with gold sleeve)
 - [x] Task 4b — Review report (per-cell) + decision_log + skipped_signals + weekly cron ✅ `c7f7544` (17 tests; review.ts per-cell + cold-cohort, append-only decision-log.ts, onSkip seam in order-manager, run-weekly-review.ts)
 - [x] Task 5a — Kill-switch core (manual flag + pure halt logic) ✅ `fc6b283` (46 tests; 2-lens adversarial review confirmed manual flag correct, found automatic-halt wiring missing → 5b)
-- [ ] Task 5b — Wire automatic halts + heartbeat into tick loop (end-to-end)
+- [x] Task 5b — Wire automatic halts + heartbeat into tick loop ✅ `6c87f39` (12 end-to-end tests, 111 bot tests; tick now calls evaluateRetirement→setKillFlag, heartbeat→effectiveKill blocks entries, derisk→sizing mult, durable cap)
 - [ ] Task 6 — Risk Hardening
 - [ ] Task 7 — Tradeability + regime re-fit
 - [ ] Task 8 — PROBE funding-charged backtest
@@ -86,3 +87,4 @@ _(append one line per loop iteration: timestamp · task · result · commit)_
 - 2026-06-14 · Task 4a Funding-ledger keystone · half-open settlement counting (math reviewer: fuzz-clean), 4-component decomposition; ADVERSARIAL REVIEW caught frictionReturn=0 defect → fixed to -(nSides·frictionPerSide), 22 tests · `954a03d`
 - 2026-06-14 · Task 4b Review layer · per-cell decompose + cold-cohort decay, append-only decision-log, skipped-signal onSkip seam, weekly cron, 17 tests · `c7f7544`
 - 2026-06-14 · Task 5a Kill-switch core · manual file/DB/env latched flag (reduce-only, restart-durable) + pure retirement-halt logic + per-symbol cap, 46 tests; 2-lens adversarial review caught automatic halts unwired (→5b) · `fc6b283`
+- 2026-06-14 · Task 5b Wire automatic halts · tick→evaluateRetirement→setKillFlag latch, heartbeat→effectiveKill blocks entries, per-obs DSR scale fix, durable per-symbol cap, sustained-DSR escalation; 12 e2e tests, 111 bot tests · `6c87f39`
