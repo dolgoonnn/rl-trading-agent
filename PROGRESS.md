@@ -20,13 +20,14 @@
 - If a task is genuinely blocked (needs a human decision or external resource), mark it `BLOCKED` with the reason, skip to the next task — do not spin.
 
 ## Pointer
-**NEXT:** Task 3b (Gold/XAU paper sleeve) — Step 1 (read `src/lib/gold/*` + `scripts/run-{gold,metals}-bot.ts`, write design note naming exact strategy+symbol, then TDD).
+**NEXT:** Task 4 (Review Loop + funding-ledger keystone) — Step 1 (write failing funding-ledger settlement-counting tests FIRST).
+**Flagged for Task 5:** add `'degradation_alert'` to the `AlertEvent` union in `src/lib/bot/alerts.ts` (pre-existing type error; Task 5 owns alerts/halts).
 
 ## Task status
 - [x] Task 1 — Safety Gate ✅ `7e638c2` (12/12 tests, 0 new typecheck errors)
 - [x] Task 2 — Migration 0004 ✅ `9ce61e5` (10/10 tests; also fixed pre-existing empty `__drizzle_migrations` drift that blocked all migrations; gitignored `.claude/`)
 - [x] Task 3 — Forward Loop + hourly snapshots ✅ `f14241d` (13/13 tests; pure snapshot.ts helpers, mark-to-market equity, migrate-on-startup, replay-bot.ts dump gate, paper-forward mode + PM2 app)
-- [ ] Task 3b — Gold/XAU paper sleeve
+- [x] Task 3b — Gold/XAU paper sleeve ✅ (F2F daily, XAUTUSDT, paper; mirrored to bot_trades/equity tagged f2f_gold; 4/4 tests)
 - [ ] Task 4 — Review Loop + funding-ledger keystone
 - [ ] Task 5 — Kill-Switch
 - [ ] Task 6 — Risk Hardening
@@ -40,6 +41,12 @@
 - Gold = include **XAU paper sleeve** (Task 3b); default to charter F2F + metals legs on **XAUTUSDT**, NOT dropped Run-12 asian_range_gold. Confirm exact strategy by reading `src/lib/gold/*` + `scripts/run-{gold,metals}-bot.ts` at Task 3b.
 - Schema = additive Drizzle migration 0004 (user approved).
 - Git = isolated branch; user WIP checkpointed at `ffc3676` (reversible).
+
+### Task 3b gold design decision
+- Strategy = **F2F daily** (`src/lib/gold`, forecast-to-fill, λ=0.95 θ=0.91, zscore50 regime filter) — NOT dropped Run-12 `asian_range_gold` (0/6 on the 11-yr holdout: WF 46.6%, DSR −0.15).
+- Symbol = **XAUTUSDT** (Tether Gold; XAUUSDT delisted from Bybit). Cadence = daily poll (~00:05 UTC, after Bybit daily close), PAPER only (live prices, simulated fills, no real-money keys).
+- Persistence: the existing `run-gold-bot.ts` wrote forward trades+equity ONLY to `data/gold-bot-state.json`, which the Sept charter review (reads `data/ict-trading.db`) cannot see. Task 3b adds a thin seam `src/lib/gold/paper-sleeve.ts` that maps each F2F paper trade/equity tick into `bot_trades` + `bot_equity_snapshots` (same DB+tables as the crypto loop), tagged `strategy='f2f_gold'`, `symbol='XAUTUSDT'` so Task 4 per-symbol/per-strategy review can separate sleeves.
+- Deferred: keeping the JSON state file as the bot's source of truth (DB rows are an append-only mirror for review); no dedup/replay guard beyond the existing `lastTickTimestamp` skip; metals-book legs stay on their own JSON track (separate sleeve, out of scope here).
 
 ## Risk register (from planning brief — watch these)
 1. Charter-window race: ~89 days to 2026-09-11; live DSR likely still DE-RISK-only at review → rely on E[MaxDD] absolute-stop + bootstrap p5 path.
@@ -64,3 +71,4 @@ _(append one line per loop iteration: timestamp · task · result · commit)_
 - 2026-06-14 · Task 1 Safety Gate · guards.ts (computePositionSize + checkPreTradeGuards), wired order-manager/data-feed/config, 12/12 vitest pass, 0 new typecheck errors · `7e638c2`
 - 2026-06-14 · Task 2 Migration 0004 · 4 new tables + 5 bot_trades cost cols, additive-only SQL, 10/10 tests; fixed empty __drizzle_migrations drift; gitignored .claude/ · `9ce61e5`
 - 2026-06-14 · Task 3 Forward Loop · hourly mark-to-market snapshots (pure snapshot.ts), migrate-on-startup, backtest-dump gated to non-forward modes, paper-forward mode + PM2 app, 13/13 tests · `f14241d`
+- 2026-06-14 · Task 3b Gold sleeve · F2F daily XAUTUSDT paper, src/lib/gold/paper-sleeve.ts mirrors trades+equity into bot_trades/snapshots tagged f2f_gold, 4/4 tests · (commit below)
