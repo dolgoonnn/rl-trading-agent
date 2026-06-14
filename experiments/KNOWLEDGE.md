@@ -4,7 +4,7 @@ Consolidated index of every experiment track in this repo (Feb–Jun 2026, ~250
 documented experiments). Read this before testing a new idea — most idea families
 have already been falsified, and the methodology lessons here are paid for.
 
-**Last updated**: 2026-06-12 (overnight research loop — 10 verdicts, see graveyard additions + Universe D)
+**Last updated**: 2026-06-14 (grounded re-validation of pre-FOMC drift US500 — CLOSED: real but decayed to ~1/3 of Lucca-Moench's 49bp, vol-gate is a multiple-testing artifact, ~82% already in leg J)
 
 ---
 
@@ -23,7 +23,7 @@ have already been falsified, and the methodology lessons here are paid for.
 | **RL (PPO/DDQN)** | Weight optimizer, signal filter, funding rate | All negative or zero-trade | ❌ DEAD | `ppo-eval-*.json`, MEMORY.md |
 | **Strategy combination** | crypto Run 20 + session book + F2F as one book; EW/handcraft/ERC/shrunk-MV, all walk-forward | Sharpe 2.16 → **2.94** (+36% vs best sleeve, ρ≈0, DM 1.72); handcraft only method to beat EW (P=99.1%, 11yr universe); **deployable at venue-realistic costs: Sharpe 2.53, 37%/yr @12% vol target, 5/5 stress gates** | ✅ EDGE (combination layer) | `strategy-combination.md` |
 | **Review-preview book (Universe D)** | fix-short with validated no-sweep gate, recombined with crypto+F2F | book sleeve 1.34→1.58; **combined Sharpe 2.61, ~39%/yr @12% vol, 9.4% maxDD, 5/5 gates** (vs 2.46 current) — the Sept review package | ✅ READY FOR REVIEW | `runs/combined-daily-D.json`, `ict-execution-layer.md` |
-| **Pre-FOMC drift (US500)** | 90 events; overlap decomposition vs US500-overnight leg | +16.8bp/event t=2.61 BUT 82% is the overnight segment (corr 0.78) and the remainder is t=0.29 — **already harvested by leg J** | ❌ CLOSED (redundant — confirms leg J is event-flow anchored) | `fomc-drift.md` |
+| **Pre-FOMC drift (US500)** | 90 events; overlap decomposition + 2026-06-14 grounded re-validation (Lucca-Moench 2015 / Kurov-Gilbert-Wolfe 2021) | +16.8bp/event t=2.61 (=published LM window, NOT mined) but ~1/3 of paper's 49bp (DECAYED per "disappearing drift"); placebo clears it as FOMC-specific (non-FOMC days +3.0bp); vol-gate +36.7bp FAILS Harvey-Liu √(2lnN) deflation; 82% already in leg J, remainder t=0.29 | ❌ CLOSED (real but decayed + redundant; MEMORY "queued" label was stale) | `fomc-drift.md`, `runs/fomc-drift-revalidation.json` |
 | **ICT execution layer on gold** | Entry-timing A/B on overnight leg (n=2949) + fix-short sweep gate (n=2950); external validation research first | Timing layer **−0.99bp/day t=−3.97** (opportunity cost of drift dominates); sweeps = CONTINUATION info (Osler confirmed in-house) — avoid-after-sweep fix gate = post-hoc candidate (+2.22bp t=2.83 no-sweep days) | ❌ DEAD as timing / ⚠️ 1 inverted-filter candidate | `ict-execution-layer.md`, `ict-validation-research.md` |
 | **Prop-firm barrier option** | Session book through Topstep-style trailing-DD rules, all historical starts | Pass rate 2–3× population base; EV +$2–5k/attempt at $25–50k notional — but contract granularity forces ≥$100k where EV ≈ 0; 100% eventually blow (extract-then-re-evaluate model) | ⚠️ SHELVED (rule-check + paper results first) | `prop-barrier-sim.md` |
 | **Practitioner mechanisms 2026** | 5-thread verified web research: what pays at retail size | flow-anchored + slow survives; OBI/MM/DEX-LP/x-exchange-arb/SPX-short-vol all measured dead; liquidation-fade + crypto VRP = next test queue | 📚 KNOWLEDGE | `practitioner-mechanisms.md` |
