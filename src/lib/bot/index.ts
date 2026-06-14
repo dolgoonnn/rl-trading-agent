@@ -37,6 +37,26 @@ export {
   readDecisionLog,
   readSkippedSignals,
 } from './decision-log';
+
+// Retirement kill-switch (latched, reduce-only) + pure halt decision
+export {
+  readKillFlag,
+  getKillFlag,
+  setKillFlag,
+  isKilled,
+  killSentinelPath,
+} from './kill-switch';
+export type { KillFlag, KillDb, KillDbRow } from './kill-switch';
+export {
+  expectedMaxDD,
+  hardKillDD,
+  checkRetirementHalt,
+} from './retirement';
+export type {
+  HaltAction,
+  RetirementDecision,
+  RetirementHaltInputs,
+} from './retirement';
 export type {
   BotDb,
   AppendDecisionLogArgs,
@@ -50,4 +70,6 @@ export {
   DEFAULT_LTF_CONFIG,
   DEFAULT_FUNDING_ARB_CONFIG,
   SYMBOL_ALLOCATION,
+  RETIREMENT_CONFIG,
+  SAFETY_GATE_CONFIG,
 } from './config';

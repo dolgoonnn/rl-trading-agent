@@ -25,6 +25,8 @@ import type {
 import type { Candle } from '@/types/candle';
 import type { PositionTracker } from './position-tracker';
 import { DEFAULT_RISK_CONFIG } from './config';
+import { calculateDeflatedSharpe } from '@/lib/rl/utils/deflated-sharpe';
+import type { KillFlag } from './kill-switch';
 
 /** Duration constants in milliseconds */
 const HOUR_MS = 3_600_000;
@@ -36,19 +38,51 @@ export class RiskEngine {
   private drawdownTiers: DrawdownTier[];
   private maxPositions: number;
   private regimeSizeMultipliers: Record<string, number>;
+  /** Selection-bias trial count used to deflate the rolling Sharpe. */
+  private deflationTrialCount: number;
+  /** Deflated-Sharpe benchmark `c` for the sizing multiplier (NOT zero). */
+  private minAcceptableSharpe: number;
 
-  constructor(riskConfig: RiskConfig = DEFAULT_RISK_CONFIG) {
+  constructor(
+    riskConfig: RiskConfig = DEFAULT_RISK_CONFIG,
+    opts: { deflationTrialCount?: number; minAcceptableSharpe?: number } = {},
+  ) {
     this.cbConfig = riskConfig.circuitBreakers;
     this.drawdownTiers = riskConfig.drawdownTiers;
     this.maxPositions = riskConfig.maxPositions;
     this.regimeSizeMultipliers = riskConfig.regimeSizeMultipliers;
+    // 236 independent trials counted in DSR validation (see MEMORY.md). The c=0.5
+    // benchmark comes from RETIREMENT_CONFIG; both are injectable for tests.
+    this.deflationTrialCount = opts.deflationTrialCount ?? 236;
+    this.minAcceptableSharpe = opts.minAcceptableSharpe ?? 0.5;
   }
 
   /**
    * Check if trading is allowed. Returns null if OK, or the blocking
    * circuit breaker if trading should be paused.
+   *
+   * The LATCHED kill flag is checked FIRST (before any equity/drawdown logic):
+   * if halted, NEW entries are blocked regardless of equity. This is REDUCE-ONLY
+   * — it blocks opening positions; it does NOT close existing ones (the caller's
+   * `manageOpenPosition` path still runs). The kill flag is injected (DI) so the
+   * decision stays testable; `nowMs` is injected for symmetry.
    */
-  canTrade(tracker: PositionTracker): CircuitBreakerState | null {
+  canTrade(
+    tracker: PositionTracker,
+    opts: { nowMs?: number; killFlag?: KillFlag } = {},
+  ): CircuitBreakerState | null {
+    const nowMs = opts.nowMs ?? Date.now();
+
+    // 0. LATCHED kill flag — checked FIRST, blocks NEW entries regardless of equity.
+    if (opts.killFlag?.halted) {
+      return {
+        type: 'max_drawdown',
+        triggeredAt: nowMs,
+        resumeAt: Infinity,
+        reason: `KILL SWITCH active (${opts.killFlag.source ?? 'unknown'}): ${opts.killFlag.reason ?? 'manual review required'} — reduce-only`,
+      };
+    }
+
     // Check active circuit breakers
     const activeBreakers = tracker.getCircuitBreakers()
       .filter((cb) => Date.now() < cb.resumeAt);
@@ -89,6 +123,66 @@ export class RiskEngine {
   }
 
   /**
+   * Per-symbol entry cap — reject a NEW entry when the symbol has already opened
+   * `maxEntriesPerDay` positions inside the rolling 24h window. This is a HARD
+   * per-symbol throttle that is INDEPENDENT of the strategy `cooldownBars` (a
+   * burst of fast bars must not punch through a daily cap). It pauses ONE symbol;
+   * it never halts the whole book. The window count is supplied by the caller
+   * (`PositionTracker.getEntriesInWindow`) so this method stays pure.
+   */
+  perSymbolEntryCap(args: {
+    symbol: BotSymbol;
+    entriesInWindow: number;
+    maxEntriesPerDay: number;
+  }): { ok: boolean; reason?: string } {
+    if (args.entriesInWindow >= args.maxEntriesPerDay) {
+      return {
+        ok: false,
+        reason: `per-symbol entry cap: ${args.symbol} has ${args.entriesInWindow} entries in 24h (cap ${args.maxEntriesPerDay})`,
+      };
+    }
+    return { ok: true };
+  }
+
+  /**
+   * Pause a single symbol after `maxConsecutiveLossesPerSymbol` consecutive
+   * losses on THAT symbol — without halting the whole book. Pure; the caller
+   * supplies the per-symbol consecutive-loss count.
+   */
+  isSymbolPaused(args: {
+    consecutiveLosses: number;
+    maxConsecutiveLossesPerSymbol: number;
+  }): boolean {
+    return args.consecutiveLosses >= args.maxConsecutiveLossesPerSymbol;
+  }
+
+  /**
+   * Heartbeat check — latches a `stale_feed` HALT when the data feed has gone
+   * quiet for longer than `heartbeatTimeoutMs`. PURE and DI: `nowMs` and
+   * `lastFeedUpdate` are injected (the live caller passes `DataFeed.lastFeedUpdate`).
+   * A null `lastFeedUpdate` (no successful fetch yet) is a COLD START, not a
+   * stale feed — we do not halt on it.
+   */
+  checkHeartbeat(args: {
+    nowMs: number;
+    lastFeedUpdate: number | null;
+    heartbeatTimeoutMs: number;
+  }): { stale: boolean; reason: string } {
+    const { nowMs, lastFeedUpdate, heartbeatTimeoutMs } = args;
+    if (lastFeedUpdate === null) {
+      return { stale: false, reason: 'no feed update yet (cold start)' };
+    }
+    const gap = nowMs - lastFeedUpdate;
+    if (gap > heartbeatTimeoutMs) {
+      return {
+        stale: true,
+        reason: `stale_feed: ${Math.round(gap / 1000)}s since last feed update (> ${Math.round(heartbeatTimeoutMs / 1000)}s)`,
+      };
+    }
+    return { stale: false, reason: 'feed fresh' };
+  }
+
+  /**
    * Get the combined position size multiplier based on all risk factors.
    * Multiply this by the base risk-per-trade to get effective risk.
    *
@@ -110,8 +204,13 @@ export class RiskEngine {
     // 2. Regime multiplier (default 1.0 for unknown regimes)
     const regimeMult = this.regimeSizeMultipliers[regime] ?? 1.0;
 
-    // 3. Rolling Sharpe multiplier
-    const sharpeMult = this.getSharpeMultiplier(tracker);
+    // 3. Rolling DEFLATED-Sharpe multiplier (selection-bias corrected).
+    const sharpeMult = this.getSharpeMultiplier({
+      rollingSharpe: tracker.getRollingSharpe(),
+      numTrades: tracker.getTotalTrades(),
+      trialCount: this.deflationTrialCount,
+      minAcceptableSharpe: this.minAcceptableSharpe,
+    });
 
     const multiplier = drawdownMult * regimeMult * sharpeMult;
 
@@ -367,14 +466,38 @@ export class RiskEngine {
   }
 
   /**
-   * Get Sharpe-based sizing multiplier.
-   * Below 0.5: reduce to 50%. Below 0: halt (handled by canTrade circuit breaker logic).
+   * DEFLATED-Sharpe sizing multiplier.
+   *
+   * Replaces the old raw-Sharpe rule. We deflate the rolling Sharpe for
+   * selection bias (trial count) via `calculateDeflatedSharpe`, then benchmark
+   * the deflated Sharpe against `minAcceptableSharpe` (c = 0.5, NOT zero):
+   *   - deflated >= c            → full size (1.0)
+   *   - 0 <  deflated <  c       → de-risk (0.5)
+   *   - deflated <= 0            → halt sizing (0)
+   *   - rolling Sharpe null      → full size (1.0; do not punish a cold start)
+   *
+   * Consequence (the RED→GREEN case): a 0.3 rolling Sharpe at 100 trials now
+   * reduces sizing — the deflation haircut from 100 trials drags it to ~0, where
+   * the old raw rule kept it at 0.5 (and never deflated at all).
    */
-  private getSharpeMultiplier(tracker: PositionTracker): number {
-    const sharpe = tracker.getRollingSharpe();
-    if (sharpe === null) return 1.0; // Not enough data yet
-    if (sharpe < 0) return 0; // Halt
-    if (sharpe < 0.5) return 0.5; // Reduce
+  getSharpeMultiplier(args: {
+    rollingSharpe: number | null;
+    numTrades: number;
+    trialCount: number;
+    minAcceptableSharpe: number;
+  }): number {
+    const { rollingSharpe, numTrades, trialCount, minAcceptableSharpe } = args;
+    if (rollingSharpe === null) return 1.0; // Not enough data yet — cold start
+
+    const dsr = calculateDeflatedSharpe(
+      rollingSharpe,
+      Math.max(1, numTrades),
+      Math.max(1, trialCount),
+    );
+    const deflated = dsr.deflatedSharpe;
+
+    if (deflated <= 0) return 0; // Halt sizing
+    if (deflated < minAcceptableSharpe) return 0.5; // De-risk: positive but below the c=0.5 floor
     return 1.0;
   }
 }

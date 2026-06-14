@@ -137,6 +137,40 @@ export type GuardResult =
   | { ok: false; reason: RejectReason };
 
 // ============================================
+// Retirement Kill-Switch (live/paper bot only)
+// ============================================
+
+/**
+ * Frozen-at-deploy parameters for the retirement kill-switch and risk hardening.
+ * The hard-kill drawdown is anchored to the chosen live volatility via E[MaxDD]
+ * (NOT the raw in-sample 63.3%). All values are pre-committed at deploy.
+ */
+export interface RetirementConfig {
+  /** Annualized volatility target the equity curve is sized to. */
+  sigmaAnnual: number;
+  /** Expected Sharpe used in the E[MaxDD] formula. */
+  sharpe: number;
+  /** Horizon (years) for the E[MaxDD] √(2·ln(T·252)) term. */
+  horizonYears: number;
+  /** Bootstrap 5th-percentile drawdown — the empirical floor for hardKillDD. */
+  bootstrapP5DD: number;
+  /** Benchmark Sharpe `c` the deflated Sharpe must clear (NOT zero). */
+  minAcceptableSharpe: number;
+  /** PSR threshold (probability the true Sharpe beats the benchmark). */
+  psr: number;
+  /** Minimum live observations before the DSR layer may HARD-halt. */
+  minTrackRecordLength: number;
+  /** Max NEW entries per symbol per 24h (independent of strategy cooldownBars). */
+  maxEntriesPerDay: number;
+  /** Consecutive losses per symbol that pause THAT symbol (not the whole book). */
+  maxConsecutiveLossesPerSymbol: number;
+  /** Heartbeat timeout (ms): stale feed beyond this latches a stale_feed HALT. */
+  heartbeatTimeoutMs: number;
+  /** Consecutive charter-p5 breaches that escalate yellow → red (hard halt). */
+  charterBreachK: number;
+}
+
+// ============================================
 // Position Types
 // ============================================
 
@@ -334,7 +368,8 @@ export type AlertEvent =
   | 'arb_position_opened'
   | 'arb_position_closed'
   | 'funding_settlement'
-  | 'arb_daily_summary';
+  | 'arb_daily_summary'
+  | 'degradation_alert';
 
 /** An alert to be sent */
 export interface BotAlert {

@@ -15,6 +15,7 @@ import type {
   RiskConfig,
   LTFConfig,
   SafetyGateConfig,
+  RetirementConfig,
 } from '@/types/bot';
 import type { FundingArbConfig } from '@/types/funding-arb';
 
@@ -185,6 +186,41 @@ export const SAFETY_GATE_CONFIG: SafetyGateConfig = {
   minStopPct: 0.001,
   maxDeviationBps: 50,
   maxCandleAgeMs: 5_400_000,
+};
+
+// ============================================
+// Retirement Kill-Switch (live/paper bot only)
+// ============================================
+
+/**
+ * Frozen-at-deploy retirement parameters.
+ *
+ * hardKillDD is derived (NOT hard-coded) from these inputs:
+ *   E[MaxDD] = sigmaAnnual·√(2·ln(horizonYears·252))/sharpe   (≈0.194 here)
+ *   hardKillDD = 1.5·max(E[MaxDD], bootstrapP5DD)             (≈0.291 here)
+ * Both are far below the raw in-sample 63.3% — we do NOT cut at that depth.
+ *
+ * - minAcceptableSharpe 0.5 → the deflated-Sharpe benchmark `c` (NOT zero): a
+ *   0.3 rolling Sharpe at 100 trials must reduce sizing where raw-Sharpe didn't.
+ * - minTrackRecordLength 50 → until this many live observations accrue, the DSR
+ *   layer may only DE-RISK (never HARD), so we don't cut at the bottom of a
+ *   normal early drawdown.
+ * - maxEntriesPerDay 3/symbol, maxConsecutiveLossesPerSymbol 4 → per-symbol
+ *   throttle independent of strategy cooldownBars; pauses one symbol, not the book.
+ * - heartbeatTimeoutMs 7_200_000 (2× a 1h bar) → stale feed latches a HALT.
+ */
+export const RETIREMENT_CONFIG: RetirementConfig = {
+  sigmaAnnual: 0.12,
+  sharpe: 2,
+  horizonYears: 0.75,
+  bootstrapP5DD: 0.10,
+  minAcceptableSharpe: 0.5,
+  psr: 0.95,
+  minTrackRecordLength: 50,
+  maxEntriesPerDay: 3,
+  maxConsecutiveLossesPerSymbol: 4,
+  heartbeatTimeoutMs: 7_200_000,
+  charterBreachK: 3,
 };
 
 // ============================================

@@ -27,9 +27,16 @@ import {
   decomposeReturn,
   type FundingSettlementSeries,
 } from '@/lib/cost/funding-ledger';
+import { calculateDeflatedSharpe } from '@/lib/rl/utils/deflated-sharpe';
 
 export class PositionTracker {
   private state: BotState;
+  /**
+   * Per-symbol entry timestamps (ms), in chronological order, for the rolling
+   * per-symbol entry cap. Kept in memory: the cap is a 24h throttle, so old
+   * timestamps fall out of every window query naturally and we prune on read.
+   */
+  private entryTimestamps: Map<string, number[]> = new Map();
 
   constructor(initialCapital: number) {
     this.state = {
@@ -527,6 +534,53 @@ export class PositionTracker {
     const periodsPerYear = (365 * 24 * 3_600_000) / avgIntervalMs;
 
     return (mean / stdDev) * Math.sqrt(periodsPerYear);
+  }
+
+  // ============================================
+  // Per-symbol entry window (retirement kill-switch cap)
+  // ============================================
+
+  /**
+   * Record a NEW entry for a symbol at timestamp `ts` (ms). Feeds the per-symbol
+   * entry cap. Stored in memory in chronological order; old entries are pruned
+   * lazily on read so the list never grows unbounded for a long-lived symbol.
+   */
+  recordEntry(symbol: string, ts: number): void {
+    const list = this.entryTimestamps.get(symbol) ?? [];
+    list.push(ts);
+    this.entryTimestamps.set(symbol, list);
+  }
+
+  /**
+   * Count entries for `symbol` whose timestamp is within `windowMs` before
+   * `nowMs` — i.e. in the half-open window `(nowMs − windowMs, nowMs]`. Prunes
+   * timestamps that have fallen out of the window as a side effect.
+   */
+  getEntriesInWindow(symbol: string, windowMs: number, nowMs: number): number {
+    const list = this.entryTimestamps.get(symbol);
+    if (!list || list.length === 0) return 0;
+    const cutoff = nowMs - windowMs;
+    const kept = list.filter((t) => t > cutoff && t <= nowMs);
+    // Prune anything older than the window so memory stays bounded.
+    this.entryTimestamps.set(symbol, list.filter((t) => t > cutoff));
+    return kept.length;
+  }
+
+  /**
+   * Rolling DEFLATED Sharpe — the rolling Sharpe (from equity snapshots)
+   * deflated for `trials` selection-bias. Returns null when the rolling Sharpe
+   * is null (insufficient snapshot history) so the caller can treat a cold start
+   * as "not enough data" rather than a failing edge.
+   */
+  getRollingDeflatedSharpe(trials: number, windowDays = 30): number | null {
+    const sharpe = this.getRollingSharpe(windowDays);
+    if (sharpe === null) return null;
+    const dsr = calculateDeflatedSharpe(
+      sharpe,
+      Math.max(1, this.state.totalTrades),
+      Math.max(1, trials),
+    );
+    return dsr.deflatedSharpe;
   }
 
   // ============================================

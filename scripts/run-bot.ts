@@ -40,7 +40,9 @@ import {
 } from '../src/lib/bot';
 import { LTFConfirmation } from '../src/lib/bot/ltf-confirmation';
 import { shouldSnapshot } from '../src/lib/bot/snapshot';
-import { logSkippedSignal } from '../src/lib/bot/decision-log';
+import { logSkippedSignal, appendDecisionLog } from '../src/lib/bot/decision-log';
+import { isKilled, type KillFlag } from '../src/lib/bot/kill-switch';
+import { RETIREMENT_CONFIG } from '../src/lib/bot/config';
 import { db } from '../src/lib/data/db';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import type { BotConfig, BotSymbol, BotPosition, LTFConfig } from '../src/types/bot';
@@ -151,6 +153,14 @@ class TradingBot {
 
   // Limit order execution
   private limitOrderExecutor: LimitOrderExecutor | null = null;
+
+  // Retirement kill-switch. We read the latched flag (fs sentinel + env + DB row)
+  // BEFORE processing any symbol each tick. `killAlerted` dedupes the alert so a
+  // sustained halt does not spam Telegram every 30s.
+  private killAlerted = false;
+  // Heartbeat: latches a stale_feed halt once the feed goes quiet past the
+  // configured timeout. Reset only after a fresh feed update + manual review.
+  private heartbeatAlerted = false;
 
   constructor(
     config: BotConfig,
@@ -351,8 +361,26 @@ class TradingBot {
       // Cleanup expired circuit breakers
       this.riskEngine.cleanupExpiredBreakers(this.tracker);
 
+      const nowMs = Date.now();
+
+      // 0a. LATCHED kill flag — read the out-of-band sources (data/KILL sentinel,
+      // env KILL_SWITCH, bot_kill_switch DB row) BEFORE touching any symbol. When
+      // halted we skip ALL new-entry processing (reduce-only). Open positions are
+      // still managed by manageOpenPosition inside processSymbol, so we DO NOT
+      // return early — we pass the kill flag down so only NEW entries are blocked.
+      const killFlag = isKilled(db, { nowMs });
+      await this.handleKillFlag(killFlag);
+
+      // 0b. Heartbeat — latch a stale_feed halt if the feed has gone quiet.
+      const heartbeat = this.riskEngine.checkHeartbeat({
+        nowMs,
+        lastFeedUpdate: this.dataFeed.lastFeedUpdate,
+        heartbeatTimeoutMs: RETIREMENT_CONFIG.heartbeatTimeoutMs,
+      });
+      await this.handleHeartbeat(heartbeat);
+
       for (const symbol of this.config.symbols) {
-        await this.processSymbol(symbol);
+        await this.processSymbol(symbol, killFlag);
       }
 
       // Hourly mark-to-market equity snapshot (deduped by UTC hour bucket).
@@ -389,7 +417,63 @@ class TradingBot {
     this.tracker.recordSnapshot(this.latestPrices, nowMs);
   }
 
-  private async processSymbol(symbol: BotSymbol): Promise<void> {
+  /**
+   * Latched kill-flag handler. On a fresh trip, append an immutable decision_log
+   * row + fire one critical alert. Deduped so a sustained halt does not spam.
+   */
+  private async handleKillFlag(killFlag: KillFlag): Promise<void> {
+    if (killFlag.halted) {
+      if (!this.killAlerted) {
+        this.killAlerted = true;
+        try {
+          appendDecisionLog(db, {
+            type: 'halt',
+            detail: {
+              kind: 'kill_switch',
+              source: killFlag.source,
+              reason: killFlag.reason,
+            },
+          });
+        } catch (err) {
+          console.warn('[run-bot] failed to append kill-switch decision_log:', err);
+        }
+        await this.alerts.circuitBreakerTriggered(
+          'kill_switch',
+          `KILL SWITCH active (${killFlag.source ?? 'unknown'}): ${killFlag.reason ?? 'manual review required'} — reduce-only (new entries blocked)`,
+        );
+      }
+    } else {
+      // Manual reset detected (flag cleared) — log the resume once.
+      if (this.killAlerted) {
+        this.killAlerted = false;
+        try {
+          appendDecisionLog(db, { type: 'resume', detail: { kind: 'kill_switch' } });
+        } catch (err) {
+          console.warn('[run-bot] failed to append kill-switch resume decision_log:', err);
+        }
+      }
+    }
+  }
+
+  /** Stale-feed heartbeat handler — alert + decision_log once per stale episode. */
+  private async handleHeartbeat(heartbeat: { stale: boolean; reason: string }): Promise<void> {
+    if (heartbeat.stale && !this.heartbeatAlerted) {
+      this.heartbeatAlerted = true;
+      try {
+        appendDecisionLog(db, {
+          type: 'halt',
+          detail: { kind: 'stale_feed', reason: heartbeat.reason },
+        });
+      } catch (err) {
+        console.warn('[run-bot] failed to append stale_feed decision_log:', err);
+      }
+      await this.alerts.circuitBreakerTriggered('stale_feed', heartbeat.reason);
+    } else if (!heartbeat.stale && this.heartbeatAlerted) {
+      this.heartbeatAlerted = false;
+    }
+  }
+
+  private async processSymbol(symbol: BotSymbol, killFlag?: KillFlag): Promise<void> {
     // Process pending limit orders first
     if (this.limitOrderExecutor?.hasPendingOrder(symbol)) {
       await this.processLimitOrder(symbol);
@@ -429,8 +513,10 @@ class TradingBot {
       return; // Don't open new position while one is open for this symbol
     }
 
-    // 2. Check if trading is allowed (circuit breakers)
-    const blocker = this.riskEngine.canTrade(this.tracker);
+    // 2. Check if trading is allowed (kill flag FIRST, then circuit breakers).
+    // Reduce-only: this gate blocks NEW entries; the open-position management
+    // above (manageOpenPosition) already ran, so existing positions still exit.
+    const blocker = this.riskEngine.canTrade(this.tracker, { nowMs: Date.now(), killFlag });
     if (blocker) {
       if (this.config.verbose) {
         console.log(`  ${symbol}: trading blocked — ${blocker.reason}`);
@@ -439,6 +525,26 @@ class TradingBot {
     }
 
     if (!this.riskEngine.canTradeSymbol(this.tracker, symbol)) return;
+
+    // 2b. Per-symbol entry cap (independent of strategy cooldownBars). Caps NEW
+    // entries to maxEntriesPerDay per symbol over a rolling 24h window; this
+    // pauses ONE symbol, never the whole book.
+    const nowMs = Date.now();
+    const entriesInWindow = this.tracker.getEntriesInWindow(symbol, 24 * 3_600_000, nowMs);
+    const capCheck = this.riskEngine.perSymbolEntryCap({
+      symbol,
+      entriesInWindow,
+      maxEntriesPerDay: RETIREMENT_CONFIG.maxEntriesPerDay,
+    });
+    if (!capCheck.ok) {
+      if (this.config.verbose) console.log(`  ${symbol}: ${capCheck.reason}`);
+      try {
+        logSkippedSignal(db, { ts: nowMs, symbol, reason: 'per_symbol_entry_cap', detail: { entriesInWindow } });
+      } catch (err) {
+        console.warn('[run-bot] failed to persist per_symbol_entry_cap skip:', err);
+      }
+      return;
+    }
 
     // 3. Evaluate signal (SignalEngine auto-routes to correct strategy per symbol)
     const result = this.signalEngine.evaluate(allCandles, symbol);
@@ -540,6 +646,8 @@ class TradingBot {
 
     // Track and alert
     this.tracker.addPosition(position);
+    // Record the entry for the rolling per-symbol entry cap.
+    this.tracker.recordEntry(symbol, position.entryTimestamp);
     await this.alerts.signalDetected(
       symbol,
       result.signal.totalScore,
