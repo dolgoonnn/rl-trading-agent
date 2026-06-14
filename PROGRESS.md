@@ -8,7 +8,7 @@
 ## How this loop works (read FIRST each iteration)
 1. Read this file + the plan. Find the **next unchecked `- [ ]` task/step**.
 2. **Implement** it via a subagent doing strict TDD (failing test → implement → green).
-3. **Evaluate** in the main thread: run `pnpm typecheck && pnpm lint && npx vitest run <files>`; paste real output. Red→fix before commit. Never claim pass without output.
+3. **Evaluate** in the main thread, paste REAL output. The repo has ~230 PRE-EXISTING typecheck errors in unrelated files, so NEVER gate on global `pnpm typecheck` exit code. Instead: (a) `npx vitest run <task test files>` MUST pass; (b) NEW-errors-only typecheck — `pnpm typecheck 2>&1 | grep -E "<edited files>"` must show no error that isn't already on the baseline commit `47a6e76` (use `git show 47a6e76:<file>` to confirm pre-existing); (c) `npx eslint <edited files>` clean. Red→fix before commit. Never claim pass without output.
 4. **Commit** with `gmp "<msg>" <type> backend` (never raw git).
 5. Tick the box in the plan, append an entry to the Iteration Log below, update the pointer.
 6. When all plan tasks are checked → **Research phase** (see plan footer + preference memory): ground in a reputable source first, save knowledge to `experiments/*.md` + `KNOWLEDGE.md` even on null results, queue candidates for next review — never touch the live book.
@@ -20,10 +20,10 @@
 - If a task is genuinely blocked (needs a human decision or external resource), mark it `BLOCKED` with the reason, skip to the next task — do not spin.
 
 ## Pointer
-**NEXT:** Task 1 (Pre-Trade Safety Gate) — Step 1 (write failing tests).
+**NEXT:** Task 2 (Migration 0004 — additive schema) — Step 1 (write failing migration round-trip test).
 
 ## Task status
-- [ ] Task 1 — Safety Gate
+- [x] Task 1 — Safety Gate ✅ `7e638c2` (12/12 tests, 0 new typecheck errors)
 - [ ] Task 2 — Migration 0004
 - [ ] Task 3 — Forward Loop + hourly snapshots
 - [ ] Task 3b — Gold/XAU paper sleeve
@@ -61,3 +61,4 @@
 ## Iteration log
 _(append one line per loop iteration: timestamp · task · result · commit)_
 - 2026-06-14 · setup · branch + checkpoint `ffc3676`, plan + PROGRESS written · —
+- 2026-06-14 · Task 1 Safety Gate · guards.ts (computePositionSize + checkPreTradeGuards), wired order-manager/data-feed/config, 12/12 vitest pass, 0 new typecheck errors · `7e638c2`

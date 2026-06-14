@@ -13,7 +13,7 @@
 ## Operating Constraints (apply to EVERY task)
 
 - **Paper only.** Never place real orders, never read/require real-money exchange keys, never flip to live. Real-money is an explicitly-gated future decision.
-- **TDD, Red→Green.** Write the failing test first, run it, see it fail for the right reason, implement minimally, run it green, then `pnpm typecheck && pnpm lint`.
+- **TDD, Red→Green.** Write the failing test first, run it, see it fail for the right reason, implement minimally, run it green. Then verify: `npx vitest run <task tests>` green + **new-errors-only** typecheck (`pnpm typecheck 2>&1 | grep <edited files>` shows nothing absent from baseline `47a6e76` — the repo carries ~230 pre-existing errors, so global `pnpm typecheck` exit code is NOT a gate) + `npx eslint <edited files>` clean.
 - **No `any`.** Real types or `unknown` + narrowing.
 - **DI the clock and I/O.** Guard/cost/sizing functions take `nowMs`, `markPrice`, candle timestamps as arguments. No internal `Date.now()`/`fetch` in pure logic.
 - **Commit per task** with `gmp "<msg>" <type> backend` after green + typecheck + lint. One task = one commit.
@@ -47,7 +47,7 @@
 
 ---
 
-## Task 1: Pre-Trade Safety Gate
+## Task 1: Pre-Trade Safety Gate — ✅ DONE (`7e638c2`, 12/12 tests, 0 new typecheck errors)
 
 **Plan group:** PLAN-A. **Depends on:** none (build first — only live money-risk in the deployed bot).
 
