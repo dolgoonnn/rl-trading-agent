@@ -20,7 +20,7 @@
 - If a task is genuinely blocked (needs a human decision or external resource), mark it `BLOCKED` with the reason, skip to the next task — do not spin.
 
 ## Pointer
-**NEXT:** Task 4b (Review report + decision_log + skipped_signals + weekly cron) — uses the funding-ledger keystone from 4a.
+**NEXT:** Task 5 (Retirement Kill-Switch) — Step 1 (write failing kill-switch + retirement-halt tests). ADVERSARIAL REVIEW this one (safety-critical, gates the book). Also fold in the flagged `AlertEvent` `'degradation_alert'` union fix.
 **Flagged for Task 5:** add `'degradation_alert'` to the `AlertEvent` union in `src/lib/bot/alerts.ts` (pre-existing type error; Task 5 owns alerts/halts).
 **Flagged (review finding, defer):** live crypto `closePosition` passes no funding series today, so live `fundingReturn=0` until funding wiring; the keystone is exercised by the Task 8 backtest. Wire a live `FundingSettlementSeries` when convenient.
 
@@ -30,7 +30,7 @@
 - [x] Task 3 — Forward Loop + hourly snapshots ✅ `f14241d` (13/13 tests; pure snapshot.ts helpers, mark-to-market equity, migrate-on-startup, replay-bot.ts dump gate, paper-forward mode + PM2 app)
 - [x] Task 3b — Gold/XAU paper sleeve ✅ (F2F daily, XAUTUSDT, paper; mirrored to bot_trades/equity tagged f2f_gold; 4/4 tests)
 - [x] Task 4a — Funding-ledger keystone + 4-component decomposition ✅ `954a03d` (22 tests; adversarial review caught + fixed frictionReturn=0 → real friction attribution consistent with gold sleeve)
-- [ ] Task 4b — Review report (per-cell) + decision_log + skipped_signals + weekly cron
+- [x] Task 4b — Review report (per-cell) + decision_log + skipped_signals + weekly cron ✅ `c7f7544` (17 tests; review.ts per-cell + cold-cohort, append-only decision-log.ts, onSkip seam in order-manager, run-weekly-review.ts)
 - [ ] Task 5 — Kill-Switch
 - [ ] Task 6 — Risk Hardening
 - [ ] Task 7 — Tradeability + regime re-fit
@@ -75,3 +75,4 @@ _(append one line per loop iteration: timestamp · task · result · commit)_
 - 2026-06-14 · Task 3 Forward Loop · hourly mark-to-market snapshots (pure snapshot.ts), migrate-on-startup, backtest-dump gated to non-forward modes, paper-forward mode + PM2 app, 13/13 tests · `f14241d`
 - 2026-06-14 · Task 3b Gold sleeve · F2F daily XAUTUSDT paper, src/lib/gold/paper-sleeve.ts mirrors trades+equity into bot_trades/snapshots tagged f2f_gold, 4/4 tests · `66227c8`
 - 2026-06-14 · Task 4a Funding-ledger keystone · half-open settlement counting (math reviewer: fuzz-clean), 4-component decomposition; ADVERSARIAL REVIEW caught frictionReturn=0 defect → fixed to -(nSides·frictionPerSide), 22 tests · `954a03d`
+- 2026-06-14 · Task 4b Review layer · per-cell decompose + cold-cohort decay, append-only decision-log, skipped-signal onSkip seam, weekly cron, 17 tests · `c7f7544`

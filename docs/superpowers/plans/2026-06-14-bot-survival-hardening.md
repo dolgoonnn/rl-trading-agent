@@ -129,7 +129,7 @@
 - [ ] **Step 3 — Run fail → implement → green → typecheck/lint.**
 - [ ] **Step 4 — Commit:** `gmp "add gold/XAU paper sleeve to forward bot (charter F2F+metals, XAUTUSDT, paper)" feat backend`
 
-## Task 4: Review Loop + funding-ledger keystone
+## Task 4: Review Loop + funding-ledger keystone — ✅ DONE (4a `954a03d` + 4b `c7f7544`)
 
 **Plan group:** PLAN-D. **Depends on:** Tasks 2, 3.
 
