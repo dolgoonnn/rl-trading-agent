@@ -79,7 +79,7 @@ Commits ffc3676(checkpoint) → 7e638c2 → 9ce61e5 → f14241d → 66227c8 → 
 ## Research queue (after Task 9; ground each in a reputable source first)
 - [DONE `86dac43`] Funding/basis carry (BIS WP 1087) — NULL net-of-cost; funding family CLOSED (stays a cost, not harvested).
 - [DONE `2f3dfa8`] Pre-FOMC drift US500 — CLOSED (grounded Lucca-Moench 2015 + Kurov 2021): decayed to 1/3, vol-gate fails Harvey-Liu, 82% redundant with leg J. No new leg.
-- [BLOCKED — needs ≥30–60d L2 collection via collect-btc-orderflow.ts] Net-of-cost predictive OFI/CVD probe (prior OOS Sharpe 0.12).
+- [PIPELINE BUILT `2b7165f`, STUDY AWAITS DATA] Net-of-cost predictive OFI/CVD probe (prior OOS Sharpe 0.12). Feature pipeline `src/lib/microstructure/ofi-features.ts` (snapshotOFI proxy, CVD from buyVol/sellVol, microprice, imbalance) built + validated on real data, grounded Cont-Kukanov-Stoikov; 23 tests. NO predictive verdict drawn — deferred until ≥30–60d. NDJSON schema richer than documented: ts,mid,spreadBps,bidDepth5,askDepth5,imb5,imb25,buyVol,sellVol,tradeCount (+optional liqBuy/liqSell/liqCount).
 - [BLOCKED — needs ≥30–60d collection + 2-vintage holdout] Liquidation-cascade-fade event study.
 
 ## Iteration log
@@ -99,6 +99,8 @@ _(append one line per loop iteration: timestamp · task · result · commit)_
 - 2026-06-14 · Task 9 ATR-stop arms PROBE · chandelier + vertical-barrier + per-arm funding debit on Run-20 log; NULL (no arm beats baseline net-of-funding); 8 tests · `87e65c8`
 - 2026-06-14 · RESEARCH funding-carry · grounded BIS WP1087 + arXiv replication; reproduced 7.6% net APY + 2024→2025 decay; NULL tradeable alpha (gated harvest net-negative, Sharpe is illusion); funding family closed; 5 tests · `86dac43`
 - 2026-06-14 · RESEARCH pre-FOMC drift · grounded Lucca-Moench 2015 + Kurov 2021; CLOSED (decayed 1/3, vol-gate fails Harvey-Liu deflation, 82% redundant w/ leg J); placebo confirms FOMC-specificity; 9 tests · `2f3dfa8`
+- 2026-06-14 · OPS · restarted L2 orderflow collector (stalled 06-12) + durable PM2 entry; accumulating BTCUSDT 1s snapshots · `9c904da`
+- 2026-06-14 · INFRA · OFI/CVD/microprice feature pipeline (grounded Cont-Kukanov-Stoikov) + NDJSON loader, validated on real data, 23 tests; predictive verdict DEFERRED to ≥30-60d · `2b7165f`
 
 ## 🛑 LOOP STATUS (2026-06-14): feasible work EXHAUSTED — disciplined idle, NOT spinning
 All 9 build tasks done + 2 grounded research items closed. Remaining work is genuinely gated, NOT skipped lazily:
