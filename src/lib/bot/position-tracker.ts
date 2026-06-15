@@ -6,7 +6,7 @@
  * via Drizzle ORM for crash recovery.
  */
 
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and, gte, lt } from 'drizzle-orm';
 import type {
   BotPosition,
   BotTradeRecord,
@@ -384,7 +384,7 @@ export class PositionTracker {
     const drawdown = peakEquity > 0 ? (peakEquity - equity) / peakEquity : 0;
     const cumulativePnl = equity - this.getInitialCapital();
 
-    db.insert(botEquitySnapshots).values({
+    const row = {
       timestamp: nowMs,
       equity,
       peakEquity,
@@ -392,7 +392,28 @@ export class PositionTracker {
       openPositions: this.state.openPositions.length,
       dailyPnl: this.state.dailyPnl,
       cumulativePnl,
-    }).run();
+    };
+
+    // Idempotent per UTC hour: at most ONE snapshot per hour, latest equity
+    // wins. The per-tick path already gates on shouldSnapshot, but the
+    // startup/shutdown/trade-close callers (and PM2 autorestarts) bypass it and
+    // would otherwise inject intra-hour duplicates that skew any
+    // Sharpe-from-snapshots / DSR computation downstream. De-dupe at the source.
+    const HOUR_MS = 3_600_000;
+    const bucketStart = Math.floor(nowMs / HOUR_MS) * HOUR_MS;
+    const existing = db.select({ id: botEquitySnapshots.id })
+      .from(botEquitySnapshots)
+      .where(and(
+        gte(botEquitySnapshots.timestamp, bucketStart),
+        lt(botEquitySnapshots.timestamp, bucketStart + HOUR_MS),
+      ))
+      .all();
+
+    if (existing.length > 0) {
+      db.update(botEquitySnapshots).set(row).where(eq(botEquitySnapshots.id, existing[0]!.id)).run();
+    } else {
+      db.insert(botEquitySnapshots).values(row).run();
+    }
   }
 
   // ============================================
