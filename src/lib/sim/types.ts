@@ -29,7 +29,7 @@ export interface SimTradeResult {
   direction: 'long' | 'short';
   entryPrice: number;       // cost-adjusted entry
   exitPrice: number;        // cost-adjusted exit
-  pnlPercent: number;       // net of cost (gross of funding)
+  pnlPercent: number;       // cost-adjusted gross return; does NOT include funding (see netReturn)
   strategy?: string;
   exitReason: SimExitReason;
   tier: FidelityTier;

@@ -58,6 +58,9 @@ export function simulatePosition(
   for (let i = startIndex; i < candles.length; i++) {
     const bar = candles[i];
     if (!bar) continue;
+    // barsHeld matches legacy simulatePositionSimple (i - entryIndex).
+    // Precondition: position.entryIndex <= startIndex. Callers must not pass a
+    // startIndex below entryIndex, or barsHeld would inflate and trip maxBars early.
     const barsHeld = i - position.entryIndex;
 
     const req: BarFillRequest = {
