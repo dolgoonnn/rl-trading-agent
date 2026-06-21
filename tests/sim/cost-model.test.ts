@@ -30,10 +30,10 @@ describe('SpreadFeeImpactCostModel', () => {
   const m = new SpreadFeeImpactCostModel({ takerFee: 0.00055, makerFee: 0.0002, impactCoef: 0.5, maxFillVolumeFrac: 0.025 });
   it('charges taker fee + half-spread on a small order (no impact)', () => {
     const out = m.apply(100, 'long', { side: 'entry', halfSpread: 0.0001, barVolume: 1e9, orderQty: 1 });
-    // ~ 100 * (1 + 0.00055 + 0.0001), impact ~ 0 (but sqrt-impact still nonzero on finite orderQty)
-    expect(out).toBeGreaterThan(100 * (1 + 0.00055 + 0.0001) - 1e-6);
-    // impact at orderQty=1, barVolume=1e9 is ~0.00158 abs (0.5*sqrt(1e-9)*100), well inside 1e-3 relative (=0.1 abs)
-    expect(out).toBeLessThan(100 * (1 + 0.00055 + 0.0001) + 1e-3);
+    // entry=taker fee 0.00055 + halfSpread 0.0001 + sqrt-impact 0.5*sqrt(1/1e9) (~1.58e-5)
+    const expectedImpact = 0.5 * Math.sqrt(1 / 1e9);
+    const expected = 100 * (1 + 0.00055 + 0.0001 + expectedImpact);
+    expect(out).toBeCloseTo(expected, 6);
   });
   it('adds sqrt impact when order is a real fraction of bar volume', () => {
     const small = m.apply(100, 'long', { side: 'entry', halfSpread: 0, barVolume: 1e6, orderQty: 1 });
