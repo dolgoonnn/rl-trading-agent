@@ -57,3 +57,29 @@ describe('pessimisticResolve', () => {
     expect(r!.fillTimestamp).toBe(9_000);
   });
 });
+
+import { ohlcHeuristicResolve } from '@/lib/sim/intrabar';
+
+describe('ohlcHeuristicResolve', () => {
+  // Open near HIGH => assume path O->H->L->C. A long whose TP and SL both sit
+  // in range should fill TP first (high reached before low).
+  it('long, open near high: TP fills first on a straddle', () => {
+    const r = ohlcHeuristicResolve({
+      levels: { direction: 'long', stopLoss: 95, takeProfit: 110 },
+      bar: { timestamp: 1, open: 113, high: 115, low: 90, close: 100, volume: 1 },
+      barsHeld: 1, maxBars: 100,
+    });
+    expect(r!.exitReason).toBe('take_profit');
+    expect(r!.tier).toBe('ohlc_heuristic');
+  });
+
+  // Open near LOW => assume path O->L->H->C. Same straddle now fills SL first.
+  it('long, open near low: SL fills first on a straddle', () => {
+    const r = ohlcHeuristicResolve({
+      levels: { direction: 'long', stopLoss: 95, takeProfit: 110 },
+      bar: { timestamp: 1, open: 92, high: 115, low: 90, close: 100, volume: 1 },
+      barsHeld: 1, maxBars: 100,
+    });
+    expect(r!.exitReason).toBe('stop_loss');
+  });
+});
