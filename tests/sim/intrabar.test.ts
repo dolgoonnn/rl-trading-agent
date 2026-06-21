@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { pessimisticResolve } from '@/lib/sim/intrabar';
+import { pessimisticResolve, ohlcHeuristicResolve } from '@/lib/sim/intrabar';
 import type { BarFillRequest } from '@/lib/sim/types';
 import type { Candle } from '@/types/candle';
 
@@ -57,8 +57,6 @@ describe('pessimisticResolve', () => {
     expect(r!.fillTimestamp).toBe(9_000);
   });
 });
-
-import { ohlcHeuristicResolve } from '@/lib/sim/intrabar';
 
 describe('ohlcHeuristicResolve', () => {
   // Open near HIGH => assume path O->H->L->C. A long whose TP and SL both sit
