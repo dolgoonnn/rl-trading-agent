@@ -4,6 +4,45 @@ export type SimExitReason = 'stop_loss' | 'take_profit' | 'max_bars' | 'strategy
 export type FidelityTier = 'l2_depth' | 'subbar_1m' | 'ohlc_heuristic' | 'pessimistic';
 export type EntryTiming = 'signal_close' | 'next_open';
 
+export interface SimPosition {
+  direction: 'long' | 'short';
+  entryPrice: number;       // raw signal price (pre-cost)
+  entryTimestamp: number;
+  entryIndex: number;
+  stopLoss: number;
+  takeProfit: number;
+  strategy: string;
+}
+
+export interface SimConfig {
+  entryTiming: EntryTiming;
+  maxBars: number;
+  barMs: number;
+  exitMode: 'simple' | 'partial_tp' | 'breakeven' | 'trailing';
+  partialTP?: { fraction: number; triggerR: number; beBuffer: number };
+  trailing?: { activationR: number; distanceR: number };
+}
+
+export interface SimTradeResult {
+  entryTimestamp: number;
+  exitTimestamp: number;
+  direction: 'long' | 'short';
+  entryPrice: number;       // cost-adjusted entry
+  exitPrice: number;        // cost-adjusted exit
+  pnlPercent: number;       // net of cost (gross of funding)
+  strategy?: string;
+  exitReason: SimExitReason;
+  tier: FidelityTier;
+  grossReturn: number;      // == pnlPercent (cost already in adjusted prices)
+  fundingReturn: number;
+  netReturn: number;        // grossReturn + fundingReturn
+}
+
+export interface SubBarProvider {
+  /** 1m candles strictly inside [barTs, barTs + barMs). Empty when none. */
+  subBarsFor(barTs: number, barMs: number): Candle[];
+}
+
 export interface SimLevels {
   direction: 'long' | 'short';
   stopLoss: number;
