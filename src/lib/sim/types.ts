@@ -36,6 +36,10 @@ export interface CostContext {
   orderQty?: number;
   /** Half-spread as a fraction of price (e.g. 0.0001 = 1bp). */
   halfSpread?: number;
-  /** Per-bar volatility (fraction) for the sqrt-impact term. */
+  /**
+   * Per-bar volatility (fraction) for the sqrt-impact term. Defaults to 1 when
+   * absent — callers who do not inject vol should fold the typical volatility
+   * into `impactCoef` (i.e. set impactCoef ≈ Y × σ_typical).
+   */
   volatility?: number;
 }
