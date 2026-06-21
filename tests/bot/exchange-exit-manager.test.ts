@@ -67,3 +67,77 @@ describe('ExchangeExitManager.armExits', () => {
     expect(client.setTradingStop).not.toHaveBeenCalled();
   });
 });
+
+describe('ExchangeExitManager.clearExits', () => {
+  it('sends "0" for both SL and TP to remove the position stop', async () => {
+    const client = mockClient();
+    const mgr = new ExchangeExitManager(client, { enabled: true, triggerBy: 'MarkPrice' });
+    const res = await mgr.clearExits('BTCUSDT');
+    expect(res.ok).toBe(true);
+    expect(client.setTradingStop).toHaveBeenCalledWith(
+      expect.objectContaining({ symbol: 'BTCUSDT', positionIdx: 0, stopLoss: '0', takeProfit: '0' }),
+    );
+  });
+
+  it('is a no-op when disabled — never touches the exchange', async () => {
+    const client = mockClient();
+    const mgr = new ExchangeExitManager(client, { enabled: false, triggerBy: 'MarkPrice' });
+    const res = await mgr.clearExits('BTCUSDT');
+    expect(res.ok).toBe(true);
+    expect(client.setTradingStop).not.toHaveBeenCalled();
+  });
+});
+
+describe('ExchangeExitManager.marketClose', () => {
+  it('flattens with a reduce-only market order on the closing side', async () => {
+    const client = mockClient();
+    const mgr = new ExchangeExitManager(client, { enabled: true, triggerBy: 'MarkPrice' });
+    const res = await mgr.marketClose('BTCUSDT', 'Sell', '0.01');
+    expect(res.ok).toBe(true);
+    expect(client.submitOrder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        category: 'linear', symbol: 'BTCUSDT', side: 'Sell',
+        orderType: 'Market', qty: '0.01', reduceOnly: true,
+      }),
+    );
+  });
+
+  it('is a no-op when disabled — never touches the exchange', async () => {
+    const client = mockClient();
+    const mgr = new ExchangeExitManager(client, { enabled: false, triggerBy: 'MarkPrice' });
+    const res = await mgr.marketClose('BTCUSDT', 'Sell', '0.01');
+    expect(res.ok).toBe(true);
+    expect(client.submitOrder).not.toHaveBeenCalled();
+  });
+});
+
+describe('ExchangeExitManager.getOpenSize', () => {
+  it('parses the live position size and avgPrice', async () => {
+    const client = mockClient({
+      getPositionInfo: vi.fn().mockResolvedValue({
+        retCode: 0, retMsg: 'OK',
+        result: { list: [{ size: '0.012', side: 'Buy', avgPrice: '60100' }] },
+      }),
+    });
+    const mgr = new ExchangeExitManager(client, { enabled: true, triggerBy: 'MarkPrice' });
+    const r = await mgr.getOpenSize('BTCUSDT');
+    expect(r.size).toBeCloseTo(0.012);
+    expect(r.avgPrice).toBeCloseTo(60100);
+  });
+
+  it('reports size 0 when the venue has no open position', async () => {
+    const client = mockClient(); // getPositionInfo returns list: []
+    const mgr = new ExchangeExitManager(client, { enabled: true, triggerBy: 'MarkPrice' });
+    const r = await mgr.getOpenSize('BTCUSDT');
+    expect(r.size).toBe(0);
+  });
+
+  it('is a no-op when disabled — never touches the exchange, returns size 0', async () => {
+    const client = mockClient();
+    const mgr = new ExchangeExitManager(client, { enabled: false, triggerBy: 'MarkPrice' });
+    const r = await mgr.getOpenSize('BTCUSDT');
+    expect(r.size).toBe(0);
+    expect(r.avgPrice).toBe(0);
+    expect(client.getPositionInfo).not.toHaveBeenCalled();
+  });
+});
