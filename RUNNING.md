@@ -65,6 +65,8 @@ When this flag is set, the bot places the stop-loss and final take-profit as a *
 **Phase 1 caveat — partial-TP stays in-process**
 Only the hard SL and the final TP live on the exchange. The fractional partial-TP (e.g. 50 % @ 1.41 R) continues to be managed in-process, exactly as validated in Run-20. Phase 2 — moving the fractional partial onto the exchange as a resting reduce-only order — is deferred; it requires fill-reconciliation (poll closed-PnL) and introduces an accepted parity change (exchange fills intrabar vs. our candle-close model).
 
+> ⚠️ **Accounting diverges after a partial-TP.** The exchange holds a 100 % SL+TP (`tpslMode: 'Full'`); the partial is booked only in the in-process shadow. So once a partial fires, the bot's **reported equity/PnL can diverge from the real Bybit balance** (e.g. a reversal-to-BE after a partial: the exchange sells 100 % at BE while the shadow already booked the partial profit). The reported equity curve — and the drawdown / DSR / kill-switch logic that consumes it — is therefore **unreliable post-partial** until the Phase-2 per-tick position-size reconciliation lands. While running live with `--exchange-exits`, **reconcile realized PnL against the Bybit account balance**, not the bot's equity snapshots.
+
 **Pre-live verification checklist (manual — operator must complete before trusting with real money)**
 
 This procedure has **NOT yet been run**. The flag is not considered validated for real-money use until all steps below are confirmed with evidence (screenshot or `getPositionInfo` output).

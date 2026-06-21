@@ -292,6 +292,16 @@ class TradingBot {
           enabled: true,
         });
         console.log('[exchange-exits] ENABLED — SL/TP will be placed on Bybit at fill');
+        // The only real-exchange-fill path is processLimitOrder (--limit-orders).
+        // Without it (or with --ltf, which opens shadow-only positions), no real
+        // position is ever created, so exchange exits arm NOTHING — warn loudly so
+        // the "ENABLED" line above is not mistaken for actual protection.
+        if (!limitOrdersEnabled) {
+          console.warn(
+            '[exchange-exits] INERT: requires --limit-orders to create real exchange fills. ' +
+            'Without it (e.g. --ltf or paper-forward shadow fills) nothing is armed on Bybit.',
+          );
+        }
       } else {
         console.warn('--exchange-exits requires BYBIT_API_KEY and BYBIT_API_SECRET env vars');
       }
@@ -1194,6 +1204,9 @@ class TradingBot {
     // 0 funding booked + logged (fail-safe, never crashes the close).
     const closedPos = exitResult.position;
     if (this.exchangeExitManager?.isEnabled) {
+      // checkPositionExit only returns stop_loss | take_profit | max_bars here;
+      // 'shutdown' is produced by forceClose in stop() (which flattens in its own
+      // loop), so it is unreachable on this path — kept defensively.
       if (closedPos.exitReason === 'max_bars' || closedPos.exitReason === 'shutdown') {
         // No exchange equivalent for a time exit — flatten the REAL position first.
         const live = await this.exchangeExitManager.getOpenSize(closedPos.symbol);
