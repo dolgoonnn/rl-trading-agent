@@ -125,4 +125,35 @@ describe('subBarResolve', () => {
     });
     expect(r).toBeNull();
   });
+
+  it('short: 1m path hits TP before SL -> take_profit (covers short branch)', () => {
+    const subBars: Candle[] = [
+      { timestamp: 10, open: 100, high: 100, low: 89, close: 90, volume: 1 }, // TP (low<=90) first
+      { timestamp: 70, open: 90, high: 111, low: 90, close: 110, volume: 1 },  // SL later
+    ];
+    const r = subBarResolve({
+      levels: { direction: 'short', stopLoss: 110, takeProfit: 90 },
+      bar: { timestamp: 0, open: 100, high: 111, low: 89, close: 110, volume: 2 },
+      barsHeld: 1, maxBars: 100, subBars,
+    });
+    expect(r!.exitReason).toBe('take_profit');
+    expect(r!.exitPrice).toBe(90);
+    expect(r!.fillTimestamp).toBe(10);
+    expect(r!.tier).toBe('subbar_1m');
+  });
+
+  it('no touch across 1m but maxBars reached -> max_bars at exec bar close', () => {
+    const subBars: Candle[] = [
+      { timestamp: 10, open: 100, high: 105, low: 99, close: 101, volume: 1 },
+    ];
+    const r = subBarResolve({
+      levels: { direction: 'long', stopLoss: 80, takeProfit: 130 },
+      bar: { timestamp: 0, open: 100, high: 105, low: 99, close: 102, volume: 1 },
+      barsHeld: 100, maxBars: 100, subBars,
+    });
+    expect(r!.exitReason).toBe('max_bars');
+    expect(r!.exitPrice).toBe(102);
+    expect(r!.fillTimestamp).toBe(0);
+    expect(r!.tier).toBe('subbar_1m');
+  });
 });
