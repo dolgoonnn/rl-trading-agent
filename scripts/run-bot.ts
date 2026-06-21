@@ -39,6 +39,9 @@ import {
   DEFAULT_FUNDING_ARB_CONFIG,
 } from '../src/lib/bot';
 import { LTFConfirmation } from '../src/lib/bot/ltf-confirmation';
+import { ExchangeExitManager } from '../src/lib/bot/exchange-exit-manager';
+import { EXCHANGE_EXIT_CONFIG } from '../src/lib/bot/config';
+import { RestClientV5 } from 'bybit-api';
 import type { LiveGuardInputs } from '../src/lib/bot/order-manager';
 import { computePositionSize } from '../src/lib/bot/guards';
 import { shouldSnapshot } from '../src/lib/bot/snapshot';
@@ -66,6 +69,7 @@ function parseArgs(): {
   fundingArbEnabled: boolean;
   arbOnly: boolean;
   limitOrdersEnabled: boolean;
+  exchangeExitsEnabled: boolean;
 } {
   const args = process.argv.slice(2);
   const config = { ...DEFAULT_BOT_CONFIG };
@@ -74,6 +78,7 @@ function parseArgs(): {
   let fundingArbEnabled = false;
   let arbOnly = false;
   let limitOrdersEnabled = false;
+  let exchangeExitsEnabled = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -120,10 +125,13 @@ function parseArgs(): {
       case '--limit-orders':
         limitOrdersEnabled = true;
         break;
+      case '--exchange-exits':
+        exchangeExitsEnabled = true;
+        break;
     }
   }
 
-  return { config, resume, ltfEnabled, fundingArbEnabled, arbOnly, limitOrdersEnabled };
+  return { config, resume, ltfEnabled, fundingArbEnabled, arbOnly, limitOrdersEnabled, exchangeExitsEnabled };
 }
 
 // ============================================
@@ -160,6 +168,9 @@ class TradingBot {
 
   // Limit order execution
   private limitOrderExecutor: LimitOrderExecutor | null = null;
+
+  // Exchange-native protective exits (SL/TP on Bybit)
+  private exchangeExitManager: ExchangeExitManager | null = null;
 
   // Retirement kill-switch. We read the latched flag (fs sentinel + env + DB row)
   // BEFORE processing any symbol each tick. `killAlerted` dedupes the alert so a
@@ -203,6 +214,7 @@ class TradingBot {
     fundingArbEnabled: boolean,
     arbOnly: boolean,
     limitOrdersEnabled = false,
+    exchangeExitsEnabled = false,
   ) {
     this.config = config;
     this.arbOnly = arbOnly;
@@ -266,6 +278,22 @@ class TradingBot {
         console.log('Limit order execution: ENABLED (maker fills)');
       } else {
         console.warn('--limit-orders requires BYBIT_API_KEY and BYBIT_API_SECRET env vars');
+      }
+    }
+
+    // Exchange-native protective exits (requires API keys)
+    if (exchangeExitsEnabled) {
+      const apiKey = process.env.BYBIT_API_KEY;
+      const apiSecret = process.env.BYBIT_API_SECRET;
+      if (apiKey && apiSecret) {
+        const client = new RestClientV5({ key: apiKey, secret: apiSecret, testnet: false });
+        this.exchangeExitManager = new ExchangeExitManager(client, {
+          ...EXCHANGE_EXIT_CONFIG,
+          enabled: true,
+        });
+        console.log('[exchange-exits] ENABLED — SL/TP will be placed on Bybit at fill');
+      } else {
+        console.warn('--exchange-exits requires BYBIT_API_KEY and BYBIT_API_SECRET env vars');
       }
     }
 
@@ -375,6 +403,12 @@ class TradingBot {
     // Cancel pending limit orders
     if (this.limitOrderExecutor) {
       await this.limitOrderExecutor.cancelAll();
+    }
+
+    // Exchange-native exits: note that SL/TP orders live on Bybit and persist
+    // even after this process stops. Log so the operator knows they are still armed.
+    if (this.exchangeExitManager?.isEnabled) {
+      console.log('[exchange-exits] process stopping — exchange-native stops remain armed on Bybit');
     }
 
     // Close all open positions on shutdown
@@ -1298,8 +1332,8 @@ async function main(): Promise<void> {
   // creates every table. Relies on a non-empty __drizzle_migrations table.
   migrate(db, { migrationsFolder: './drizzle' });
 
-  const { config, resume, ltfEnabled, fundingArbEnabled, arbOnly, limitOrdersEnabled } = parseArgs();
-  const bot = new TradingBot(config, resume, ltfEnabled, fundingArbEnabled, arbOnly, limitOrdersEnabled);
+  const { config, resume, ltfEnabled, fundingArbEnabled, arbOnly, limitOrdersEnabled, exchangeExitsEnabled } = parseArgs();
+  const bot = new TradingBot(config, resume, ltfEnabled, fundingArbEnabled, arbOnly, limitOrdersEnabled, exchangeExitsEnabled);
 
   // Graceful shutdown handlers (PM2 compatible)
   const shutdown = async (signal: string) => {

@@ -26,8 +26,8 @@ export interface ExchangeExitClient {
     tpslMode?: 'Full' | 'Partial';
     stopLoss?: string;
     takeProfit?: string;
-    slTriggerBy?: string;
-    tpTriggerBy?: string;
+    slTriggerBy?: 'LastPrice' | 'IndexPrice' | 'MarkPrice';
+    tpTriggerBy?: 'LastPrice' | 'IndexPrice' | 'MarkPrice';
   }): Promise<{ retCode: number; retMsg: string }>;
   submitOrder(params: {
     category: 'linear';
