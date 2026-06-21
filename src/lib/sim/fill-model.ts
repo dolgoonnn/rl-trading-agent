@@ -18,7 +18,7 @@ export interface FillModel {
  * selectable here because latency/queue require the event loop.
  */
 export class DefaultFillModel implements FillModel {
-  constructor(private cost: CostModel, private opts: { allowHeuristic?: boolean } = {}) {}
+  constructor(private readonly cost: CostModel, private readonly opts: { allowHeuristic?: boolean } = {}) {}
 
   resolveExit(req: BarFillRequest): FillResult | null {
     if (req.subBars && req.subBars.length > 0) return subBarResolve(req);

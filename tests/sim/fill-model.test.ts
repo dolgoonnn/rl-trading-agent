@@ -34,6 +34,16 @@ describe('DefaultFillModel.resolveExit tier selection', () => {
     expect(r!.tier).toBe('pessimistic');
     expect(r!.exitReason).toBe('stop_loss');
   });
+
+  it('defaults to pessimistic floor when opts omitted entirely', () => {
+    const fm = new DefaultFillModel(cost); // no opts -> allowHeuristic undefined (falsy)
+    expect(fm.resolveExit(straddle)!.tier).toBe('pessimistic');
+  });
+
+  it('empty subBars array does NOT select subbar_1m (falls through to floor)', () => {
+    const fm = new DefaultFillModel(cost);
+    expect(fm.resolveExit({ ...straddle, subBars: [] })!.tier).toBe('pessimistic');
+  });
 });
 
 describe('DefaultFillModel.applyCost', () => {
