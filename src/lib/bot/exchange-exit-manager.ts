@@ -155,6 +155,10 @@ export class ExchangeExitManager {
       return {
         exitPrice,
         closedPnl: parseFloat(row.closedPnl) || 0,
+        // Bybit returns updatedTime as a millisecond-epoch string. If that format
+        // ever changed, this would parse to 0 / a too-small value → the reconcile
+        // guard (closedAtMs > entryTimestamp) rejects it: a missed reconcile, never
+        // a spurious close (fails safe).
         closedAtMs: parseInt(row.updatedTime, 10) || 0,
       };
     } catch {
@@ -194,4 +198,33 @@ export class ExchangeExitManager {
 /** The order side that flattens a position of the given direction. */
 export function closeSideFor(direction: 'long' | 'short'): 'Buy' | 'Sell' {
   return direction === 'long' ? 'Sell' : 'Buy';
+}
+
+/**
+ * Pure decision for per-tick exchange-close reconciliation. Returns the close to
+ * book, or null to do nothing this tick. Kept pure (no I/O) so the safety-critical
+ * guard is unit-testable.
+ *
+ * Reconcile ONLY when the venue is flat (`openSize === 0`) AND a realized close
+ * record POST-DATES this position's entry. `getOpenSize` returns size 0 on a
+ * transient API error too, so size 0 alone is not proof; in one-way mode an open
+ * position cannot have a venue close newer than its own entry, so the timestamp
+ * check rejects both the API-error case and a stale prior-trade record. `reason`
+ * is inferred from proximity to TP vs SL (cosmetic — PnL books from exitPrice).
+ */
+export function decideExchangeReconcile(args: {
+  openSize: number;
+  realized: { exitPrice: number; closedAtMs: number } | null;
+  entryTimestamp: number;
+  takeProfit: number;
+  currentSL: number;
+}): { exitPrice: number; reason: 'take_profit' | 'stop_loss' } | null {
+  if (args.openSize > 0) return null;
+  if (!args.realized || args.realized.closedAtMs <= args.entryTimestamp) return null;
+  const { exitPrice } = args.realized;
+  const reason: 'take_profit' | 'stop_loss' =
+    Math.abs(exitPrice - args.takeProfit) < Math.abs(exitPrice - args.currentSL)
+      ? 'take_profit'
+      : 'stop_loss';
+  return { exitPrice, reason };
 }

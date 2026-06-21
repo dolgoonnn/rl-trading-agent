@@ -39,7 +39,7 @@ import {
   DEFAULT_FUNDING_ARB_CONFIG,
 } from '../src/lib/bot';
 import { LTFConfirmation } from '../src/lib/bot/ltf-confirmation';
-import { ExchangeExitManager, closeSideFor } from '../src/lib/bot/exchange-exit-manager';
+import { ExchangeExitManager, closeSideFor, decideExchangeReconcile } from '../src/lib/bot/exchange-exit-manager';
 import { EXCHANGE_EXIT_CONFIG } from '../src/lib/bot/config';
 import { RestClientV5 } from 'bybit-api';
 import type { LiveGuardInputs } from '../src/lib/bot/order-manager';
@@ -54,7 +54,7 @@ import {
 import { RETIREMENT_CONFIG, SAFETY_GATE_CONFIG, SYMBOL_ALLOCATION } from '../src/lib/bot/config';
 import { db } from '../src/lib/data/db';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
-import type { BotConfig, BotSymbol, BotPosition, LTFConfig, ExitReason } from '../src/types/bot';
+import type { BotConfig, BotSymbol, BotPosition, LTFConfig } from '../src/types/bot';
 import type { Candle } from '../src/types/candle';
 import type { FundingSettlementSeries } from '../src/lib/cost/funding-ledger';
 
@@ -1179,27 +1179,27 @@ class TradingBot {
   private async reconcileExchangeClose(position: BotPosition): Promise<boolean> {
     if (!this.exchangeExitManager?.isEnabled) return false;
     const live = await this.exchangeExitManager.getOpenSize(position.symbol);
-    if (live.size > 0) return false; // still clearly open on the venue — cheap pre-filter
+    // Only query closed-PnL when the venue looks flat (cheap pre-filter). The
+    // authoritative guard lives in decideExchangeReconcile (requires a close record
+    // post-dating entry, so a transient getOpenSize error can't spuriously close).
+    const realized = live.size > 0
+      ? null
+      : await this.exchangeExitManager.getRealizedClose(position.symbol);
+    const decision = decideExchangeReconcile({
+      openSize: live.size,
+      realized,
+      entryTimestamp: position.entryTimestamp,
+      takeProfit: position.takeProfit,
+      currentSL: position.currentSL,
+    });
+    if (!decision) return false;
 
-    // `getOpenSize` returns size 0 on a transient API error too, so size 0 alone is
-    // NOT proof of a close. Require a realized close record that POST-DATES this
-    // position's entry as the authoritative signal: in one-way mode an open position
-    // cannot have a close newer than its own entry, so this rejects both the
-    // API-error case and a stale prior-trade record. No record → wait, retry next tick.
-    const realized = await this.exchangeExitManager.getRealizedClose(position.symbol);
-    if (!realized || realized.closedAtMs <= position.entryTimestamp) return false;
-    const exitPrice = realized.exitPrice;
-    const reason: ExitReason =
-      Math.abs(exitPrice - position.takeProfit) < Math.abs(exitPrice - position.currentSL)
-        ? 'take_profit'
-        : 'stop_loss';
-
-    const result = this.orderManager.forceClose(position, exitPrice, reason);
+    const result = this.orderManager.forceClose(position, decision.exitPrice, decision.reason);
     const fundingSeries = await this.buildFundingSeries(result.position);
     this.tracker.closePosition(result.position, fundingSeries);
     await this.alerts.positionClosed(result.position);
     await this.exchangeExitManager.clearExits(position.symbol);
-    console.log(`  ${position.symbol}: RECONCILED exchange close @ $${exitPrice} (${reason})`);
+    console.log(`  ${position.symbol}: RECONCILED exchange close @ $${decision.exitPrice} (${decision.reason})`);
 
     const triggered = this.riskEngine.evaluateAfterTrade(this.tracker);
     for (const cb of triggered) await this.alerts.circuitBreakerTriggered(cb.type, cb.reason);

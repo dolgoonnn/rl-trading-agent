@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   ExchangeExitManager,
   closeSideFor,
+  decideExchangeReconcile,
   type ExchangeExitClient,
 } from '@/lib/bot/exchange-exit-manager';
 
@@ -206,5 +207,42 @@ describe('ExchangeExitManager.getRealizedClose', () => {
     const client = mockClient({ getClosedPnL: vi.fn().mockRejectedValue(new Error('ETIMEDOUT')) });
     const mgr = new ExchangeExitManager(client, { enabled: true, triggerBy: 'MarkPrice' });
     expect(await mgr.getRealizedClose('BTCUSDT')).toBeNull();
+  });
+});
+
+describe('decideExchangeReconcile', () => {
+  const base = { entryTimestamp: 1000, takeProfit: 65000, currentSL: 60000 };
+
+  it('does NOT reconcile when the venue still shows an open size', () => {
+    const realized = { exitPrice: 64000, closedAtMs: 2000 }; // fresh, but still open
+    expect(decideExchangeReconcile({ openSize: 0.01, realized, ...base })).toBeNull();
+  });
+
+  it('does NOT reconcile when flat but there is no close record (transient API error)', () => {
+    expect(decideExchangeReconcile({ openSize: 0, realized: null, ...base })).toBeNull();
+  });
+
+  it('does NOT reconcile when the close record pre-dates entry (stale prior trade)', () => {
+    const realized = { exitPrice: 64000, closedAtMs: base.entryTimestamp - 1 };
+    expect(decideExchangeReconcile({ openSize: 0, realized, ...base })).toBeNull();
+  });
+
+  it('does NOT reconcile when closedAtMs equals entryTimestamp (<= boundary)', () => {
+    const realized = { exitPrice: 64000, closedAtMs: base.entryTimestamp };
+    expect(decideExchangeReconcile({ openSize: 0, realized, ...base })).toBeNull();
+  });
+
+  it('reconciles when flat AND the close record post-dates entry', () => {
+    const realized = { exitPrice: 64900, closedAtMs: base.entryTimestamp + 1 };
+    const d = decideExchangeReconcile({ openSize: 0, realized, ...base });
+    expect(d).not.toBeNull();
+    expect(d!.exitPrice).toBe(64900);
+    expect(d!.reason).toBe('take_profit'); // 64900 nearer 65000 TP than 60000 SL
+  });
+
+  it('infers stop_loss when the exit price is nearer the SL', () => {
+    const realized = { exitPrice: 60100, closedAtMs: base.entryTimestamp + 1 };
+    const d = decideExchangeReconcile({ openSize: 0, realized, ...base });
+    expect(d!.reason).toBe('stop_loss');
   });
 });
