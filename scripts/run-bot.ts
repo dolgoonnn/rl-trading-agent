@@ -405,10 +405,11 @@ class TradingBot {
       await this.limitOrderExecutor.cancelAll();
     }
 
-    // Exchange-native exits: note that SL/TP orders live on Bybit and persist
-    // even after this process stops. Log so the operator knows they are still armed.
+    // Exchange-native exits: graceful shutdown flattens real positions and clears
+    // their stops. A hard crash instead leaves these stops armed on Bybit to
+    // protect open positions.
     if (this.exchangeExitManager?.isEnabled) {
-      console.log('[exchange-exits] process stopping — exchange-native stops remain armed on Bybit');
+      console.log('[exchange-exits] graceful shutdown — flattening real positions and clearing exchange stops (a hard crash instead leaves these stops armed on Bybit to protect open positions)');
     }
 
     // Close all open positions on shutdown
@@ -419,6 +420,15 @@ class TradingBot {
         if (price === null) {
           console.error(`No price available to close ${position.symbol} on shutdown`);
           continue;
+        }
+        if (this.exchangeExitManager?.isEnabled) {
+          const live = await this.exchangeExitManager.getOpenSize(position.symbol);
+          if (live.size > 0) {
+            await this.exchangeExitManager.marketClose(
+              position.symbol, closeSideFor(position.direction), live.size.toString(),
+            );
+          }
+          await this.exchangeExitManager.clearExits(position.symbol);
         }
         const result = this.orderManager.forceClose(position, price, 'shutdown');
         // Same realized-funding wiring as the live exit path: book the real
