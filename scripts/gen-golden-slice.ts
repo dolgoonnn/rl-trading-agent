@@ -61,7 +61,11 @@ function legacyExpected(
       : pos.entryPrice * (1 - friction); // short: sell price goes DOWN
 
   // --- Loop (mirrors simulatePositionSimple / checkSLTPMaxBars) ---
-  for (let i = pos.entryIndex; i < candles.length; i++) {
+  // Production calls simulatePositionSimple(position, allCandles, i + 1) with
+  // position.entryIndex = i, i.e. SL/TP checking starts at the bar AFTER entry
+  // (you enter at the signal bar's close, so that already-closed bar can't fill
+  // you). Start at entryIndex + 1 so barsHeld begins at 1, matching legacy.
+  for (let i = pos.entryIndex + 1; i < candles.length; i++) {
     const candle = candles[i];
     if (!candle) continue;
 
@@ -147,9 +151,8 @@ function main(): void {
   const positions: SimPosition[] = [];
   const expected: GoldenExpected[] = [];
 
-  // Last safe entry index: CANDLE_LIMIT - 1 - 1 = 1998 but we want at least 1 candle to check
-  // The generator places positions at 50, 100, ..., stopping before CANDLE_LIMIT - STEP
-  // so all positions have at least STEP candles to work with (most will resolve via SL/TP).
+  // Place positions at 50, 100, ... up to CANDLE_LIMIT - STEP (= 1950), so every
+  // position has at least STEP candles after entry to resolve (most via SL/TP).
   const maxEntryIndex = CANDLE_LIMIT - STEP;
 
   let directionToggle = 0; // 0=long, 1=short

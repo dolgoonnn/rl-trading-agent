@@ -73,7 +73,10 @@ describe('parity-regression: simulatePosition reproduces legacy backtest-conflue
 
   it('matches every golden trade on entry price, exit price, pnl, and exit reason', () => {
     fixture.positions.forEach((pos, idx) => {
-      const result = simulatePosition(pos, fixture.candles, pos.entryIndex, {
+      // startIndex = entryIndex + 1 mirrors production:
+      // backtest-confluence calls simulatePositionSimple(pos, candles, i + 1) with
+      // pos.entryIndex = i, so SL/TP checking starts on the bar AFTER the signal close.
+      const result = simulatePosition(pos, fixture.candles, pos.entryIndex + 1, {
         fillModel,
         config: cfg,
       });
