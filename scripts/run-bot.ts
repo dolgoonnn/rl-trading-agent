@@ -424,9 +424,12 @@ class TradingBot {
         if (this.exchangeExitManager?.isEnabled) {
           const live = await this.exchangeExitManager.getOpenSize(position.symbol);
           if (live.size > 0) {
-            await this.exchangeExitManager.marketClose(
+            const flat = await this.exchangeExitManager.marketClose(
               position.symbol, closeSideFor(position.direction), live.size.toString(),
             );
+            if (!flat.ok) {
+              console.error(`  ${position.symbol}: shutdown flatten failed (${flat.reason}) — exchange SL still armed`);
+            }
           }
           await this.exchangeExitManager.clearExits(position.symbol);
         }
@@ -1285,7 +1288,13 @@ class TradingBot {
           );
           if (!armed.ok) {
             // Cannot protect the position → flatten immediately (reduce-only market).
-            const qty = (position.positionSizeUSDT / result.fillPrice).toString();
+            // Prefer the venue's real position size (already at correct step
+            // precision) over a float notional/price estimate that Bybit may
+            // reject on qty precision; fall back to the estimate if unavailable.
+            const liveQty = await this.exchangeExitManager.getOpenSize(symbol);
+            const qty = liveQty.size > 0
+              ? liveQty.size.toString()
+              : (position.positionSizeUSDT / result.fillPrice).toString();
             const flat = await this.exchangeExitManager.marketClose(
               symbol, closeSideFor(position.direction), qty,
             );
