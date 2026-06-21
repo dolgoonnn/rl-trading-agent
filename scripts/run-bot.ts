@@ -1228,6 +1228,28 @@ class TradingBot {
       await this.alerts.partialTPTaken(position, position.partialPnlPercent);
       console.log(`  ${position.symbol}: Partial TP taken, SL moved to $${position.currentSL.toFixed(2)}`);
       if (this.exchangeExitManager?.isEnabled) {
+        // Phase 2b: reduce the REAL venue position by the partial fraction (market
+        // reduce-only) at the SAME candle-close moment the shadow takes its partial,
+        // so the venue realizes the partial too — closes the residual post-partial
+        // divergence (without this the venue holds 100% and a reversal-to-BE sells
+        // 100% at BE while the shadow already booked the partial profit). No intrabar
+        // parity change: the trigger is still candle-close.
+        const partialFraction = RUN20_STRATEGY_CONFIG.partialTP.fraction;
+        if (partialFraction > 0 && partialFraction < 1) {
+          const liveBeforeReduce = await this.exchangeExitManager.getOpenSize(position.symbol);
+          if (liveBeforeReduce.size > 0) {
+            const reduceQty = (liveBeforeReduce.size * partialFraction).toString();
+            const reduced = await this.exchangeExitManager.marketClose(
+              position.symbol, closeSideFor(position.direction), reduceQty,
+            );
+            if (!reduced.ok) {
+              console.error(`  ${position.symbol}: partial venue-reduce failed (${reduced.reason}) — venue still holds full size`);
+            } else {
+              console.log(`  ${position.symbol}: reduced venue position by ${(partialFraction * 100).toFixed(0)}% (partial)`);
+            }
+          }
+        }
+        // Re-arm SL(BE)+TP for the now-reduced remainder (tpslMode Full covers it).
         const reArmed = await this.exchangeExitManager.armExits(
           position.symbol, position.currentSL, position.takeProfit,
         );
