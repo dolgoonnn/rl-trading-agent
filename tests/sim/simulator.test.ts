@@ -67,3 +67,42 @@ describe('simulatePosition (partial_tp + breakeven)', () => {
     expect(r!.exitReason).toBe('stop_loss');
   });
 });
+
+describe('simulatePosition (trailing)', () => {
+  it('trails SL up, only tightens, and stops at the trailed level (not the original SL)', () => {
+    // entry 100, original SL 90 (rawRisk 10), TP 200 (never hit). Trail: activate at 1R, 0.5R behind the high.
+    const pos: SimPosition = { direction: 'long', entryPrice: 100, entryTimestamp: 0, entryIndex: 0, stopLoss: 90, takeProfit: 200, strategy: 'ob' };
+    const candles = [
+      c(0, 100, 100, 100, 100),
+      c(3_600_000, 100, 115, 111, 114),  // high 115 -> trail SL to 115-5=110; low 111 > 110, no stop
+      c(7_200_000, 114, 114, 105, 106),  // high 114 -> recompute 109 but Math.max keeps 110 (no loosen); low 105 <= 110 -> stop at 110
+    ];
+    const r = simulatePosition(pos, candles, 1, {
+      fillModel: fm,
+      config: { entryTiming: 'signal_close', maxBars: 100, barMs: 3_600_000, exitMode: 'trailing',
+                trailing: { activationR: 1.0, distanceR: 0.5 } },
+    });
+    expect(r!.exitReason).toBe('stop_loss');
+    expect(r!.exitPrice).toBe(110); // the trailed level, NOT the original SL of 90
+    expect(r!.pnlPercent).toBeCloseTo(0.10, 9);
+  });
+});
+
+describe('simulatePosition (strategyExit hook)', () => {
+  it('exits with reason "strategy" at the bar the hook fires, at that bar close', () => {
+    const pos: SimPosition = { direction: 'long', entryPrice: 100, entryTimestamp: 0, entryIndex: 0, stopLoss: 50, takeProfit: 200, strategy: 'ob' };
+    const candles = [
+      c(0, 100, 100, 100, 100),
+      c(3_600_000, 100, 105, 98, 102),   // hook returns null here (SL/TP also untouched)
+      c(7_200_000, 102, 106, 99, 104),   // hook fires here -> exit at close 104
+    ];
+    const r = simulatePosition(pos, candles, 1, {
+      fillModel: fm,
+      config: baseCfg, // simple mode; SL 50 / TP 200 never trigger
+      strategyExit: (_pos, bar) => (bar.timestamp === 7_200_000 ? 'strategy' : null),
+    });
+    expect(r!.exitReason).toBe('strategy');
+    expect(r!.exitPrice).toBe(104);
+    expect(r!.exitTimestamp).toBe(7_200_000);
+  });
+});
