@@ -39,7 +39,7 @@ import {
   DEFAULT_FUNDING_ARB_CONFIG,
 } from '../src/lib/bot';
 import { LTFConfirmation } from '../src/lib/bot/ltf-confirmation';
-import { ExchangeExitManager } from '../src/lib/bot/exchange-exit-manager';
+import { ExchangeExitManager, closeSideFor } from '../src/lib/bot/exchange-exit-manager';
 import { EXCHANGE_EXIT_CONFIG } from '../src/lib/bot/config';
 import { RestClientV5 } from 'bybit-api';
 import type { LiveGuardInputs } from '../src/lib/bot/order-manager';
@@ -1243,6 +1243,27 @@ class TradingBot {
 
       if (position) {
         position.regime = result.order.regime;
+
+        // Arm the protective SL+TP on Bybit BEFORE we consider the position "tracked".
+        if (this.exchangeExitManager?.isEnabled) {
+          const armed = await this.exchangeExitManager.armExits(
+            symbol, position.stopLoss, position.takeProfit,
+          );
+          if (!armed.ok) {
+            // Cannot protect the position → flatten immediately (reduce-only market).
+            const qty = (position.positionSizeUSDT / result.fillPrice).toString();
+            const flat = await this.exchangeExitManager.marketClose(
+              symbol, closeSideFor(position.direction), qty,
+            );
+            console.error(
+              `  ${symbol}: ARM FAILED (${armed.reason}) — flattened (${flat.ok ? 'ok' : flat.reason}); position NOT tracked`,
+            );
+            await this.exchangeExitManager.clearExits(symbol); // belt-and-suspenders
+            return;
+          }
+          console.log(`  ${symbol}: exchange SL=${position.stopLoss} TP=${position.takeProfit} armed`);
+        }
+
         this.tracker.addPosition(position);
         await this.alerts.positionOpened(position);
         console.log(`  ${symbol}: LIMIT FILLED — ${position.direction.toUpperCase()} @ $${result.fillPrice.toFixed(2)} (maker)`);
