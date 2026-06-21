@@ -33,6 +33,7 @@ interface GoldenFixture {
   candles: Candle[];
   positions: SimPosition[];
   expected: GoldenExpected[];
+  expectedPartial: GoldenExpected[];
 }
 
 const fixture = JSON.parse(
@@ -97,6 +98,42 @@ describe('parity-regression: simulatePosition reproduces legacy backtest-conflue
       expect(result.pnlPercent).toBeCloseTo(exp.pnlPercent, 9);
 
       // exitReason: exact string match — this is the primary behavioral invariant
+      expect(result.exitReason).toBe(exp.exitReason);
+    });
+  });
+});
+
+describe('parity-regression: simulatePosition partial_tp reproduces legacy simulatePositionPartialTP', () => {
+  const fillModel = new DefaultFillModel(
+    new FlatFrictionCostModel(FRICTION),
+    { allowHeuristic: false },
+  );
+
+  // Must match gen-golden-slice.ts PARTIAL exactly.
+  const cfg: SimConfig = {
+    entryTiming: 'signal_close',
+    maxBars: MAXBARS,
+    barMs: 3_600_000,
+    exitMode: 'partial_tp',
+    partialTP: { fraction: 0.5, triggerR: 1.0, beBuffer: 0.1 },
+  };
+
+  it('matches every legacy partial trade on entry price, exit price, pnl, and exit reason', () => {
+    fixture.positions.forEach((pos, idx) => {
+      const result = simulatePosition(pos, fixture.candles, pos.entryIndex + 1, {
+        fillModel,
+        config: cfg,
+      });
+
+      expect(result).not.toBeNull();
+      if (!result) return;
+
+      const exp = fixture.expectedPartial[idx];
+      if (!exp) throw new Error(`Missing expectedPartial[${idx}]`);
+
+      expect(result.entryPrice).toBeCloseTo(exp.entryPrice, 6);
+      expect(result.exitPrice).toBeCloseTo(exp.exitPrice, 6);
+      expect(result.pnlPercent).toBeCloseTo(exp.pnlPercent, 9);
       expect(result.exitReason).toBe(exp.exitReason);
     });
   });

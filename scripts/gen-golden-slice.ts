@@ -31,6 +31,10 @@ const CANDLE_LIMIT = 2000;
 const STEP = 50;
 const FIXTURE_PATH = 'tests/sim/fixtures/golden-run20-slice.json';
 
+// Partial-TP config used for the partial golden (exercises partial + BE-stop move).
+// triggerR=1.0 fires at 1R (= the 2% SL distance) before the 4% (2R) take-profit.
+const PARTIAL = { fraction: 0.5, triggerR: 1.0, beBuffer: 0.1 };
+
 // ---------------------------------------------------------------------------
 // Expected-result shape (subset of SimTradeResult we care about)
 // ---------------------------------------------------------------------------
@@ -135,6 +139,98 @@ function legacyExpected(
 }
 
 // ---------------------------------------------------------------------------
+// Self-contained legacy partial-TP oracle
+// Mirrors backtest-confluence.ts simulatePositionPartialTP EXACTLY:
+//   per bar: SL check -> TP check -> partial eval (move SL to adjustedEntry+buffer)
+//   -> maxBars; blended finalPnl = fraction*partialPnl + (1-fraction)*exitPnl.
+// Loop starts at entryIndex + 1 (production calls it with i + 1). NOT circular —
+// does not import simulatePosition.
+// ---------------------------------------------------------------------------
+function legacyExpectedPartial(
+  pos: SimPosition,
+  candles: Candle[],
+  friction: number,
+  maxBars: number,
+  partial: { fraction: number; triggerR: number; beBuffer: number },
+): GoldenExpected {
+  const adjustedEntry =
+    pos.direction === 'long' ? pos.entryPrice * (1 + friction) : pos.entryPrice * (1 - friction);
+  const riskDistance =
+    pos.direction === 'long' ? pos.entryPrice - pos.stopLoss : pos.stopLoss - pos.entryPrice;
+  let currentSL = pos.stopLoss;
+  let partialTaken = false;
+  let partialPnl = 0;
+
+  const exitFric = (level: number): number =>
+    pos.direction === 'long' ? level * (1 - friction) : level * (1 + friction);
+  const pnlOf = (adjExit: number): number =>
+    pos.direction === 'long'
+      ? (adjExit - adjustedEntry) / adjustedEntry
+      : (adjustedEntry - adjExit) / adjustedEntry;
+  const blend = (exitPnl: number): number =>
+    partialTaken ? partial.fraction * partialPnl + (1 - partial.fraction) * exitPnl : exitPnl;
+
+  for (let i = pos.entryIndex + 1; i < candles.length; i++) {
+    const candle = candles[i];
+    if (!candle) continue;
+    const barsHeld = i - pos.entryIndex;
+
+    // SL then TP (legacy order), using currentSL
+    if (pos.direction === 'long') {
+      if (candle.low <= currentSL) {
+        const adjExit = exitFric(currentSL);
+        return { entryPrice: adjustedEntry, exitPrice: adjExit, pnlPercent: blend(pnlOf(adjExit)), exitReason: 'stop_loss' };
+      }
+      if (candle.high >= pos.takeProfit) {
+        const adjExit = exitFric(pos.takeProfit);
+        return { entryPrice: adjustedEntry, exitPrice: adjExit, pnlPercent: blend(pnlOf(adjExit)), exitReason: 'take_profit' };
+      }
+    } else {
+      if (candle.high >= currentSL) {
+        const adjExit = exitFric(currentSL);
+        return { entryPrice: adjustedEntry, exitPrice: adjExit, pnlPercent: blend(pnlOf(adjExit)), exitReason: 'stop_loss' };
+      }
+      if (candle.low <= pos.takeProfit) {
+        const adjExit = exitFric(pos.takeProfit);
+        return { entryPrice: adjustedEntry, exitPrice: adjExit, pnlPercent: blend(pnlOf(adjExit)), exitReason: 'take_profit' };
+      }
+    }
+
+    // partial eval (move SL to adjustedEntry +/- buffer)
+    if (!partialTaken && riskDistance > 0) {
+      const unrealizedR =
+        pos.direction === 'long'
+          ? (candle.close - pos.entryPrice) / riskDistance
+          : (pos.entryPrice - candle.close) / riskDistance;
+      if (unrealizedR >= partial.triggerR) {
+        partialTaken = true;
+        partialPnl = pnlOf(exitFric(candle.close));
+        if (partial.beBuffer >= 0) {
+          const buffer = riskDistance * partial.beBuffer;
+          currentSL =
+            pos.direction === 'long'
+              ? Math.max(currentSL, adjustedEntry + buffer)
+              : Math.min(currentSL, adjustedEntry - buffer);
+        }
+      }
+    }
+
+    // maxBars
+    if (barsHeld >= maxBars) {
+      const adjExit = exitFric(candle.close);
+      return { entryPrice: adjustedEntry, exitPrice: adjExit, pnlPercent: blend(pnlOf(adjExit)), exitReason: 'max_bars' };
+    }
+  }
+
+  const lastCandle = candles[candles.length - 1];
+  if (!lastCandle) {
+    throw new Error('gen-golden-slice: empty candle array — cannot compute closeAtEnd (partial)');
+  }
+  const adjExit = exitFric(lastCandle.close);
+  return { entryPrice: adjustedEntry, exitPrice: adjExit, pnlPercent: blend(pnlOf(adjExit)), exitReason: 'max_bars' };
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 function main(): void {
@@ -150,6 +246,7 @@ function main(): void {
   // Generate deterministic positions — skip last MAXBARS candles so most trades can resolve
   const positions: SimPosition[] = [];
   const expected: GoldenExpected[] = [];
+  const expectedPartial: GoldenExpected[] = [];
 
   // Place positions at 50, 100, ... up to CANDLE_LIMIT - STEP (= 1950), so every
   // position has at least STEP candles after entry to resolve (most via SL/TP).
@@ -178,6 +275,7 @@ function main(): void {
 
     positions.push(pos);
     expected.push(legacyExpected(pos, candles, FRICTION, MAXBARS));
+    expectedPartial.push(legacyExpectedPartial(pos, candles, FRICTION, MAXBARS, PARTIAL));
   }
 
   // Sanity checks
@@ -192,8 +290,13 @@ function main(): void {
     throw new Error(`Too few positions (${positions.length}); expected ≥30`);
   }
 
+  // Partial-mode distribution (sanity)
+  const partialReasons = { stop_loss: 0, take_profit: 0, max_bars: 0 };
+  for (const e of expectedPartial) partialReasons[e.exitReason]++;
+  console.log('Partial-mode exit distribution:', partialReasons);
+
   // Write fixture
-  const fixture = { candles, positions, expected };
+  const fixture = { candles, positions, expected, expectedPartial };
   mkdirSync(dirname(FIXTURE_PATH), { recursive: true });
   writeFileSync(FIXTURE_PATH, JSON.stringify(fixture, null, 0));
   console.log(`Fixture written to ${FIXTURE_PATH} (${positions.length} trades)`);
