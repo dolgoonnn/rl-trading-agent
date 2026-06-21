@@ -96,7 +96,7 @@ _<fill: coverage map, critical gaps, proposed tests, merge/live verdict>_
 | **I3-A** friction double-count in paper mode vs real fills | Important | ❌ **DEFERRED** (§6). |
 | M1/M2/M3 (slippage, clock-skew, reason label) | Minor | Accepted/documented. |
 
-Post-fix verification: typecheck **227**, full suite **358/358**, feature files lint-clean. An independent opus re-review of the fix pass was run (see §6 for its verdict).
+Post-fix verification: typecheck **227**, full suite **358/358**, feature files lint-clean. **Independent opus re-review of the fix pass: "FIXES CORRECT, NO REGRESSION"** — headline orphan walked line-by-line and confirmed closed; `null` fail-closed at all 5 `getOpenSize` call sites; 3-state reconcile cannot strand an open position; no 2a/close-block double-act (reduce-only + mutual exclusion); partial-reduce stays protected after a failed reduce. Two new **Minor** notes (both accepted): (a) `SYMBOL_QTY_STEP` covers only BTC/ETH/SOL — a coarse-step symbol added later would fall back to the finer default and its partial reduce could reject (latent on universe expansion; in-code comment already warns → see §6.5); (b) no watchdog on a persistent `'pending'` reconcile state (venue is already flat so no unprotected exposure; self-heals when the closedPnL record lands; shutdown cleans up).
 
 ## 6. Residual risks & before-live gates (MUST do before enabling `--exchange-exits` with real money)
 
