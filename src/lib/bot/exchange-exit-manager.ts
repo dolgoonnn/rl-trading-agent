@@ -156,3 +156,8 @@ export class ExchangeExitManager {
     }
   }
 }
+
+/** The order side that flattens a position of the given direction. */
+export function closeSideFor(direction: 'long' | 'short'): 'Buy' | 'Sell' {
+  return direction === 'long' ? 'Sell' : 'Buy';
+}

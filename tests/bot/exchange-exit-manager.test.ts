@@ -141,3 +141,12 @@ describe('ExchangeExitManager.getOpenSize', () => {
     expect(client.getPositionInfo).not.toHaveBeenCalled();
   });
 });
+
+import { closeSideFor } from '@/lib/bot/exchange-exit-manager';
+
+describe('closeSideFor', () => {
+  it('closes a long with a Sell and a short with a Buy', () => {
+    expect(closeSideFor('long')).toBe('Sell');
+    expect(closeSideFor('short')).toBe('Buy');
+  });
+});

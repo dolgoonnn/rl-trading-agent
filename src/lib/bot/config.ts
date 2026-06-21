@@ -19,6 +19,7 @@ import type {
   TradeabilityConfig,
 } from '@/types/bot';
 import type { FundingArbConfig } from '@/types/funding-arb';
+import { DEFAULT_EXCHANGE_EXIT_CONFIG, type ExchangeExitConfig } from './exchange-exit-manager';
 
 // ============================================
 // Bot Config Defaults
@@ -170,6 +171,14 @@ export const DEFAULT_FUNDING_ARB_CONFIG: FundingArbConfig = {
   commissionPerSide: 0.00055, // Bybit taker
   pollIntervalMinutes: 60, // Hourly
 };
+
+// ============================================
+// Exchange-Native Protective Exits (live bot only)
+// ============================================
+
+// Exchange-Native Protective Exits (live bot only). `enabled` is flipped on by
+// the --exchange-exits CLI flag in run-bot; default OFF keeps paper/backtest pure.
+export const EXCHANGE_EXIT_CONFIG: ExchangeExitConfig = { ...DEFAULT_EXCHANGE_EXIT_CONFIG };
 
 // ============================================
 // Pre-Trade Safety Gate (live/paper bot only)
