@@ -68,6 +68,66 @@ export class ExchangeExitManager {
     return this.config.enabled;
   }
 
+  /** Remove the position-attached SL/TP (Bybit clears with the string "0"). */
+  async clearExits(symbol: string): Promise<ExitOpResult> {
+    // Defense-in-depth: never touch the live exchange when disabled, even if a
+    // caller forgets to gate on `isEnabled`. Paper/backtest has no real position.
+    if (!this.config.enabled) return { ok: true };
+    try {
+      const resp = await this.client.setTradingStop({
+        category: BYBIT_CATEGORY,
+        symbol,
+        positionIdx: 0,
+        tpslMode: 'Full',
+        stopLoss: '0',
+        takeProfit: '0',
+      });
+      if (resp.retCode !== 0) {
+        return { ok: false, reason: `clearExits retCode=${resp.retCode}: ${resp.retMsg}` };
+      }
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+    }
+  }
+
+  /** Flatten the position with a reduce-only market order (time-exit/shutdown/kill). */
+  async marketClose(symbol: string, closeSide: 'Buy' | 'Sell', qty: string): Promise<ExitOpResult> {
+    // Defense-in-depth: never touch the live exchange when disabled, even if a
+    // caller forgets to gate on `isEnabled`. Paper/backtest has no real position.
+    if (!this.config.enabled) return { ok: true };
+    try {
+      const resp = await this.client.submitOrder({
+        category: BYBIT_CATEGORY,
+        symbol,
+        side: closeSide,
+        orderType: 'Market',
+        qty,
+        reduceOnly: true,
+      });
+      if (resp.retCode !== 0) {
+        return { ok: false, reason: `marketClose retCode=${resp.retCode}: ${resp.retMsg}` };
+      }
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+    }
+  }
+
+  /** Current real position size + avg entry (size 0 ⇒ flat). Never throws. */
+  async getOpenSize(symbol: string): Promise<{ size: number; avgPrice: number }> {
+    // Defense-in-depth: return zero immediately when disabled; paper has no real position.
+    if (!this.config.enabled) return { size: 0, avgPrice: 0 };
+    try {
+      const resp = await this.client.getPositionInfo({ category: BYBIT_CATEGORY, symbol });
+      const row = resp.retCode === 0 ? resp.result.list[0] : undefined;
+      if (!row) return { size: 0, avgPrice: 0 };
+      return { size: parseFloat(row.size) || 0, avgPrice: parseFloat(row.avgPrice) || 0 };
+    } catch {
+      return { size: 0, avgPrice: 0 };
+    }
+  }
+
   /**
    * Arm (or replace) the position-attached SL + final TP. Bybit treats a repeat
    * call as a replace, so this doubles as the breakeven-move amend.
