@@ -186,6 +186,7 @@ describe('ExchangeExitManager.getRealizedClose', () => {
     expect(r).not.toBeNull();
     expect(r!.exitPrice).toBeCloseTo(64250.5);
     expect(r!.closedPnl).toBeCloseTo(12.3);
+    expect(r!.closedAtMs).toBe(1);
   });
 
   it('returns null when the closed-PnL list is empty', async () => {

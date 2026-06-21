@@ -1179,13 +1179,16 @@ class TradingBot {
   private async reconcileExchangeClose(position: BotPosition): Promise<boolean> {
     if (!this.exchangeExitManager?.isEnabled) return false;
     const live = await this.exchangeExitManager.getOpenSize(position.symbol);
-    if (live.size > 0) return false; // still open on the venue — nothing to reconcile
+    if (live.size > 0) return false; // still clearly open on the venue — cheap pre-filter
 
-    // Venue is flat but we still hold the shadow open → the exchange closed it.
-    // Book at the REAL exchange exit price; if closed-PnL is unavailable, fall back
-    // to the known stop level (conservative — assume the protective stop fired).
+    // `getOpenSize` returns size 0 on a transient API error too, so size 0 alone is
+    // NOT proof of a close. Require a realized close record that POST-DATES this
+    // position's entry as the authoritative signal: in one-way mode an open position
+    // cannot have a close newer than its own entry, so this rejects both the
+    // API-error case and a stale prior-trade record. No record → wait, retry next tick.
     const realized = await this.exchangeExitManager.getRealizedClose(position.symbol);
-    const exitPrice = realized?.exitPrice ?? position.currentSL;
+    if (!realized || realized.closedAtMs <= position.entryTimestamp) return false;
+    const exitPrice = realized.exitPrice;
     const reason: ExitReason =
       Math.abs(exitPrice - position.takeProfit) < Math.abs(exitPrice - position.currentSL)
         ? 'take_profit'

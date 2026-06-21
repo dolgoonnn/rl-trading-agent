@@ -142,7 +142,9 @@ export class ExchangeExitManager {
    * Used to reconcile the shadow book when the venue's SL/TP fired. Returns null
    * when disabled, on error, on an empty list, or on an unparseable price. Never throws.
    */
-  async getRealizedClose(symbol: string): Promise<{ exitPrice: number; closedPnl: number } | null> {
+  async getRealizedClose(
+    symbol: string,
+  ): Promise<{ exitPrice: number; closedPnl: number; closedAtMs: number } | null> {
     if (!this.config.enabled) return null;
     try {
       const resp = await this.client.getClosedPnL({ category: BYBIT_CATEGORY, symbol, limit: 1 });
@@ -150,7 +152,11 @@ export class ExchangeExitManager {
       if (!row) return null;
       const exitPrice = parseFloat(row.avgExitPrice);
       if (!Number.isFinite(exitPrice) || exitPrice <= 0) return null;
-      return { exitPrice, closedPnl: parseFloat(row.closedPnl) || 0 };
+      return {
+        exitPrice,
+        closedPnl: parseFloat(row.closedPnl) || 0,
+        closedAtMs: parseInt(row.updatedTime, 10) || 0,
+      };
     } catch {
       return null;
     }
