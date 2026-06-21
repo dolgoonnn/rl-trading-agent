@@ -56,4 +56,14 @@ describe('ExchangeExitManager.armExits', () => {
     expect(res.ok).toBe(false);
     expect(res.reason).toContain('ETIMEDOUT');
   });
+
+  it('is a no-op when disabled — never touches the exchange', async () => {
+    const client = mockClient();
+    const mgr = new ExchangeExitManager(client, { enabled: false, triggerBy: 'MarkPrice' });
+
+    const res = await mgr.armExits('BTCUSDT', 60000, 65000);
+
+    expect(res.ok).toBe(true);
+    expect(client.setTradingStop).not.toHaveBeenCalled();
+  });
 });

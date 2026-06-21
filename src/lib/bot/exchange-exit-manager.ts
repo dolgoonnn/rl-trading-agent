@@ -73,6 +73,9 @@ export class ExchangeExitManager {
    * call as a replace, so this doubles as the breakeven-move amend.
    */
   async armExits(symbol: string, stopLoss: number, takeProfit: number): Promise<ExitOpResult> {
+    // Defense-in-depth: never touch the live exchange when disabled, even if a
+    // caller forgets to gate on `isEnabled`. Paper/backtest has no real position.
+    if (!this.config.enabled) return { ok: true };
     try {
       const resp = await this.client.setTradingStop({
         category: BYBIT_CATEGORY,
