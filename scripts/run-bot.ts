@@ -1161,6 +1161,16 @@ class TradingBot {
       this.tracker.updatePosition(position);
       await this.alerts.partialTPTaken(position, position.partialPnlPercent);
       console.log(`  ${position.symbol}: Partial TP taken, SL moved to $${position.currentSL.toFixed(2)}`);
+      if (this.exchangeExitManager?.isEnabled) {
+        const reArmed = await this.exchangeExitManager.armExits(
+          position.symbol, position.currentSL, position.takeProfit,
+        );
+        if (!reArmed.ok) {
+          console.error(`  ${position.symbol}: BE re-arm failed (${reArmed.reason}) — exchange SL still at original level`);
+        } else {
+          console.log(`  ${position.symbol}: exchange SL re-armed to BE ${position.currentSL}`);
+        }
+      }
     }
 
     if (!exitResult) return; // Still open
@@ -1170,6 +1180,20 @@ class TradingBot {
     // matching the funding-charged backtest. Empty/failed history ⇒ undefined ⇒
     // 0 funding booked + logged (fail-safe, never crashes the close).
     const closedPos = exitResult.position;
+    if (this.exchangeExitManager?.isEnabled) {
+      if (closedPos.exitReason === 'max_bars' || closedPos.exitReason === 'shutdown') {
+        // No exchange equivalent for a time exit — flatten the REAL position first.
+        const live = await this.exchangeExitManager.getOpenSize(closedPos.symbol);
+        if (live.size > 0) {
+          const flat = await this.exchangeExitManager.marketClose(
+            closedPos.symbol, closeSideFor(closedPos.direction), live.size.toString(),
+          );
+          if (!flat.ok) console.error(`  ${closedPos.symbol}: time-exit flatten failed (${flat.reason})`);
+        }
+      }
+      // For SL/TP the exchange already executed (or will) — clear any residual stop.
+      await this.exchangeExitManager.clearExits(closedPos.symbol);
+    }
     const fundingSeries = await this.buildFundingSeries(closedPos);
     this.tracker.closePosition(closedPos, fundingSeries);
     await this.alerts.positionClosed(closedPos);
