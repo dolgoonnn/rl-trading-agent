@@ -3,6 +3,9 @@ import {
   ExchangeExitManager,
   closeSideFor,
   decideExchangeReconcile,
+  roundQtyToStep,
+  computePartialReduceQty,
+  selectFlattenQty,
   type ExchangeExitClient,
 } from '@/lib/bot/exchange-exit-manager';
 
@@ -146,23 +149,39 @@ describe('ExchangeExitManager.getOpenSize', () => {
     });
     const mgr = new ExchangeExitManager(client, { enabled: true, triggerBy: 'MarkPrice' });
     const r = await mgr.getOpenSize('BTCUSDT');
-    expect(r.size).toBeCloseTo(0.012);
-    expect(r.avgPrice).toBeCloseTo(60100);
+    expect(r).not.toBeNull();
+    expect(r!.size).toBeCloseTo(0.012);
+    expect(r!.avgPrice).toBeCloseTo(60100);
   });
 
-  it('reports size 0 when the venue has no open position', async () => {
+  it('reports size 0 (CONFIRMED flat) when the venue has no open position', async () => {
     const client = mockClient(); // getPositionInfo returns list: []
     const mgr = new ExchangeExitManager(client, { enabled: true, triggerBy: 'MarkPrice' });
     const r = await mgr.getOpenSize('BTCUSDT');
-    expect(r.size).toBe(0);
+    expect(r).toEqual({ size: 0, avgPrice: 0 });
   });
 
-  it('is a no-op when disabled — never touches the exchange, returns size 0', async () => {
+  it('returns null (UNKNOWN, not flat) on a non-zero retCode', async () => {
+    const client = mockClient({
+      getPositionInfo: vi.fn().mockResolvedValue({ retCode: 10001, retMsg: 'err', result: { list: [] } }),
+    });
+    const mgr = new ExchangeExitManager(client, { enabled: true, triggerBy: 'MarkPrice' });
+    expect(await mgr.getOpenSize('BTCUSDT')).toBeNull();
+  });
+
+  it('returns null (UNKNOWN, not flat) on a network throw', async () => {
+    const client = mockClient({
+      getPositionInfo: vi.fn().mockRejectedValue(new Error('ECONNRESET')),
+    });
+    const mgr = new ExchangeExitManager(client, { enabled: true, triggerBy: 'MarkPrice' });
+    expect(await mgr.getOpenSize('BTCUSDT')).toBeNull();
+  });
+
+  it('is a no-op when disabled — never touches the exchange, returns confirmed-flat', async () => {
     const client = mockClient();
     const mgr = new ExchangeExitManager(client, { enabled: false, triggerBy: 'MarkPrice' });
     const r = await mgr.getOpenSize('BTCUSDT');
-    expect(r.size).toBe(0);
-    expect(r.avgPrice).toBe(0);
+    expect(r).toEqual({ size: 0, avgPrice: 0 });
     expect(client.getPositionInfo).not.toHaveBeenCalled();
   });
 });
@@ -244,5 +263,60 @@ describe('decideExchangeReconcile', () => {
     const realized = { exitPrice: 60100, closedAtMs: base.entryTimestamp + 1 };
     const d = decideExchangeReconcile({ openSize: 0, realized, ...base });
     expect(d!.reason).toBe('stop_loss');
+  });
+});
+
+describe('roundQtyToStep', () => {
+  it('rounds DOWN to the symbol qtyStep (never over-close)', () => {
+    expect(roundQtyToStep(0.75, 'SOLUSDT')).toBe(0.7);   // step 0.1
+    expect(roundQtyToStep(0.0615, 'BTCUSDT')).toBe(0.061); // step 0.001
+    expect(roundQtyToStep(0.137, 'ETHUSDT')).toBe(0.13);  // step 0.01
+  });
+  it('uses the default step (0.001) for an unknown symbol', () => {
+    expect(roundQtyToStep(1.23456, 'WHATEVERUSDT')).toBe(1.234);
+  });
+  it('returns 0 for non-positive or non-finite qty', () => {
+    expect(roundQtyToStep(0, 'BTCUSDT')).toBe(0);
+    expect(roundQtyToStep(-1, 'BTCUSDT')).toBe(0);
+    expect(roundQtyToStep(NaN, 'BTCUSDT')).toBe(0);
+  });
+  it('keeps a clean decimal string (no float artifacts)', () => {
+    expect(roundQtyToStep(0.012, 'ETHUSDT').toString()).toBe('0.01'); // step 0.01
+    expect(roundQtyToStep(0.006000000000000001, 'BTCUSDT').toString()).toBe('0.006');
+  });
+});
+
+describe('computePartialReduceQty', () => {
+  it('returns size*fraction rounded DOWN to step, as a clean string', () => {
+    expect(computePartialReduceQty(0.1, 0.5, 'BTCUSDT')).toBe('0.05');
+    expect(computePartialReduceQty(1.5, 0.5, 'SOLUSDT')).toBe('0.7'); // 0.75 → step 0.1 → 0.7
+    expect(computePartialReduceQty(0.123, 0.5, 'BTCUSDT')).toBe('0.061'); // 0.0615 → 0.061
+  });
+  it('returns null when fraction is out of (0,1)', () => {
+    expect(computePartialReduceQty(0.1, 0, 'BTCUSDT')).toBeNull();
+    expect(computePartialReduceQty(0.1, 1, 'BTCUSDT')).toBeNull();
+    expect(computePartialReduceQty(0.1, 1.5, 'BTCUSDT')).toBeNull();
+  });
+  it('returns null when liveSize is non-positive', () => {
+    expect(computePartialReduceQty(0, 0.5, 'BTCUSDT')).toBeNull();
+  });
+  it('returns null when the rounded qty is below one step', () => {
+    expect(computePartialReduceQty(0.001, 0.5, 'BTCUSDT')).toBeNull(); // 0.0005 < step 0.001
+  });
+});
+
+describe('selectFlattenQty', () => {
+  it('uses the venue-reported live size when known and > 0', () => {
+    expect(selectFlattenQty(0.012, 999, 60000, 'BTCUSDT')).toBe('0.012');
+  });
+  it('returns null when the venue is confirmed flat (size 0)', () => {
+    expect(selectFlattenQty(0, 999, 60000, 'BTCUSDT')).toBeNull();
+  });
+  it('falls back to a step-rounded notional estimate when size is UNKNOWN (null)', () => {
+    // 600 / 60000 = 0.01 → step 0.001 → '0.01'
+    expect(selectFlattenQty(null, 600, 60000, 'BTCUSDT')).toBe('0.01');
+  });
+  it('returns null when unknown and no usable fill price', () => {
+    expect(selectFlattenQty(null, 600, 0, 'BTCUSDT')).toBeNull();
   });
 });

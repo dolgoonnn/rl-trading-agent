@@ -39,7 +39,13 @@ import {
   DEFAULT_FUNDING_ARB_CONFIG,
 } from '../src/lib/bot';
 import { LTFConfirmation } from '../src/lib/bot/ltf-confirmation';
-import { ExchangeExitManager, closeSideFor, decideExchangeReconcile } from '../src/lib/bot/exchange-exit-manager';
+import {
+  ExchangeExitManager,
+  closeSideFor,
+  decideExchangeReconcile,
+  computePartialReduceQty,
+  selectFlattenQty,
+} from '../src/lib/bot/exchange-exit-manager';
 import { EXCHANGE_EXIT_CONFIG } from '../src/lib/bot/config';
 import { RestClientV5 } from 'bybit-api';
 import type { LiveGuardInputs } from '../src/lib/bot/order-manager';
@@ -432,16 +438,24 @@ class TradingBot {
           continue;
         }
         if (this.exchangeExitManager?.isEnabled) {
+          // Fail CLOSED: only clear the protective stop once flat is confirmed/forced.
+          // If the venue state is unknown or the flatten fails, leave the stop armed
+          // (a hard crash would too) rather than orphan an unprotected position.
           const live = await this.exchangeExitManager.getOpenSize(position.symbol);
-          if (live.size > 0) {
+          if (live === null) {
+            console.error(`  ${position.symbol}: venue state UNKNOWN on shutdown — leaving exchange stop armed`);
+          } else if (live.size > 0) {
             const flat = await this.exchangeExitManager.marketClose(
               position.symbol, closeSideFor(position.direction), live.size.toString(),
             );
-            if (!flat.ok) {
-              console.error(`  ${position.symbol}: shutdown flatten failed (${flat.reason}) — exchange SL still armed`);
+            if (flat.ok) {
+              await this.exchangeExitManager.clearExits(position.symbol);
+            } else {
+              console.error(`  ${position.symbol}: shutdown flatten failed (${flat.reason}) — leaving exchange stop armed`);
             }
+          } else {
+            await this.exchangeExitManager.clearExits(position.symbol);
           }
-          await this.exchangeExitManager.clearExits(position.symbol);
         }
         const result = this.orderManager.forceClose(position, price, 'shutdown');
         // Same realized-funding wiring as the live exit path: book the real
@@ -1176,23 +1190,30 @@ class TradingBot {
    * the REAL exchange exit price. Returns true if it reconciled (caller returns).
    * Reason is inferred from proximity to currentSL vs takeProfit. Gated/null-safe.
    */
-  private async reconcileExchangeClose(position: BotPosition): Promise<boolean> {
-    if (!this.exchangeExitManager?.isEnabled) return false;
+  private async reconcileExchangeClose(
+    position: BotPosition,
+  ): Promise<'reconciled' | 'pending' | 'proceed'> {
+    if (!this.exchangeExitManager?.isEnabled) return 'proceed';
     const live = await this.exchangeExitManager.getOpenSize(position.symbol);
-    // Only query closed-PnL when the venue looks flat (cheap pre-filter). The
-    // authoritative guard lives in decideExchangeReconcile (requires a close record
-    // post-dating entry, so a transient getOpenSize error can't spuriously close).
-    const realized = live.size > 0
-      ? null
-      : await this.exchangeExitManager.getRealizedClose(position.symbol);
+    if (live === null) return 'proceed'; // venue state UNKNOWN → let the in-process path (fail-closed) handle it
+    if (live.size > 0) return 'proceed'; // still open on the venue → manage normally
+
+    // Venue is CONFIRMED flat. Book at the real exit price IF the close record is
+    // available (decideExchangeReconcile requires a record post-dating entry, so a
+    // transient getOpenSize error — which returns null above, not size 0 — can't
+    // reach here spuriously).
+    const realized = await this.exchangeExitManager.getRealizedClose(position.symbol);
     const decision = decideExchangeReconcile({
-      openSize: live.size,
+      openSize: 0,
       realized,
       entryTimestamp: position.entryTimestamp,
       takeProfit: position.takeProfit,
       currentSL: position.currentSL,
     });
-    if (!decision) return false;
+    // Venue flat but the closed-PnL record hasn't surfaced yet (Bybit is eventually
+    // consistent) → do NOT fall through to the in-process check (which would manage a
+    // phantom position); wait and retry next tick.
+    if (!decision) return 'pending';
 
     const result = this.orderManager.forceClose(position, decision.exitPrice, decision.reason);
     const fundingSeries = await this.buildFundingSeries(result.position);
@@ -1205,7 +1226,7 @@ class TradingBot {
     for (const cb of triggered) await this.alerts.circuitBreakerTriggered(cb.type, cb.reason);
     this.tracker.saveState();
     this.tracker.recordSnapshot();
-    return true;
+    return 'reconciled';
   }
 
   private async manageOpenPosition(
@@ -1214,9 +1235,11 @@ class TradingBot {
     currentBarIndex: number,
   ): Promise<void> {
     // If the exchange already closed this position (its SL/TP fired on Bybit),
-    // reconcile the shadow at the REAL exit price and skip the in-process check
-    // this tick — prevents managing a position that is already flat on the venue.
-    if (await this.reconcileExchangeClose(position)) return;
+    // reconcile the shadow at the REAL exit price and skip the in-process check this
+    // tick. 'pending' (venue flat but the closed-PnL record hasn't surfaced yet) also
+    // skips — we must not manage a position that is already flat on the venue. Only
+    // 'proceed' (venue still open, or state unknown/disabled) runs the in-process path.
+    if ((await this.reconcileExchangeClose(position)) !== 'proceed') return;
 
     const wasPT = position.partialTaken;
 
@@ -1235,18 +1258,22 @@ class TradingBot {
         // 100% at BE while the shadow already booked the partial profit). No intrabar
         // parity change: the trigger is still candle-close.
         const partialFraction = RUN20_STRATEGY_CONFIG.partialTP.fraction;
-        if (partialFraction > 0 && partialFraction < 1) {
-          const liveBeforeReduce = await this.exchangeExitManager.getOpenSize(position.symbol);
-          if (liveBeforeReduce.size > 0) {
-            const reduceQty = (liveBeforeReduce.size * partialFraction).toString();
-            const reduced = await this.exchangeExitManager.marketClose(
-              position.symbol, closeSideFor(position.direction), reduceQty,
-            );
-            if (!reduced.ok) {
-              console.error(`  ${position.symbol}: partial venue-reduce failed (${reduced.reason}) — venue still holds full size`);
-            } else {
-              console.log(`  ${position.symbol}: reduced venue position by ${(partialFraction * 100).toFixed(0)}% (partial)`);
-            }
+        const liveBeforeReduce = await this.exchangeExitManager.getOpenSize(position.symbol);
+        // computePartialReduceQty rounds DOWN to the symbol's qtyStep (avoids the
+        // Bybit qty-precision reject) and returns null when there's nothing to reduce.
+        const reduceQty = liveBeforeReduce
+          ? computePartialReduceQty(liveBeforeReduce.size, partialFraction, position.symbol)
+          : null;
+        if (reduceQty) {
+          const reduced = await this.exchangeExitManager.marketClose(
+            position.symbol, closeSideFor(position.direction), reduceQty,
+          );
+          if (!reduced.ok) {
+            // Venue keeps full size; it is still PROTECTED by the re-arm below, but the
+            // shadow already booked the partial → accounting diverges (reconcile vs balance).
+            console.error(`  ${position.symbol}: partial venue-reduce failed (${reduced.reason}) — venue still holds full size; reconcile PnL vs Bybit balance`);
+          } else {
+            console.log(`  ${position.symbol}: reduced venue position by ${reduceQty} (partial ${(partialFraction * 100).toFixed(0)}%)`);
           }
         }
         // Re-arm SL(BE)+TP for the now-reduced remainder (tpslMode Full covers it).
@@ -1269,21 +1296,28 @@ class TradingBot {
     // 0 funding booked + logged (fail-safe, never crashes the close).
     const closedPos = exitResult.position;
     if (this.exchangeExitManager?.isEnabled) {
-      // checkPositionExit only returns stop_loss | take_profit | max_bars here;
-      // 'shutdown' is produced by forceClose in stop() (which flattens in its own
-      // loop), so it is unreachable on this path — kept defensively.
-      if (closedPos.exitReason === 'max_bars' || closedPos.exitReason === 'shutdown') {
-        // No exchange equivalent for a time exit — flatten the REAL position first.
-        const live = await this.exchangeExitManager.getOpenSize(closedPos.symbol);
-        if (live.size > 0) {
-          const flat = await this.exchangeExitManager.marketClose(
-            closedPos.symbol, closeSideFor(closedPos.direction), live.size.toString(),
-          );
-          if (!flat.ok) console.error(`  ${closedPos.symbol}: time-exit flatten failed (${flat.reason})`);
+      // ALWAYS reconcile the venue to flat before clearing the stop — on EVERY exit
+      // reason, not just time-exits. The shadow detects SL/TP from LastPrice klines but
+      // the venue stop triggers on MarkPrice, so a wick can close the shadow while the
+      // venue is still open; if we cleared the stop assuming "the venue already fired",
+      // we'd orphan a real, unprotected position. Fail CLOSED: if the venue state is
+      // unknown, leave the stop armed; only clear once flat is confirmed/forced.
+      const live = await this.exchangeExitManager.getOpenSize(closedPos.symbol);
+      if (live === null) {
+        console.error(`  ${closedPos.symbol}: venue state UNKNOWN on close — leaving exchange stop armed (reconcile later)`);
+      } else if (live.size > 0) {
+        const flat = await this.exchangeExitManager.marketClose(
+          closedPos.symbol, closeSideFor(closedPos.direction), live.size.toString(),
+        );
+        if (flat.ok) {
+          await this.exchangeExitManager.clearExits(closedPos.symbol);
+        } else {
+          console.error(`  ${closedPos.symbol}: close flatten failed (${flat.reason}) — leaving exchange stop armed`);
         }
+      } else {
+        // Venue already flat (its stop fired) — clear any residual stop.
+        await this.exchangeExitManager.clearExits(closedPos.symbol);
       }
-      // For SL/TP the exchange already executed (or will) — clear any residual stop.
-      await this.exchangeExitManager.clearExits(closedPos.symbol);
     }
     const fundingSeries = await this.buildFundingSeries(closedPos);
     this.tracker.closePosition(closedPos, fundingSeries);
@@ -1366,20 +1400,30 @@ class TradingBot {
           );
           if (!armed.ok) {
             // Cannot protect the position → flatten immediately (reduce-only market).
-            // Prefer the venue's real position size (already at correct step
-            // precision) over a float notional/price estimate that Bybit may
-            // reject on qty precision; fall back to the estimate if unavailable.
+            // selectFlattenQty prefers the venue's real (step-aligned) size and falls
+            // back to a step-rounded notional/price estimate when the size is unknown.
             const liveQty = await this.exchangeExitManager.getOpenSize(symbol);
-            const qty = liveQty.size > 0
-              ? liveQty.size.toString()
-              : (position.positionSizeUSDT / result.fillPrice).toString();
-            const flat = await this.exchangeExitManager.marketClose(
-              symbol, closeSideFor(position.direction), qty,
+            const qty = selectFlattenQty(
+              liveQty ? liveQty.size : null, position.positionSizeUSDT, result.fillPrice, symbol,
             );
-            console.error(
-              `  ${symbol}: ARM FAILED (${armed.reason}) — flattened (${flat.ok ? 'ok' : flat.reason}); position NOT tracked`,
-            );
-            await this.exchangeExitManager.clearExits(symbol); // belt-and-suspenders
+            // "Already confirmed flat" (liveQty.size===0) counts as flattened.
+            let flatOk = liveQty !== null && liveQty.size === 0;
+            if (qty) {
+              const flat = await this.exchangeExitManager.marketClose(
+                symbol, closeSideFor(position.direction), qty,
+              );
+              flatOk = flat.ok;
+              if (flat.ok) await this.exchangeExitManager.clearExits(symbol);
+            }
+            if (flatOk) {
+              console.error(`  ${symbol}: ARM FAILED (${armed.reason}) — flattened ok; position NOT tracked`);
+            } else {
+              // Catastrophic: a real position is open on the venue, we could neither
+              // arm a stop NOR flatten it. Make it LOUD — never silently orphan.
+              // TODO(before-live): latch the kill-switch + retry flatten on later ticks
+              // + push a critical Telegram alert (needs the db handle threaded here).
+              console.error(`  ${symbol}: CRITICAL — ARM FAILED (${armed.reason}) AND flatten failed — REAL UNPROTECTED POSITION on Bybit; manual intervention required`);
+            }
             return;
           }
           console.log(`  ${symbol}: exchange SL=${position.stopLoss} TP=${position.takeProfit} armed`);

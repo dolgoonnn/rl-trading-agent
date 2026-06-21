@@ -123,17 +123,24 @@ export class ExchangeExitManager {
     }
   }
 
-  /** Current real position size + avg entry (size 0 ⇒ flat). Never throws. */
-  async getOpenSize(symbol: string): Promise<{ size: number; avgPrice: number }> {
-    // Defense-in-depth: return zero immediately when disabled; paper has no real position.
+  /**
+   * Current real position size + avg entry. Returns `null` when the venue state
+   * is UNKNOWN (API error / non-zero retCode) — callers MUST treat null as "cannot
+   * confirm" and fail closed (do NOT clear a protective stop, do NOT spuriously
+   * reconcile). `{ size: 0 }` means CONFIRMED flat (empty list, or disabled/paper).
+   * Never throws.
+   */
+  async getOpenSize(symbol: string): Promise<{ size: number; avgPrice: number } | null> {
+    // Disabled (paper) has no real position → confirmed flat (callers gate on isEnabled anyway).
     if (!this.config.enabled) return { size: 0, avgPrice: 0 };
     try {
       const resp = await this.client.getPositionInfo({ category: BYBIT_CATEGORY, symbol });
-      const row = resp.retCode === 0 ? resp.result.list[0] : undefined;
-      if (!row) return { size: 0, avgPrice: 0 };
+      if (resp.retCode !== 0) return null; // venue state UNKNOWN — not "flat"
+      const row = resp.result.list[0];
+      if (!row) return { size: 0, avgPrice: 0 }; // empty list ⇒ genuinely flat
       return { size: parseFloat(row.size) || 0, avgPrice: parseFloat(row.avgPrice) || 0 };
     } catch {
-      return { size: 0, avgPrice: 0 };
+      return null; // network error ⇒ UNKNOWN, not flat
     }
   }
 
@@ -227,4 +234,62 @@ export function decideExchangeReconcile(args: {
       ? 'take_profit'
       : 'stop_loss';
   return { exitPrice, reason };
+}
+
+/**
+ * Bybit linear-perp quantity step (`qtyStep`) per symbol — used to round reduce-only
+ * qty DOWN so the venue does not reject on qty-precision. STATIC table for the bot's
+ * universe; **verify against `getInstrumentsInfo` before adding symbols** (steps can
+ * change, and a wrong step here silently breaks the partial reduce). Unknown symbol
+ * → `DEFAULT_QTY_STEP`.
+ */
+export const SYMBOL_QTY_STEP: Record<string, number> = {
+  BTCUSDT: 0.001,
+  ETHUSDT: 0.01,
+  SOLUSDT: 0.1,
+};
+const DEFAULT_QTY_STEP = 0.001;
+
+/** Round a quantity DOWN to the symbol's step (never over-close on a reduce). 0 if non-positive. */
+export function roundQtyToStep(qty: number, symbol: string): number {
+  const step = SYMBOL_QTY_STEP[symbol] ?? DEFAULT_QTY_STEP;
+  if (!(step > 0) || !Number.isFinite(qty) || qty <= 0) return 0;
+  const units = Math.floor(qty / step + 1e-9); // +epsilon to absorb float error at the boundary
+  const decimals = (step.toString().split('.')[1] ?? '').length;
+  return parseFloat((units * step).toFixed(decimals));
+}
+
+/**
+ * Venue-ready qty string to reduce a position by `fraction`, rounded DOWN to the
+ * symbol's step. Returns null when fraction ∉ (0,1), liveSize ≤ 0, or the rounded
+ * qty is below one step (nothing meaningful to send). Fixes the raw `size*fraction`
+ * qty-precision reject (audit C1).
+ */
+export function computePartialReduceQty(liveSize: number, fraction: number, symbol: string): string | null {
+  if (!(fraction > 0) || !(fraction < 1)) return null;
+  if (!(liveSize > 0)) return null;
+  const rounded = roundQtyToStep(liveSize * fraction, symbol);
+  return rounded > 0 ? rounded.toString() : null;
+}
+
+/**
+ * Venue-ready qty string to FLATTEN a position. Prefers the venue-reported live size
+ * (already step-aligned); when the live size is UNKNOWN (`null`, an API error) falls
+ * back to a notional/price estimate rounded to step. Returns null when the venue is
+ * confirmed flat (size 0) or nothing is closeable.
+ */
+export function selectFlattenQty(
+  liveSize: number | null,
+  positionSizeUsdt: number,
+  fillPrice: number,
+  symbol: string,
+): string | null {
+  if (liveSize !== null) {
+    return liveSize > 0 ? liveSize.toString() : null; // 0 ⇒ confirmed flat, nothing to close
+  }
+  if (fillPrice > 0) {
+    const est = roundQtyToStep(positionSizeUsdt / fillPrice, symbol);
+    return est > 0 ? est.toString() : null;
+  }
+  return null;
 }
