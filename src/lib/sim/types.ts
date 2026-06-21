@@ -25,3 +25,17 @@ export interface FillResult {
   fillTimestamp: number;
   tier: FidelityTier;
 }
+
+export interface CostContext {
+  side: 'entry' | 'exit';
+  /** Which leg an exit fills as. TP exits rest (maker); SL/timeout cross (taker). */
+  exitSide?: 'maker' | 'taker';
+  /** Bar volume (base units) for impact gating. */
+  barVolume?: number;
+  /** Order size (base units) for impact gating. */
+  orderQty?: number;
+  /** Half-spread as a fraction of price (e.g. 0.0001 = 1bp). */
+  halfSpread?: number;
+  /** Per-bar volatility (fraction) for the sqrt-impact term. */
+  volatility?: number;
+}
