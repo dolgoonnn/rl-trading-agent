@@ -46,3 +46,24 @@ describe('simulatePosition (simple mode)', () => {
     expect(r!.netReturn).toBeCloseTo(0.10 - 0.0001, 9);
   });
 });
+
+describe('simulatePosition (partial_tp + breakeven)', () => {
+  it('takes a partial at triggerR, moves SL to BE+buffer, blends pnl', () => {
+    // Long entry 100, SL 90 (risk 10), TP 130. Partial 50% at 1R (price 110),
+    // BE buffer 0.1 -> SL moves to 101. Then price falls and stops the remainder at 101.
+    const pos: SimPosition = { direction: 'long' as const, entryPrice: 100, entryTimestamp: 0, entryIndex: 0, stopLoss: 90, takeProfit: 130, strategy: 'ob' };
+    const candles = [
+      c(0, 100, 101, 99, 100),
+      c(3_600_000, 100, 111, 100, 110),     // hits 1R -> partial 50% at close 110 (+10%)
+      c(7_200_000, 110, 110, 100, 101),     // falls; remainder stopped at new SL 101 (+1%)
+    ];
+    const r = simulatePosition(pos, candles, 1, {
+      fillModel: fm,
+      config: { entryTiming: 'signal_close', maxBars: 100, barMs: 3_600_000, exitMode: 'partial_tp',
+                partialTP: { fraction: 0.5, triggerR: 1.0, beBuffer: 0.1 } },
+    });
+    // blended: 0.5 * 10% + 0.5 * 1% = 5.5%
+    expect(r!.pnlPercent).toBeCloseTo(0.055, 6);
+    expect(r!.exitReason).toBe('stop_loss');
+  });
+});
