@@ -43,6 +43,13 @@ import {
   type TradeResult,
   type WalkForwardResult,
 } from './walk-forward-validate';
+import {
+  simulatePosition,
+  DefaultFillModel,
+  FlatFrictionCostModel,
+  type SimPosition,
+  type SimConfig,
+} from '../src/lib/sim';
 
 // ============================================
 // Types
@@ -80,234 +87,18 @@ interface ScalpBacktestResult {
 }
 
 // ============================================
-// Friction Helpers (same pattern as 1H backtest)
+// Sim helpers
 // ============================================
 
-function applyEntryFriction(price: number, direction: 'long' | 'short', friction: number): number {
-  return direction === 'long'
-    ? price * (1 + friction)
-    : price * (1 - friction);
-}
-
-function applyExitFriction(price: number, direction: 'long' | 'short', friction: number): number {
-  return direction === 'long'
-    ? price * (1 - friction)
-    : price * (1 + friction);
-}
-
-function calculatePnlPercent(
-  adjustedEntry: number,
-  adjustedExit: number,
-  direction: 'long' | 'short',
-): number {
-  return direction === 'long'
-    ? (adjustedExit - adjustedEntry) / adjustedEntry
-    : (adjustedEntry - adjustedExit) / adjustedEntry;
-}
-
-// ============================================
-// Position Simulation
-// ============================================
-
-function simulatePositionSimple(
-  position: SimulatedPosition,
-  candles: Candle[],
-  startIndex: number,
-  maxBars: number,
-  friction: number,
-): TradeResult | null {
-  const adjustedEntry = applyEntryFriction(position.entryPrice, position.direction, friction);
-
-  for (let i = startIndex; i < candles.length; i++) {
-    const candle = candles[i];
-    if (!candle) continue;
-
-    const barsHeld = i - position.entryIndex;
-
-    const exitPrice = checkSLTPMaxBars(position, candle, barsHeld, maxBars);
-    if (exitPrice !== null) {
-      const adjustedExit = applyExitFriction(exitPrice, position.direction, friction);
-      return {
-        entryTimestamp: position.entryTimestamp,
-        exitTimestamp: candle.timestamp,
-        direction: position.direction,
-        entryPrice: adjustedEntry,
-        exitPrice: adjustedExit,
-        pnlPercent: calculatePnlPercent(adjustedEntry, adjustedExit, position.direction),
-        strategy: position.strategy,
-      };
-    }
-  }
-
-  return closeAtEnd(position, candles, adjustedEntry, friction);
-}
-
-function simulatePositionPartialTP(
-  position: SimulatedPosition,
-  candles: Candle[],
-  startIndex: number,
-  config: PartialTPConfig,
-  maxBars: number,
-  friction: number,
-): TradeResult | null {
-  const adjustedEntry = applyEntryFriction(position.entryPrice, position.direction, friction);
-  const riskDistance = position.direction === 'long'
-    ? position.entryPrice - position.stopLoss
-    : position.stopLoss - position.entryPrice;
-
-  const triggerPrice = position.direction === 'long'
-    ? position.entryPrice + riskDistance * config.triggerR
-    : position.entryPrice - riskDistance * config.triggerR;
-
-  let partialTaken = false;
-  let currentSL = position.stopLoss;
-  let realizedPnl = 0;
-  const remainingFraction = 1 - config.fraction;
-
-  for (let i = startIndex; i < candles.length; i++) {
-    const candle = candles[i];
-    if (!candle) continue;
-
-    const barsHeld = i - position.entryIndex;
-
-    if (position.direction === 'long') {
-      if (candle.low <= currentSL) {
-        const exitPrice = applyExitFriction(currentSL, position.direction, friction);
-        const exitPnl = partialTaken
-          ? calculatePnlPercent(adjustedEntry, exitPrice, position.direction) * remainingFraction + realizedPnl
-          : calculatePnlPercent(adjustedEntry, exitPrice, position.direction);
-        return {
-          entryTimestamp: position.entryTimestamp,
-          exitTimestamp: candle.timestamp,
-          direction: position.direction,
-          entryPrice: adjustedEntry,
-          exitPrice,
-          pnlPercent: exitPnl,
-          strategy: position.strategy,
-        };
-      }
-
-      if (!partialTaken && candle.high >= triggerPrice) {
-        partialTaken = true;
-        const partialExit = applyExitFriction(triggerPrice, position.direction, friction);
-        realizedPnl = calculatePnlPercent(adjustedEntry, partialExit, position.direction) * config.fraction;
-        if (config.beBuffer >= 0) {
-          currentSL = position.entryPrice + riskDistance * config.beBuffer;
-        }
-      }
-
-      if (candle.high >= position.takeProfit) {
-        const exitPrice = applyExitFriction(position.takeProfit, position.direction, friction);
-        const exitPnl = partialTaken
-          ? calculatePnlPercent(adjustedEntry, exitPrice, position.direction) * remainingFraction + realizedPnl
-          : calculatePnlPercent(adjustedEntry, exitPrice, position.direction);
-        return {
-          entryTimestamp: position.entryTimestamp,
-          exitTimestamp: candle.timestamp,
-          direction: position.direction,
-          entryPrice: adjustedEntry,
-          exitPrice,
-          pnlPercent: exitPnl,
-          strategy: position.strategy,
-        };
-      }
-    } else {
-      if (candle.high >= currentSL) {
-        const exitPrice = applyExitFriction(currentSL, position.direction, friction);
-        const exitPnl = partialTaken
-          ? calculatePnlPercent(adjustedEntry, exitPrice, position.direction) * remainingFraction + realizedPnl
-          : calculatePnlPercent(adjustedEntry, exitPrice, position.direction);
-        return {
-          entryTimestamp: position.entryTimestamp,
-          exitTimestamp: candle.timestamp,
-          direction: position.direction,
-          entryPrice: adjustedEntry,
-          exitPrice,
-          pnlPercent: exitPnl,
-          strategy: position.strategy,
-        };
-      }
-
-      if (!partialTaken && candle.low <= triggerPrice) {
-        partialTaken = true;
-        const partialExit = applyExitFriction(triggerPrice, position.direction, friction);
-        realizedPnl = calculatePnlPercent(adjustedEntry, partialExit, position.direction) * config.fraction;
-        if (config.beBuffer >= 0) {
-          currentSL = position.entryPrice - riskDistance * config.beBuffer;
-        }
-      }
-
-      if (candle.low <= position.takeProfit) {
-        const exitPrice = applyExitFriction(position.takeProfit, position.direction, friction);
-        const exitPnl = partialTaken
-          ? calculatePnlPercent(adjustedEntry, exitPrice, position.direction) * remainingFraction + realizedPnl
-          : calculatePnlPercent(adjustedEntry, exitPrice, position.direction);
-        return {
-          entryTimestamp: position.entryTimestamp,
-          exitTimestamp: candle.timestamp,
-          direction: position.direction,
-          entryPrice: adjustedEntry,
-          exitPrice,
-          pnlPercent: exitPnl,
-          strategy: position.strategy,
-        };
-      }
-    }
-
-    if (barsHeld >= maxBars) {
-      const exitPrice = applyExitFriction(candle.close, position.direction, friction);
-      const exitPnl = partialTaken
-        ? calculatePnlPercent(adjustedEntry, exitPrice, position.direction) * remainingFraction + realizedPnl
-        : calculatePnlPercent(adjustedEntry, exitPrice, position.direction);
-      return {
-        entryTimestamp: position.entryTimestamp,
-        exitTimestamp: candle.timestamp,
-        direction: position.direction,
-        entryPrice: adjustedEntry,
-        exitPrice,
-        pnlPercent: exitPnl,
-        strategy: position.strategy,
-      };
-    }
-  }
-
-  return closeAtEnd(position, candles, adjustedEntry, friction);
-}
-
-function checkSLTPMaxBars(
-  position: SimulatedPosition,
-  candle: Candle,
-  barsHeld: number,
-  maxBars: number,
-): number | null {
-  if (position.direction === 'long') {
-    if (candle.low <= position.stopLoss) return position.stopLoss;
-    if (candle.high >= position.takeProfit) return position.takeProfit;
-  } else {
-    if (candle.high >= position.stopLoss) return position.stopLoss;
-    if (candle.low <= position.takeProfit) return position.takeProfit;
-  }
-  if (barsHeld >= maxBars) return candle.close;
-  return null;
-}
-
-function closeAtEnd(
-  position: SimulatedPosition,
-  candles: Candle[],
-  adjustedEntry: number,
-  friction: number,
-): TradeResult | null {
-  const lastCandle = candles[candles.length - 1];
-  if (!lastCandle) return null;
-  const adjustedExit = applyExitFriction(lastCandle.close, position.direction, friction);
+function toSimPos(p: SimulatedPosition): SimPosition {
   return {
-    entryTimestamp: position.entryTimestamp,
-    exitTimestamp: lastCandle.timestamp,
-    direction: position.direction,
-    entryPrice: adjustedEntry,
-    exitPrice: adjustedExit,
-    pnlPercent: calculatePnlPercent(adjustedEntry, adjustedExit, position.direction),
-    strategy: position.strategy,
+    direction: p.direction,
+    entryPrice: p.entryPrice,
+    entryTimestamp: p.entryTimestamp,
+    entryIndex: p.entryIndex,
+    stopLoss: p.stopLoss,
+    takeProfit: p.takeProfit,
+    strategy: p.strategy,
   };
 }
 
@@ -359,6 +150,7 @@ function createScalpRunner(
   cooldownBars: number,
   friction: number,
   suppressRegimes: string[],
+  tf: number,
   partialTP?: PartialTPConfig,
 ): { runner: WalkForwardStrategyRunner; allTrades: TradeResult[] } {
   const allTrades: TradeResult[] = [];
@@ -432,12 +224,25 @@ function createScalpRunner(
             strategy: signal.strategy,
           };
 
-          let trade: TradeResult | null;
-          if (exitMode === 'partial_tp' && partialTP) {
-            trade = simulatePositionPartialTP(position, all5m, i + 1, partialTP, maxBars, friction);
-          } else {
-            trade = simulatePositionSimple(position, all5m, i + 1, maxBars, friction);
-          }
+          const fillModel = new DefaultFillModel(new FlatFrictionCostModel(friction), { allowHeuristic: false });
+          // NOTE: with --partial-tp, the shared sim triggers the partial on bar CLOSE
+          // (unrealizedR from close), matching the production confluence path. The old
+          // scalp local sim triggered the partial on intrabar high/low reaching the
+          // trigger price. Simple-mode (default) is byte-identical; partial-mode metrics
+          // differ by design — scalp is a sandbox and the unified close-based rule is
+          // intentionally consistent with backtest-confluence.
+          const simConfig: SimConfig = {
+            entryTiming: 'next_open',
+            maxBars,
+            barMs: tf * 60_000,
+            exitMode: exitMode === 'partial_tp' ? 'partial_tp' : 'simple',
+            partialTP: exitMode === 'partial_tp' && partialTP ? {
+              fraction: partialTP.fraction,
+              triggerR: partialTP.triggerR,
+              beBuffer: partialTP.beBuffer,
+            } : undefined,
+          };
+          const trade: TradeResult | null = simulatePosition(toSimPos(position), all5m, i + 1, { fillModel, config: simConfig });
 
           if (trade) {
             windowTrades.push(trade);
@@ -698,7 +503,7 @@ async function main(): Promise<void> {
   // Create strategy and runner
   const strategy = createStrategy(strategyName, ict5mConfig, atrConfig, sweepChochConfig);
   const { runner, allTrades } = createScalpRunner(
-    strategy, threshold, exitMode, maxBars, cooldownBars, friction, suppressRegimes, partialTP,
+    strategy, threshold, exitMode, maxBars, cooldownBars, friction, suppressRegimes, tf, partialTP,
   );
 
   // Run walk-forward validation on execution-TF candles
