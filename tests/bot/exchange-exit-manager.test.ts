@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   ExchangeExitManager,
+  closeSideFor,
   type ExchangeExitClient,
 } from '@/lib/bot/exchange-exit-manager';
 
@@ -75,8 +76,20 @@ describe('ExchangeExitManager.clearExits', () => {
     const res = await mgr.clearExits('BTCUSDT');
     expect(res.ok).toBe(true);
     expect(client.setTradingStop).toHaveBeenCalledWith(
-      expect.objectContaining({ symbol: 'BTCUSDT', positionIdx: 0, stopLoss: '0', takeProfit: '0' }),
+      expect.objectContaining({
+        symbol: 'BTCUSDT', positionIdx: 0, tpslMode: 'Full', stopLoss: '0', takeProfit: '0',
+      }),
     );
+  });
+
+  it('returns ok:false when the exchange rejects with a non-zero retCode', async () => {
+    const client = mockClient({
+      setTradingStop: vi.fn().mockResolvedValue({ retCode: 110001, retMsg: 'order not found' }),
+    });
+    const mgr = new ExchangeExitManager(client, { enabled: true, triggerBy: 'MarkPrice' });
+    const res = await mgr.clearExits('BTCUSDT');
+    expect(res.ok).toBe(false);
+    expect(res.reason).toContain('110001');
   });
 
   it('is a no-op when disabled — never touches the exchange', async () => {
@@ -100,6 +113,16 @@ describe('ExchangeExitManager.marketClose', () => {
         orderType: 'Market', qty: '0.01', reduceOnly: true,
       }),
     );
+  });
+
+  it('returns ok:false when the exchange rejects with a non-zero retCode', async () => {
+    const client = mockClient({
+      submitOrder: vi.fn().mockResolvedValue({ retCode: 110017, retMsg: 'reduce-only rejected' }),
+    });
+    const mgr = new ExchangeExitManager(client, { enabled: true, triggerBy: 'MarkPrice' });
+    const res = await mgr.marketClose('BTCUSDT', 'Sell', '0.01');
+    expect(res.ok).toBe(false);
+    expect(res.reason).toContain('110017');
   });
 
   it('is a no-op when disabled — never touches the exchange', async () => {
@@ -141,8 +164,6 @@ describe('ExchangeExitManager.getOpenSize', () => {
     expect(client.getPositionInfo).not.toHaveBeenCalled();
   });
 });
-
-import { closeSideFor } from '@/lib/bot/exchange-exit-manager';
 
 describe('closeSideFor', () => {
   it('closes a long with a Sell and a short with a Buy', () => {

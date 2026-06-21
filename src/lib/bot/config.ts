@@ -176,8 +176,8 @@ export const DEFAULT_FUNDING_ARB_CONFIG: FundingArbConfig = {
 // Exchange-Native Protective Exits (live bot only)
 // ============================================
 
-// Exchange-Native Protective Exits (live bot only). `enabled` is flipped on by
-// the --exchange-exits CLI flag in run-bot; default OFF keeps paper/backtest pure.
+// `enabled` is flipped on by the --exchange-exits CLI flag in run-bot;
+// default OFF keeps paper/backtest pure.
 export const EXCHANGE_EXIT_CONFIG: ExchangeExitConfig = { ...DEFAULT_EXCHANGE_EXIT_CONFIG };
 
 // ============================================

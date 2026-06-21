@@ -11,6 +11,10 @@
  * `{ ok, reason }` and lets the caller decide (the caller's safety rule: if a
  * live position can't be protected, flatten it).
  */
+// NOTE: config.ts imports back from this module (DEFAULT_EXCHANGE_EXIT_CONFIG),
+// so this is a circular import. It is safe ONLY because BYBIT_CATEGORY is read
+// lazily inside method bodies (ES live binding), never at module-init time.
+// Do not reference BYBIT_CATEGORY at top level here, or it will be undefined.
 import { BYBIT_CATEGORY } from './config';
 
 /** Structural slice of RestClientV5 we depend on (lets tests inject a mock). */
