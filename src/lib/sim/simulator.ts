@@ -87,6 +87,23 @@ export function simulatePosition(
       return finishBlended(position, adjustedEntry, adjustedExit, 'strategy', bar.timestamp, 'pessimistic', rateAt, partialTaken, partialFraction, partialPnl);
     }
 
+    // SL/TP FIRST (legacy order: before partial and maxBars). maxBars is suppressed
+    // (Infinity) here so the time-exit fires AFTER the partial move below — exactly
+    // as legacy simulatePositionPartialTP / checkSLTPMaxBars sequence.
+    const slReq: BarFillRequest = {
+      levels: { direction: position.direction, stopLoss: mutableSL, takeProfit: position.takeProfit },
+      bar,
+      barsHeld,
+      maxBars: Number.POSITIVE_INFINITY,
+      subBars: subBars?.subBarsFor(bar.timestamp, config.barMs),
+    };
+    const sltp = fillModel.resolveExit(slReq);
+    if (sltp) {
+      const exitSide = sltp.exitReason === 'take_profit' ? 'maker' : 'taker';
+      const adjustedExit = fillModel.applyCost(sltp.exitPrice, 'exit', position.direction, { exitSide });
+      return finishBlended(position, adjustedEntry, adjustedExit, sltp.exitReason, sltp.fillTimestamp, sltp.tier, rateAt, partialTaken, partialFraction, partialPnl);
+    }
+
     // partial TP: take a fraction at triggerR and move SL to BE+buffer (once)
     if (config.exitMode === 'partial_tp' && config.partialTP && !partialTaken && rawRisk > 0) {
       const unrealizedR =
@@ -94,16 +111,18 @@ export function simulatePosition(
           ? (bar.close - position.entryPrice) / rawRisk
           : (position.entryPrice - bar.close) / rawRisk;
       if (unrealizedR >= config.partialTP.triggerR) {
-        const adjPartialExit = fillModel.applyCost(bar.close, 'exit', position.direction, { exitSide: 'maker' });
+        // partial leg crosses the book (taker) — matches legacy simulatePositionPartialTP
+        const adjPartialExit = fillModel.applyCost(bar.close, 'exit', position.direction, { exitSide: 'taker' });
         partialPnl = pnlPercent(adjustedEntry, adjPartialExit, position.direction);
         partialFraction = config.partialTP.fraction;
         partialTaken = true;
         if (config.partialTP.beBuffer >= 0) {
           const buf = rawRisk * config.partialTP.beBuffer;
+          // BE off the ADJUSTED (friction-inclusive) entry so the stop covers the real fill (legacy parity)
           mutableSL =
             position.direction === 'long'
-              ? Math.max(mutableSL, position.entryPrice + buf)
-              : Math.min(mutableSL, position.entryPrice - buf);
+              ? Math.max(mutableSL, adjustedEntry + buf)
+              : Math.min(mutableSL, adjustedEntry - buf);
         }
       }
     }
@@ -124,18 +143,10 @@ export function simulatePosition(
       }
     }
 
-    const req: BarFillRequest = {
-      levels: { direction: position.direction, stopLoss: mutableSL, takeProfit: position.takeProfit },
-      bar,
-      barsHeld,
-      maxBars: config.maxBars,
-      subBars: subBars?.subBarsFor(bar.timestamp, config.barMs),
-    };
-    const exit = fillModel.resolveExit(req);
-    if (exit) {
-      const exitSide = exit.exitReason === 'take_profit' ? 'maker' : 'taker';
-      const adjustedExit = fillModel.applyCost(exit.exitPrice, 'exit', position.direction, { exitSide });
-      return finishBlended(position, adjustedEntry, adjustedExit, exit.exitReason, exit.fillTimestamp, exit.tier, rateAt, partialTaken, partialFraction, partialPnl);
+    // maxBars time-exit LAST (legacy order: after the partial move), at the bar close.
+    if (barsHeld >= config.maxBars) {
+      const adjustedExit = fillModel.applyCost(bar.close, 'exit', position.direction, { exitSide: 'taker' });
+      return finishBlended(position, adjustedEntry, adjustedExit, 'max_bars', bar.timestamp, 'pessimistic', rateAt, partialTaken, partialFraction, partialPnl);
     }
   }
 
