@@ -70,3 +70,27 @@ export function ohlcHeuristicResolve(req: BarFillRequest): FillResult | null {
   }
   return null;
 }
+
+/**
+ * Walk the injected 1m candles in time order; the first 1m candle whose range
+ * touches SL or TP determines the exit. A 1m candle that straddles BOTH levels
+ * has no finer data to disambiguate, so we apply the pessimistic floor WITHIN
+ * that candle (SL wins). Max-bars (checked at the exec-bar level) exits at the
+ * exec bar close.
+ */
+export function subBarResolve(req: BarFillRequest): FillResult | null {
+  const { levels, bar, barsHeld, maxBars, subBars } = req;
+  if (!subBars || subBars.length === 0) return null;
+
+  for (const sub of subBars) {
+    const inner = pessimisticResolve({ levels, bar: sub, barsHeld: 0, maxBars: Number.POSITIVE_INFINITY });
+    if (inner) {
+      return { exitPrice: inner.exitPrice, exitReason: inner.exitReason, fillTimestamp: sub.timestamp, tier: 'subbar_1m' };
+    }
+  }
+
+  if (barsHeld >= maxBars) {
+    return { exitPrice: bar.close, exitReason: 'max_bars', fillTimestamp: bar.timestamp, tier: 'subbar_1m' };
+  }
+  return null;
+}

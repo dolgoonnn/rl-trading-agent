@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { pessimisticResolve, ohlcHeuristicResolve } from '@/lib/sim/intrabar';
+import { pessimisticResolve, ohlcHeuristicResolve, subBarResolve } from '@/lib/sim/intrabar';
 import type { BarFillRequest } from '@/lib/sim/types';
 import type { Candle } from '@/types/candle';
 
@@ -79,5 +79,50 @@ describe('ohlcHeuristicResolve', () => {
       barsHeld: 1, maxBars: 100,
     });
     expect(r!.exitReason).toBe('stop_loss');
+  });
+});
+
+describe('subBarResolve', () => {
+  it('proves SL-first is WRONG: 1m path hits TP before SL on a straddling 1h bar', () => {
+    // 1h bar straddles both 95 (SL) and 110 (TP). Pessimistic says stop_loss.
+    // But the 1m path goes UP to TP first, THEN down to SL. Truth = take_profit.
+    const subBars: Candle[] = [
+      { timestamp: 10, open: 100, high: 111, low: 100, close: 110, volume: 1 }, // TP touched here
+      { timestamp: 70, open: 110, high: 110, low: 94, close: 96, volume: 1 },   // SL later
+    ];
+    const r = subBarResolve({
+      levels: { direction: 'long', stopLoss: 95, takeProfit: 110 },
+      bar: { timestamp: 0, open: 100, high: 111, low: 94, close: 96, volume: 2 },
+      barsHeld: 1, maxBars: 100, subBars,
+    });
+    expect(r!.exitReason).toBe('take_profit');
+    expect(r!.exitPrice).toBe(110);
+    expect(r!.fillTimestamp).toBe(10);   // the 1m candle that touched first
+    expect(r!.tier).toBe('subbar_1m');
+  });
+
+  it('single straddling 1m candle falls back to pessimistic (SL) within it', () => {
+    const subBars: Candle[] = [
+      { timestamp: 10, open: 100, high: 111, low: 94, close: 100, volume: 1 },
+    ];
+    const r = subBarResolve({
+      levels: { direction: 'long', stopLoss: 95, takeProfit: 110 },
+      bar: { timestamp: 0, open: 100, high: 111, low: 94, close: 100, volume: 1 },
+      barsHeld: 1, maxBars: 100, subBars,
+    });
+    expect(r!.exitReason).toBe('stop_loss');
+    expect(r!.tier).toBe('subbar_1m');
+  });
+
+  it('no touch across 1m, under maxBars -> null', () => {
+    const subBars: Candle[] = [
+      { timestamp: 10, open: 100, high: 105, low: 99, close: 101, volume: 1 },
+    ];
+    const r = subBarResolve({
+      levels: { direction: 'long', stopLoss: 80, takeProfit: 130 },
+      bar: { timestamp: 0, open: 100, high: 105, low: 99, close: 101, volume: 1 },
+      barsHeld: 1, maxBars: 100, subBars,
+    });
+    expect(r).toBeNull();
   });
 });
