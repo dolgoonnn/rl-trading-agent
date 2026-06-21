@@ -43,6 +43,11 @@ export interface ExchangeExitClient {
     retMsg: string;
     result: { list: Array<{ size: string; side: string; avgPrice: string }> };
   }>;
+  getClosedPnL(params: { category: 'linear'; symbol: string; limit?: number }): Promise<{
+    retCode: number;
+    retMsg: string;
+    result: { list: Array<{ avgExitPrice: string; closedPnl: string; side: string; qty: string; updatedTime: string }> };
+  }>;
 }
 
 export interface ExchangeExitConfig {
@@ -129,6 +134,25 @@ export class ExchangeExitManager {
       return { size: parseFloat(row.size) || 0, avgPrice: parseFloat(row.avgPrice) || 0 };
     } catch {
       return { size: 0, avgPrice: 0 };
+    }
+  }
+
+  /**
+   * Most-recent realized close for the symbol (real exchange exit price + pnl).
+   * Used to reconcile the shadow book when the venue's SL/TP fired. Returns null
+   * when disabled, on error, on an empty list, or on an unparseable price. Never throws.
+   */
+  async getRealizedClose(symbol: string): Promise<{ exitPrice: number; closedPnl: number } | null> {
+    if (!this.config.enabled) return null;
+    try {
+      const resp = await this.client.getClosedPnL({ category: BYBIT_CATEGORY, symbol, limit: 1 });
+      const row = resp.retCode === 0 ? resp.result.list[0] : undefined;
+      if (!row) return null;
+      const exitPrice = parseFloat(row.avgExitPrice);
+      if (!Number.isFinite(exitPrice) || exitPrice <= 0) return null;
+      return { exitPrice, closedPnl: parseFloat(row.closedPnl) || 0 };
+    } catch {
+      return null;
     }
   }
 

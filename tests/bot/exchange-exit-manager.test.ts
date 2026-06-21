@@ -10,6 +10,7 @@ function mockClient(overrides: Partial<ExchangeExitClient> = {}): ExchangeExitCl
     setTradingStop: vi.fn().mockResolvedValue({ retCode: 0, retMsg: 'OK' }),
     submitOrder: vi.fn().mockResolvedValue({ retCode: 0, retMsg: 'OK', result: { orderId: 'x' } }),
     getPositionInfo: vi.fn().mockResolvedValue({ retCode: 0, retMsg: 'OK', result: { list: [] } }),
+    getClosedPnL: vi.fn().mockResolvedValue({ retCode: 0, retMsg: 'OK', result: { list: [] } }),
     ...overrides,
   };
 }
@@ -169,5 +170,40 @@ describe('closeSideFor', () => {
   it('closes a long with a Sell and a short with a Buy', () => {
     expect(closeSideFor('long')).toBe('Sell');
     expect(closeSideFor('short')).toBe('Buy');
+  });
+});
+
+describe('ExchangeExitManager.getRealizedClose', () => {
+  it('returns the most-recent realized exit price and pnl', async () => {
+    const client = mockClient({
+      getClosedPnL: vi.fn().mockResolvedValue({
+        retCode: 0, retMsg: 'OK',
+        result: { list: [{ avgExitPrice: '64250.5', closedPnl: '12.3', side: 'Sell', qty: '0.01', updatedTime: '1' }] },
+      }),
+    });
+    const mgr = new ExchangeExitManager(client, { enabled: true, triggerBy: 'MarkPrice' });
+    const r = await mgr.getRealizedClose('BTCUSDT');
+    expect(r).not.toBeNull();
+    expect(r!.exitPrice).toBeCloseTo(64250.5);
+    expect(r!.closedPnl).toBeCloseTo(12.3);
+  });
+
+  it('returns null when the closed-PnL list is empty', async () => {
+    const client = mockClient();
+    const mgr = new ExchangeExitManager(client, { enabled: true, triggerBy: 'MarkPrice' });
+    expect(await mgr.getRealizedClose('BTCUSDT')).toBeNull();
+  });
+
+  it('returns null when disabled — never touches the exchange', async () => {
+    const client = mockClient();
+    const mgr = new ExchangeExitManager(client, { enabled: false, triggerBy: 'MarkPrice' });
+    expect(await mgr.getRealizedClose('BTCUSDT')).toBeNull();
+    expect(client.getClosedPnL).not.toHaveBeenCalled();
+  });
+
+  it('returns null and does not throw on a client error', async () => {
+    const client = mockClient({ getClosedPnL: vi.fn().mockRejectedValue(new Error('ETIMEDOUT')) });
+    const mgr = new ExchangeExitManager(client, { enabled: true, triggerBy: 'MarkPrice' });
+    expect(await mgr.getRealizedClose('BTCUSDT')).toBeNull();
   });
 });
