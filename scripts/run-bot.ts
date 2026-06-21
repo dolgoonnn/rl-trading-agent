@@ -54,7 +54,7 @@ import {
 import { RETIREMENT_CONFIG, SAFETY_GATE_CONFIG, SYMBOL_ALLOCATION } from '../src/lib/bot/config';
 import { db } from '../src/lib/data/db';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
-import type { BotConfig, BotSymbol, BotPosition, LTFConfig } from '../src/types/bot';
+import type { BotConfig, BotSymbol, BotPosition, LTFConfig, ExitReason } from '../src/types/bot';
 import type { Candle } from '../src/types/candle';
 import type { FundingSettlementSeries } from '../src/lib/cost/funding-ledger';
 
@@ -1170,11 +1170,51 @@ class TradingBot {
     return { rateAt: (settlementMs: number): number => rateByInstant.get(settlementMs) ?? 0 };
   }
 
+  /**
+   * When `--exchange-exits` is on: detect that the venue has flattened a position
+   * our shadow still holds open (its SL/TP fired on Bybit) and close the shadow at
+   * the REAL exchange exit price. Returns true if it reconciled (caller returns).
+   * Reason is inferred from proximity to currentSL vs takeProfit. Gated/null-safe.
+   */
+  private async reconcileExchangeClose(position: BotPosition): Promise<boolean> {
+    if (!this.exchangeExitManager?.isEnabled) return false;
+    const live = await this.exchangeExitManager.getOpenSize(position.symbol);
+    if (live.size > 0) return false; // still open on the venue — nothing to reconcile
+
+    // Venue is flat but we still hold the shadow open → the exchange closed it.
+    // Book at the REAL exchange exit price; if closed-PnL is unavailable, fall back
+    // to the known stop level (conservative — assume the protective stop fired).
+    const realized = await this.exchangeExitManager.getRealizedClose(position.symbol);
+    const exitPrice = realized?.exitPrice ?? position.currentSL;
+    const reason: ExitReason =
+      Math.abs(exitPrice - position.takeProfit) < Math.abs(exitPrice - position.currentSL)
+        ? 'take_profit'
+        : 'stop_loss';
+
+    const result = this.orderManager.forceClose(position, exitPrice, reason);
+    const fundingSeries = await this.buildFundingSeries(result.position);
+    this.tracker.closePosition(result.position, fundingSeries);
+    await this.alerts.positionClosed(result.position);
+    await this.exchangeExitManager.clearExits(position.symbol);
+    console.log(`  ${position.symbol}: RECONCILED exchange close @ $${exitPrice} (${reason})`);
+
+    const triggered = this.riskEngine.evaluateAfterTrade(this.tracker);
+    for (const cb of triggered) await this.alerts.circuitBreakerTriggered(cb.type, cb.reason);
+    this.tracker.saveState();
+    this.tracker.recordSnapshot();
+    return true;
+  }
+
   private async manageOpenPosition(
     position: BotPosition,
     candle: { timestamp: number; open: number; high: number; low: number; close: number; volume: number },
     currentBarIndex: number,
   ): Promise<void> {
+    // If the exchange already closed this position (its SL/TP fired on Bybit),
+    // reconcile the shadow at the REAL exit price and skip the in-process check
+    // this tick — prevents managing a position that is already flat on the venue.
+    if (await this.reconcileExchangeClose(position)) return;
+
     const wasPT = position.partialTaken;
 
     const exitResult = this.orderManager.checkPositionExit(position, candle, currentBarIndex);
