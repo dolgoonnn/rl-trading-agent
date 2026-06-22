@@ -120,5 +120,9 @@ export function replayTrade(
     strategy: row.strategy,
   };
 
-  return simulatePosition(position, candles, startIndex, { fillModel, config });
+  // Start SL/TP checking at the bar AFTER entry (startIndex + 1), mirroring the
+  // production convention (backtest-confluence calls simulatePosition with i + 1,
+  // entryIndex = i). Entering at a bar's close means that already-closed bar
+  // cannot fill the position — checking it would manufacture false sim/live drift.
+  return simulatePosition(position, candles, startIndex + 1, { fillModel, config });
 }

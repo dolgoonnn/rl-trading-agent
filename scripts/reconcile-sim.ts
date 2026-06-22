@@ -137,7 +137,7 @@ async function main(): Promise<void> {
     console.log('\nTop outliers:');
     for (const d of outliers) {
       const delta = (d.netDelta * 1e4).toFixed(2);
-      const reason = d.reasonMatch ? 'reason=ok' : `reason: sim=${getExitReason(d, sorted)} live=${d.id}`;
+      const reason = d.reasonMatch ? 'reason=ok' : 'reason=MISMATCH';
       console.log(`  ${d.id} (${d.symbol})  netDelta=${delta}bps  ${reason}  bars=${d.barsHeldMatch ? 'ok' : 'MISMATCH'}`);
     }
   }
@@ -145,11 +145,6 @@ async function main(): Promise<void> {
   console.log('────────────────────────────────────────────────────────────\n');
 
   process.exit(report.pass ? 0 : 1);
-}
-
-// Helper: we only store diff, not individual sim exit reasons — print delta as proxy
-function getExitReason(_d: TradeDiff, _allDiffs: TradeDiff[]): string {
-  return '(see sim)';
 }
 
 main().catch((err: unknown) => {
