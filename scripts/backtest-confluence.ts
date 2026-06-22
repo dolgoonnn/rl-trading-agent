@@ -61,6 +61,7 @@ import {
   FlatFrictionCostModel,
   type SimConfig,
   type SimPosition,
+  type EntryTiming,
 } from '../src/lib/sim';
 
 // ============================================
@@ -777,6 +778,7 @@ function createConfluenceRunner(
   multiTP?: MultiTPConfig,
   futuresDataMap?: Map<string, { timestamp: number; fundingRate: number }[]>,
   chargeFunding = false,
+  entryTiming: EntryTiming = 'signal_close',
 ): {
   runner: WalkForwardStrategyRunner;
   allTrades: TradeResult[];
@@ -942,7 +944,7 @@ function createConfluenceRunner(
                 };
                 const simExitMode = partialTP ? 'partial_tp' : 'simple';
                 const simConfig: SimConfig = {
-                  entryTiming: 'signal_close',
+                  entryTiming,
                   maxBars: MAX_POSITION_BARS,
                   barMs: 3_600_000,
                   exitMode: simExitMode,
@@ -1611,6 +1613,7 @@ async function main(): Promise<void> {
   const chargeFunding = hasFlag('charge-funding'); // --charge-funding to debit realized funding as a real cost (Task 8 PROBE)
   const makerBpsArg = getArg('maker-bps'); // --maker-bps 2 (passive TP exit leg, per side)
   const takerBpsArg = getArg('taker-bps'); // --taker-bps 5.5 (entry + SL/timeout exit leg, per side)
+  const entryTimingArg = getArg('entry-timing'); // --entry-timing signal_close|next_open
 
   // Gold-specific args
   const goldRangeMinArg = getArg('asian-range-min'); // --asian-range-min 0.15 (min Asian range %)
@@ -1637,6 +1640,16 @@ async function main(): Promise<void> {
     exitMode = exitModeArg as ExitMode;
   } else if (useSimple) {
     exitMode = 'simple';
+  }
+
+  // Resolve entry timing (--entry-timing signal_close|next_open; default: signal_close)
+  let entryTiming: EntryTiming = 'signal_close';
+  if (entryTimingArg) {
+    if (!['signal_close', 'next_open'].includes(entryTimingArg)) {
+      console.error('Error: --entry-timing must be one of: signal_close, next_open');
+      process.exit(1);
+    }
+    entryTiming = entryTimingArg as EntryTiming;
   }
 
   // Parse partial TP config
@@ -1991,7 +2004,7 @@ async function main(): Promise<void> {
 
   // Create the confluence runner
   const { runner, allTrades, signalCounts, tradeRegimes, circuitBreakerFirings, fundingStats } =
-    createConfluenceRunner(threshold, exitMode, scorerConfig, circuitBreaker, partialTP, regimeSLMultipliers, riskConfig, multiTP, futuresDataMap, chargeFunding);
+    createConfluenceRunner(threshold, exitMode, scorerConfig, circuitBreaker, partialTP, regimeSLMultipliers, riskConfig, multiTP, futuresDataMap, chargeFunding, entryTiming);
 
   // Run walk-forward validation
   const walkForwardResult = await runWalkForward(runner, configOverrides, { quiet: jsonOutputMode });
