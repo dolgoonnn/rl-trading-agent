@@ -1,0 +1,15 @@
+{
+  "old": {
+    "lowVolatilityPercentile": 0.25,
+    "highVolatilityPercentile": 0.75
+  },
+  "proposed": {
+    "lowAtrPct": 0.004596366214854304,
+    "highAtrPct": 0.01190972853490389,
+    "medianAtrPct": 0.0074092093787431305,
+    "sampleCount": 86630
+  },
+  "autoApply": false,
+  "charterReviewDate": "2026-09-11",
+  "computedAtMs": 1781420186062
+}

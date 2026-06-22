@@ -1,0 +1,360 @@
+{
+  "generatedAt": "2026-06-14T07:26:03.275Z",
+  "note": "DIAGNOSTIC. In-sample replay of Run-20 bot_trades; per-arm funding debited net-of-funding R. A winning arm must clear WF/PBO before any live exit change.",
+  "config": {
+    "maxBars": 160,
+    "atrFloorK": 1.5,
+    "chandelierK": 3,
+    "verticalHorizons": [
+      40,
+      80,
+      120,
+      160
+    ],
+    "atrPeriod": 14
+  },
+  "nTradesTotal": 432,
+  "nReplayed": 432,
+  "nSkipped": 0,
+  "baselineMeanNetR": 0.20181937780676448,
+  "arms": [
+    {
+      "arm": "A_baseline",
+      "label": "A baseline (stored SL/TP)",
+      "deltaNetRvsBaseline": 0,
+      "n": 432,
+      "winRate": 0.4398148148148148,
+      "slRate": 0.5300925925925926,
+      "meanNetR": 0.20181937780676448,
+      "meanGrossR": 0.2045495759996189,
+      "fastStopRate": 0.12731481481481483,
+      "meanFundingR": -0.0027301981928543034,
+      "totalNetR": 87.18597121252226,
+      "meanBars": 60.93981481481482
+    },
+    {
+      "arm": "B_atr_floor",
+      "label": "B atr_floor (k=1.5)",
+      "deltaNetRvsBaseline": 0,
+      "n": 432,
+      "winRate": 0.4398148148148148,
+      "slRate": 0.5300925925925926,
+      "meanNetR": 0.20181937780676448,
+      "meanGrossR": 0.2045495759996189,
+      "fastStopRate": 0.12731481481481483,
+      "meanFundingR": -0.0027301981928543034,
+      "totalNetR": 87.18597121252226,
+      "meanBars": 60.93981481481482
+    },
+    {
+      "arm": "C_chandelier",
+      "label": "C chandelier (k=3)",
+      "deltaNetRvsBaseline": -0.09813748020263025,
+      "n": 432,
+      "winRate": 0.4166666666666667,
+      "slRate": 1,
+      "meanNetR": 0.10368189760413424,
+      "meanGrossR": 0.10503401951788398,
+      "fastStopRate": 0.5347222222222222,
+      "meanFundingR": -0.0013521219137497837,
+      "totalNetR": 44.79057976498599,
+      "meanBars": 21.037037037037038
+    },
+    {
+      "arm": "D_vertical_40",
+      "label": "D vertical_barrier (N=40)",
+      "deltaNetRvsBaseline": -0.056878969108256905,
+      "n": 432,
+      "winRate": 0.48842592592592593,
+      "slRate": 0.32175925925925924,
+      "meanNetR": 0.14494040869850758,
+      "meanGrossR": 0.14618595170735896,
+      "fastStopRate": 0.12731481481481483,
+      "meanFundingR": -0.0012455430088514378,
+      "totalNetR": 62.61425655775527,
+      "meanBars": 30.180555555555557
+    },
+    {
+      "arm": "D_vertical_80",
+      "label": "D vertical_barrier (N=80)",
+      "deltaNetRvsBaseline": -0.027426851928286144,
+      "n": 432,
+      "winRate": 0.4722222222222222,
+      "slRate": 0.4351851851851852,
+      "meanNetR": 0.17439252587847834,
+      "meanGrossR": 0.17633282614342302,
+      "fastStopRate": 0.12731481481481483,
+      "meanFundingR": -0.0019403002649446565,
+      "totalNetR": 75.33757117950265,
+      "meanBars": 46
+    },
+    {
+      "arm": "D_vertical_120",
+      "label": "D vertical_barrier (N=120)",
+      "deltaNetRvsBaseline": -0.022737006564331697,
+      "n": 432,
+      "winRate": 0.4375,
+      "slRate": 0.5023148148148148,
+      "meanNetR": 0.1790823712424328,
+      "meanGrossR": 0.1814243658156224,
+      "fastStopRate": 0.12731481481481483,
+      "meanFundingR": -0.0023419945731896178,
+      "totalNetR": 77.36358437673097,
+      "meanBars": 55.15277777777778
+    },
+    {
+      "arm": "D_vertical_160",
+      "label": "D vertical_barrier (N=160)",
+      "deltaNetRvsBaseline": 0,
+      "n": 432,
+      "winRate": 0.4398148148148148,
+      "slRate": 0.5300925925925926,
+      "meanNetR": 0.20181937780676448,
+      "meanGrossR": 0.2045495759996189,
+      "fastStopRate": 0.12731481481481483,
+      "meanFundingR": -0.0027301981928543034,
+      "totalNetR": 87.18597121252226,
+      "meanBars": 60.93981481481482
+    }
+  ],
+  "verdict": "NO arm beats baseline on mean net-of-funding R; Run-20 partial_tp exits near-optimal on this window.",
+  "perSymbol": {
+    "SOLUSDT": {
+      "A_baseline": {
+        "n": 188,
+        "winRate": 0.43617021276595747,
+        "slRate": 0.5478723404255319,
+        "meanNetR": 0.1942850030500458,
+        "meanGrossR": 0.19556135122724827,
+        "fastStopRate": 0.10638297872340426,
+        "meanFundingR": -0.0012763481772023737,
+        "totalNetR": 36.52558057340861,
+        "meanBars": 60.02127659574468
+      },
+      "B_atr_floor": {
+        "n": 188,
+        "winRate": 0.43617021276595747,
+        "slRate": 0.5478723404255319,
+        "meanNetR": 0.1942850030500458,
+        "meanGrossR": 0.19556135122724827,
+        "fastStopRate": 0.10638297872340426,
+        "meanFundingR": -0.0012763481772023737,
+        "totalNetR": 36.52558057340861,
+        "meanBars": 60.02127659574468
+      },
+      "C_chandelier": {
+        "n": 188,
+        "winRate": 0.42021276595744683,
+        "slRate": 1,
+        "meanNetR": 0.08516788558135677,
+        "meanGrossR": 0.08596981194688648,
+        "fastStopRate": 0.4521276595744681,
+        "meanFundingR": -0.0008019263655296632,
+        "totalNetR": 16.011562489295073,
+        "meanBars": 23.106382978723403
+      },
+      "D_vertical_40": {
+        "n": 188,
+        "winRate": 0.5159574468085106,
+        "slRate": 0.3191489361702128,
+        "meanNetR": 0.15718984557253096,
+        "meanGrossR": 0.1580362673249298,
+        "fastStopRate": 0.10638297872340426,
+        "meanFundingR": -0.0008464217523988382,
+        "totalNetR": 29.55169096763582,
+        "meanBars": 31.132978723404257
+      },
+      "D_vertical_80": {
+        "n": 188,
+        "winRate": 0.4521276595744681,
+        "slRate": 0.4521276595744681,
+        "meanNetR": 0.14388686336917264,
+        "meanGrossR": 0.14493873580740937,
+        "fastStopRate": 0.10638297872340426,
+        "meanFundingR": -0.001051872438236639,
+        "totalNetR": 27.050730313404458,
+        "meanBars": 46.6063829787234
+      },
+      "D_vertical_120": {
+        "n": 188,
+        "winRate": 0.44148936170212766,
+        "slRate": 0.5212765957446809,
+        "meanNetR": 0.1677191663275012,
+        "meanGrossR": 0.16891884261679746,
+        "fastStopRate": 0.10638297872340426,
+        "meanFundingR": -0.0011996762892963271,
+        "totalNetR": 31.531203269570227,
+        "meanBars": 54.88297872340426
+      },
+      "D_vertical_160": {
+        "n": 188,
+        "winRate": 0.43617021276595747,
+        "slRate": 0.5478723404255319,
+        "meanNetR": 0.1942850030500458,
+        "meanGrossR": 0.19556135122724827,
+        "fastStopRate": 0.10638297872340426,
+        "meanFundingR": -0.0012763481772023737,
+        "totalNetR": 36.52558057340861,
+        "meanBars": 60.02127659574468
+      }
+    },
+    "ETHUSDT": {
+      "A_baseline": {
+        "n": 147,
+        "winRate": 0.43537414965986393,
+        "slRate": 0.5306122448979592,
+        "meanNetR": 0.17747476265992018,
+        "meanGrossR": 0.18148254901760882,
+        "fastStopRate": 0.1360544217687075,
+        "meanFundingR": -0.004007786357688698,
+        "totalNetR": 26.08879011100827,
+        "meanBars": 58.775510204081634
+      },
+      "B_atr_floor": {
+        "n": 147,
+        "winRate": 0.43537414965986393,
+        "slRate": 0.5306122448979592,
+        "meanNetR": 0.17747476265992018,
+        "meanGrossR": 0.18148254901760882,
+        "fastStopRate": 0.1360544217687075,
+        "meanFundingR": -0.004007786357688698,
+        "totalNetR": 26.08879011100827,
+        "meanBars": 58.775510204081634
+      },
+      "C_chandelier": {
+        "n": 147,
+        "winRate": 0.3741496598639456,
+        "slRate": 1,
+        "meanNetR": 0.11075518992825899,
+        "meanGrossR": 0.1132244366887993,
+        "fastStopRate": 0.5782312925170068,
+        "meanFundingR": -0.0024692467605402346,
+        "totalNetR": 16.28101291945407,
+        "meanBars": 19.829931972789115
+      },
+      "D_vertical_40": {
+        "n": 147,
+        "winRate": 0.43537414965986393,
+        "slRate": 0.3469387755102041,
+        "meanNetR": 0.10792240988477694,
+        "meanGrossR": 0.11008472235339863,
+        "fastStopRate": 0.1360544217687075,
+        "meanFundingR": -0.0021623124686215747,
+        "totalNetR": 15.864594253062211,
+        "meanBars": 29.61904761904762
+      },
+      "D_vertical_80": {
+        "n": 147,
+        "winRate": 0.46938775510204084,
+        "slRate": 0.4557823129251701,
+        "meanNetR": 0.1657699774809841,
+        "meanGrossR": 0.16891775359282626,
+        "fastStopRate": 0.1360544217687075,
+        "meanFundingR": -0.0031477761118422452,
+        "totalNetR": 24.36818668970466,
+        "meanBars": 43.605442176870746
+      },
+      "D_vertical_120": {
+        "n": 147,
+        "winRate": 0.4217687074829932,
+        "slRate": 0.5034013605442177,
+        "meanNetR": 0.16049233353937523,
+        "meanGrossR": 0.16412414744422088,
+        "fastStopRate": 0.1360544217687075,
+        "meanFundingR": -0.0036318139048456557,
+        "totalNetR": 23.592373030288158,
+        "meanBars": 52.605442176870746
+      },
+      "D_vertical_160": {
+        "n": 147,
+        "winRate": 0.43537414965986393,
+        "slRate": 0.5306122448979592,
+        "meanNetR": 0.17747476265992018,
+        "meanGrossR": 0.18148254901760882,
+        "fastStopRate": 0.1360544217687075,
+        "meanFundingR": -0.004007786357688698,
+        "totalNetR": 26.08879011100827,
+        "meanBars": 58.775510204081634
+      }
+    },
+    "BTCUSDT": {
+      "A_baseline": {
+        "n": 97,
+        "winRate": 0.4536082474226804,
+        "slRate": 0.4948453608247423,
+        "meanNetR": 0.25331546936191107,
+        "meanGrossR": 0.25692729995385716,
+        "fastStopRate": 0.15463917525773196,
+        "meanFundingR": -0.0036118305919461266,
+        "totalNetR": 24.571600528105375,
+        "meanBars": 66
+      },
+      "B_atr_floor": {
+        "n": 97,
+        "winRate": 0.4536082474226804,
+        "slRate": 0.4948453608247423,
+        "meanNetR": 0.25331546936191107,
+        "meanGrossR": 0.25692729995385716,
+        "fastStopRate": 0.15463917525773196,
+        "meanFundingR": -0.0036118305919461266,
+        "totalNetR": 24.571600528105375,
+        "meanBars": 66
+      },
+      "C_chandelier": {
+        "n": 97,
+        "winRate": 0.4742268041237113,
+        "slRate": 1,
+        "meanNetR": 0.12884540573440015,
+        "meanGrossR": 0.12957092363358483,
+        "fastStopRate": 0.6288659793814433,
+        "meanFundingR": -0.0007255178991847006,
+        "totalNetR": 12.498004356236814,
+        "meanBars": 18.855670103092784
+      },
+      "D_vertical_40": {
+        "n": 97,
+        "winRate": 0.5154639175257731,
+        "slRate": 0.28865979381443296,
+        "meanNetR": 0.17729867357790968,
+        "meanGrossR": 0.17792844014992476,
+        "fastStopRate": 0.15463917525773196,
+        "meanFundingR": -0.0006297665720151373,
+        "totalNetR": 17.19797133705724,
+        "meanBars": 29.185567010309278
+      },
+      "D_vertical_80": {
+        "n": 97,
+        "winRate": 0.5154639175257731,
+        "slRate": 0.3711340206185567,
+        "meanNetR": 0.24658406367416025,
+        "meanGrossR": 0.24841637921670448,
+        "fastStopRate": 0.15463917525773196,
+        "meanFundingR": -0.0018323155425442684,
+        "totalNetR": 23.918654176393545,
+        "meanBars": 48.45360824742268
+      },
+      "D_vertical_120": {
+        "n": 97,
+        "winRate": 0.4536082474226804,
+        "slRate": 0.4639175257731959,
+        "meanNetR": 0.2292784337821917,
+        "meanGrossR": 0.2318797314029947,
+        "fastStopRate": 0.15463917525773196,
+        "meanFundingR": -0.002601297620803023,
+        "totalNetR": 22.240008076872595,
+        "meanBars": 59.5360824742268
+      },
+      "D_vertical_160": {
+        "n": 97,
+        "winRate": 0.4536082474226804,
+        "slRate": 0.4948453608247423,
+        "meanNetR": 0.25331546936191107,
+        "meanGrossR": 0.25692729995385716,
+        "fastStopRate": 0.15463917525773196,
+        "meanFundingR": -0.0036118305919461266,
+        "totalNetR": 24.571600528105375,
+        "meanBars": 66
+      }
+    }
+  }
+}

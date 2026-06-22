@@ -1,0 +1,440 @@
+{
+  "BTCUSDT": {
+    "21-23@0": {
+      "n": 1095,
+      "totalPct": 101.4,
+      "sharpe": 2.59,
+      "maxDDPct": 7.7,
+      "wr": 55.5,
+      "perYear": {
+        "2023": 27.9,
+        "2024": 38.6,
+        "2025": 29.9,
+        "2026": 5
+      },
+      "yearsPos": "4/4",
+      "firstHalfPct": 62.1,
+      "secondHalfPct": 39.3
+    },
+    "21-23@0.0001": {
+      "n": 1095,
+      "totalPct": 79.5,
+      "sharpe": 2.03,
+      "maxDDPct": 8.6,
+      "wr": 53,
+      "perYear": {
+        "2023": 21.7,
+        "2024": 31.3,
+        "2025": 22.6,
+        "2026": 3.9
+      },
+      "yearsPos": "4/4",
+      "firstHalfPct": 51.2,
+      "secondHalfPct": 28.3
+    },
+    "21-23@0.00055": {
+      "n": 1095,
+      "totalPct": -19.1,
+      "sharpe": -0.49,
+      "maxDDPct": 34.5,
+      "wr": 44.8,
+      "perYear": {
+        "2023": -6.3,
+        "2024": -1.6,
+        "2025": -10.3,
+        "2026": -0.9
+      },
+      "yearsPos": "0/4",
+      "firstHalfPct": 1.9,
+      "secondHalfPct": -21
+    },
+    "22-23@0": {
+      "n": 1095,
+      "totalPct": 65,
+      "sharpe": 2.26,
+      "maxDDPct": 8.7,
+      "wr": 53.9,
+      "perYear": {
+        "2023": 25.7,
+        "2024": 19.9,
+        "2025": 16.5,
+        "2026": 2.9
+      },
+      "yearsPos": "4/4",
+      "firstHalfPct": 39.5,
+      "secondHalfPct": 25.6
+    },
+    "22-23@0.0001": {
+      "n": 1095,
+      "totalPct": 43.1,
+      "sharpe": 1.5,
+      "maxDDPct": 10.4,
+      "wr": 50.8,
+      "perYear": {
+        "2023": 19.5,
+        "2024": 12.6,
+        "2025": 9.2,
+        "2026": 1.8
+      },
+      "yearsPos": "4/4",
+      "firstHalfPct": 28.5,
+      "secondHalfPct": 14.6
+    },
+    "22-23@0.00055": {
+      "n": 1095,
+      "totalPct": -55.4,
+      "sharpe": -1.92,
+      "maxDDPct": 60.3,
+      "wr": 37.9,
+      "perYear": {
+        "2023": -8.5,
+        "2024": -20.3,
+        "2025": -23.7,
+        "2026": -2.9
+      },
+      "yearsPos": "0/4",
+      "firstHalfPct": -20.7,
+      "secondHalfPct": -34.7
+    },
+    "22-07@0": {
+      "n": 1096,
+      "totalPct": 51.3,
+      "sharpe": 0.67,
+      "maxDDPct": 30.2,
+      "wr": 53.9,
+      "perYear": {
+        "2023": 29.2,
+        "2024": 35.9,
+        "2025": 0.6,
+        "2026": -14.6
+      },
+      "yearsPos": "3/4",
+      "firstHalfPct": 40.2,
+      "secondHalfPct": 11.1
+    },
+    "22-07@0.0001": {
+      "n": 1096,
+      "totalPct": 29.3,
+      "sharpe": 0.38,
+      "maxDDPct": 32.9,
+      "wr": 52.5,
+      "perYear": {
+        "2023": 23,
+        "2024": 28.6,
+        "2025": -6.7,
+        "2026": -15.6
+      },
+      "yearsPos": "2/4",
+      "firstHalfPct": 29.2,
+      "secondHalfPct": 0.1
+    },
+    "22-07@0.00055": {
+      "n": 1096,
+      "totalPct": -69.3,
+      "sharpe": -0.9,
+      "maxDDPct": 84.5,
+      "wr": 46.4,
+      "perYear": {
+        "2023": -5,
+        "2024": -4.3,
+        "2025": -39.5,
+        "2026": -20.5
+      },
+      "yearsPos": "0/4",
+      "firstHalfPct": -20.1,
+      "secondHalfPct": -49.2
+    }
+  },
+  "ETHUSDT": {
+    "21-23@0": {
+      "n": 1095,
+      "totalPct": 138.5,
+      "sharpe": 2.61,
+      "maxDDPct": 12.1,
+      "wr": 56.6,
+      "perYear": {
+        "2023": 29.4,
+        "2024": 53.2,
+        "2025": 47.8,
+        "2026": 8.1
+      },
+      "yearsPos": "4/4",
+      "firstHalfPct": 74.6,
+      "secondHalfPct": 64
+    },
+    "21-23@0.0001": {
+      "n": 1095,
+      "totalPct": 116.6,
+      "sharpe": 2.2,
+      "maxDDPct": 12.5,
+      "wr": 54.3,
+      "perYear": {
+        "2023": 23.2,
+        "2024": 45.9,
+        "2025": 40.5,
+        "2026": 7
+      },
+      "yearsPos": "4/4",
+      "firstHalfPct": 63.6,
+      "secondHalfPct": 53
+    },
+    "21-23@0.00055": {
+      "n": 1095,
+      "totalPct": 18.1,
+      "sharpe": 0.34,
+      "maxDDPct": 27.7,
+      "wr": 46.6,
+      "perYear": {
+        "2023": -4.8,
+        "2024": 13,
+        "2025": 7.6,
+        "2026": 2.3
+      },
+      "yearsPos": "3/4",
+      "firstHalfPct": 14.4,
+      "secondHalfPct": 3.7
+    },
+    "22-23@0": {
+      "n": 1095,
+      "totalPct": 77,
+      "sharpe": 2,
+      "maxDDPct": 15.4,
+      "wr": 52.8,
+      "perYear": {
+        "2023": 29.1,
+        "2024": 21,
+        "2025": 24.2,
+        "2026": 2.7
+      },
+      "yearsPos": "4/4",
+      "firstHalfPct": 36.5,
+      "secondHalfPct": 40.5
+    },
+    "22-23@0.0001": {
+      "n": 1095,
+      "totalPct": 55.1,
+      "sharpe": 1.43,
+      "maxDDPct": 17.5,
+      "wr": 50.2,
+      "perYear": {
+        "2023": 22.9,
+        "2024": 13.7,
+        "2025": 16.9,
+        "2026": 1.6
+      },
+      "yearsPos": "4/4",
+      "firstHalfPct": 25.6,
+      "secondHalfPct": 29.6
+    },
+    "22-23@0.00055": {
+      "n": 1095,
+      "totalPct": -43.4,
+      "sharpe": -1.13,
+      "maxDDPct": 54.3,
+      "wr": 39.5,
+      "perYear": {
+        "2023": -5.1,
+        "2024": -19.2,
+        "2025": -15.9,
+        "2026": -3.2
+      },
+      "yearsPos": "0/4",
+      "firstHalfPct": -23.7,
+      "secondHalfPct": -19.8
+    },
+    "22-07@0": {
+      "n": 1096,
+      "totalPct": 77.1,
+      "sharpe": 0.73,
+      "maxDDPct": 52.8,
+      "wr": 53.6,
+      "perYear": {
+        "2023": 32.9,
+        "2024": 49.2,
+        "2025": 18.6,
+        "2026": -23.5
+      },
+      "yearsPos": "3/4",
+      "firstHalfPct": 39.6,
+      "secondHalfPct": 37.5
+    },
+    "22-07@0.0001": {
+      "n": 1096,
+      "totalPct": 55.2,
+      "sharpe": 0.52,
+      "maxDDPct": 54.8,
+      "wr": 53.2,
+      "perYear": {
+        "2023": 26.7,
+        "2024": 41.8,
+        "2025": 11.3,
+        "2026": -24.6
+      },
+      "yearsPos": "3/4",
+      "firstHalfPct": 28.6,
+      "secondHalfPct": 26.6
+    },
+    "22-07@0.00055": {
+      "n": 1096,
+      "totalPct": -43.4,
+      "sharpe": -0.41,
+      "maxDDPct": 79.5,
+      "wr": 49.5,
+      "perYear": {
+        "2023": -1.3,
+        "2024": 8.9,
+        "2025": -21.6,
+        "2026": -29.5
+      },
+      "yearsPos": "1/4",
+      "firstHalfPct": -20.7,
+      "secondHalfPct": -22.7
+    }
+  },
+  "SOLUSDT": {
+    "21-23@0": {
+      "n": 1095,
+      "totalPct": 143.7,
+      "sharpe": 1.83,
+      "maxDDPct": 37.3,
+      "wr": 57.3,
+      "perYear": {
+        "2023": 51.2,
+        "2024": 72.4,
+        "2025": 9.2,
+        "2026": 10.7
+      },
+      "yearsPos": "4/4",
+      "firstHalfPct": 110.7,
+      "secondHalfPct": 33
+    },
+    "21-23@0.0001": {
+      "n": 1095,
+      "totalPct": 121.8,
+      "sharpe": 1.55,
+      "maxDDPct": 40.9,
+      "wr": 56.4,
+      "perYear": {
+        "2023": 45,
+        "2024": 65.1,
+        "2025": 1.9,
+        "2026": 9.7
+      },
+      "yearsPos": "4/4",
+      "firstHalfPct": 99.8,
+      "secondHalfPct": 22
+    },
+    "21-23@0.00055": {
+      "n": 1095,
+      "totalPct": 23.2,
+      "sharpe": 0.3,
+      "maxDDPct": 57,
+      "wr": 51,
+      "perYear": {
+        "2023": 17,
+        "2024": 32.2,
+        "2025": -30.9,
+        "2026": 4.9
+      },
+      "yearsPos": "3/4",
+      "firstHalfPct": 50.5,
+      "secondHalfPct": -27.3
+    },
+    "22-23@0": {
+      "n": 1095,
+      "totalPct": 87.7,
+      "sharpe": 1.57,
+      "maxDDPct": 26.4,
+      "wr": 55.2,
+      "perYear": {
+        "2023": 52.4,
+        "2024": 22.3,
+        "2025": 7.4,
+        "2026": 5.6
+      },
+      "yearsPos": "4/4",
+      "firstHalfPct": 59.7,
+      "secondHalfPct": 28
+    },
+    "22-23@0.0001": {
+      "n": 1095,
+      "totalPct": 65.8,
+      "sharpe": 1.18,
+      "maxDDPct": 29.4,
+      "wr": 54.4,
+      "perYear": {
+        "2023": 46.2,
+        "2024": 15,
+        "2025": 0.1,
+        "2026": 4.5
+      },
+      "yearsPos": "4/4",
+      "firstHalfPct": 48.7,
+      "secondHalfPct": 17.1
+    },
+    "22-23@0.00055": {
+      "n": 1095,
+      "totalPct": -32.7,
+      "sharpe": -0.59,
+      "maxDDPct": 66.3,
+      "wr": 48.3,
+      "perYear": {
+        "2023": 18.2,
+        "2024": -18,
+        "2025": -32.8,
+        "2026": -0.2
+      },
+      "yearsPos": "1/4",
+      "firstHalfPct": -0.5,
+      "secondHalfPct": -32.2
+    },
+    "22-07@0": {
+      "n": 1096,
+      "totalPct": 216.9,
+      "sharpe": 1.42,
+      "maxDDPct": 65.9,
+      "wr": 54.9,
+      "perYear": {
+        "2023": 123.1,
+        "2024": 88.7,
+        "2025": 23.7,
+        "2026": -18.7
+      },
+      "yearsPos": "3/4",
+      "firstHalfPct": 161.7,
+      "secondHalfPct": 55.2
+    },
+    "22-07@0.0001": {
+      "n": 1096,
+      "totalPct": 195,
+      "sharpe": 1.28,
+      "maxDDPct": 67.5,
+      "wr": 54.4,
+      "perYear": {
+        "2023": 116.9,
+        "2024": 81.4,
+        "2025": 16.4,
+        "2026": -19.7
+      },
+      "yearsPos": "3/4",
+      "firstHalfPct": 150.7,
+      "secondHalfPct": 44.2
+    },
+    "22-07@0.00055": {
+      "n": 1096,
+      "totalPct": 96.3,
+      "sharpe": 0.63,
+      "maxDDPct": 74.7,
+      "wr": 52.6,
+      "perYear": {
+        "2023": 88.9,
+        "2024": 48.5,
+        "2025": -16.4,
+        "2026": -24.6
+      },
+      "yearsPos": "2/4",
+      "firstHalfPct": 101.4,
+      "secondHalfPct": -5.1
+    }
+  }
+}

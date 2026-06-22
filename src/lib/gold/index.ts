@@ -56,3 +56,16 @@ export {
   runWalkForwardOptimization,
   type WalkForwardProgressCallback,
 } from './optimizer';
+
+// Paper sleeve — forward track-record persistence into bot_trades / bot_equity_snapshots
+export {
+  F2F_GOLD_STRATEGY,
+  F2F_GOLD_SYMBOL,
+  GOLD_MAX_DRAWDOWN,
+  goldEntryAllowed,
+  goldTradeToBotTradeRow,
+  goldEquitySnapshotRow,
+  persistGoldPaperTrade,
+  persistGoldEquitySnapshot,
+  type GoldEntryGate,
+} from './paper-sleeve';

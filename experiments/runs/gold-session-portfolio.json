@@ -1,0 +1,37 @@
+{
+  "days": 3366,
+  "range": [
+    "2013-08-26",
+    "2026-06-09"
+  ],
+  "correlation": 0.252,
+  "legs": {
+    "session": {
+      "totalPct": 149.85,
+      "sharpe": 1.45,
+      "maxDDPct": 13.44
+    },
+    "f2f": {
+      "totalPct": 16.28,
+      "sharpe": 0.46,
+      "maxDDPct": 5.58
+    },
+    "combo5050": {
+      "totalPct": 83.06,
+      "sharpe": 1.42,
+      "maxDDPct": 6.72
+    },
+    "volWeighted": {
+      "wSession": 0.256,
+      "totalPct": 50.52,
+      "sharpe": 1.21,
+      "maxDDPct": 3.45
+    }
+  },
+  "dsr": {
+    "sharpe": 1.55,
+    "haircut": 0.26,
+    "deflated": 1.29,
+    "trials": 15
+  }
+}

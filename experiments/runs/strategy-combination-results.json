@@ -1,0 +1,511 @@
+{
+  "generatedAt": "2026-06-14T06:29:32.594Z",
+  "universes": [
+    {
+      "label": "UNIVERSE A — all three sleeves",
+      "names": [
+        "crypto",
+        "sessionBook",
+        "f2f"
+      ],
+      "window": {
+        "start": "2023-05-29",
+        "end": "2026-01-08",
+        "days": 933
+      },
+      "sleeveStats": {
+        "crypto": {
+          "annRetPct": 18.8,
+          "sharpe": 1.88,
+          "maxDDPct": 12.6
+        },
+        "sessionBook": {
+          "annRetPct": 22.9,
+          "sharpe": 2.13,
+          "maxDDPct": 8.9
+        },
+        "f2f": {
+          "annRetPct": 14.4,
+          "sharpe": 1.15,
+          "maxDDPct": 6
+        }
+      },
+      "methods": [
+        {
+          "name": "ew",
+          "raw": {
+            "annRetPct": 31.9,
+            "sharpe": 2.93,
+            "maxDDPct": 7.2
+          },
+          "volTargeted": {
+            "annRetPct": 38.5,
+            "sharpe": 2.79,
+            "maxDDPct": 9.4
+          },
+          "avgWeights": [
+            0.333,
+            0.333,
+            0.333
+          ],
+          "avgDM": 1.72,
+          "rebalances": 24
+        },
+        {
+          "name": "handcraft",
+          "raw": {
+            "annRetPct": 31.4,
+            "sharpe": 2.96,
+            "maxDDPct": 8.3
+          },
+          "volTargeted": {
+            "annRetPct": 37.6,
+            "sharpe": 2.81,
+            "maxDDPct": 10
+          },
+          "avgWeights": [
+            0.372,
+            0.316,
+            0.313
+          ],
+          "avgDM": 1.71,
+          "rebalances": 24
+        },
+        {
+          "name": "erc",
+          "raw": {
+            "annRetPct": 32.3,
+            "sharpe": 2.88,
+            "maxDDPct": 7.2
+          },
+          "volTargeted": {
+            "annRetPct": 39.3,
+            "sharpe": 2.6,
+            "maxDDPct": 10.2
+          },
+          "avgWeights": [
+            0.323,
+            0.331,
+            0.346
+          ],
+          "avgDM": 1.71,
+          "rebalances": 24
+        },
+        {
+          "name": "mvshrunk",
+          "raw": {
+            "annRetPct": 32.1,
+            "sharpe": 2.88,
+            "maxDDPct": 8.3
+          },
+          "volTargeted": {
+            "annRetPct": 39.6,
+            "sharpe": 2.67,
+            "maxDDPct": 10
+          },
+          "avgWeights": [
+            0.36,
+            0.317,
+            0.323
+          ],
+          "avgDM": 1.7,
+          "rebalances": 24
+        }
+      ],
+      "bootstrapVsEW": {
+        "handcraft": {
+          "meanDiff": 0.03,
+          "pct5": -0.11,
+          "probAWins": 62.7
+        },
+        "erc": {
+          "meanDiff": -0.05,
+          "pct5": -0.2,
+          "probAWins": 24.9
+        },
+        "mvshrunk": {
+          "meanDiff": -0.05,
+          "pct5": -0.24,
+          "probAWins": 32.2
+        }
+      }
+    },
+    {
+      "label": "UNIVERSE B — long history",
+      "names": [
+        "sessionBook",
+        "f2f"
+      ],
+      "window": {
+        "start": "2015-01-01",
+        "end": "2026-01-08",
+        "days": 3442
+      },
+      "sleeveStats": {
+        "sessionBook": {
+          "annRetPct": 16,
+          "sharpe": 1.55,
+          "maxDDPct": 12.1
+        },
+        "f2f": {
+          "annRetPct": 6.1,
+          "sharpe": 0.6,
+          "maxDDPct": 9.8
+        }
+      },
+      "methods": [
+        {
+          "name": "ew",
+          "raw": {
+            "annRetPct": 15.5,
+            "sharpe": 1.53,
+            "maxDDPct": 11.7
+          },
+          "volTargeted": {
+            "annRetPct": 18.1,
+            "sharpe": 1.55,
+            "maxDDPct": 17
+          },
+          "avgWeights": [
+            0.5,
+            0.5
+          ],
+          "avgDM": 1.4,
+          "rebalances": 124
+        },
+        {
+          "name": "handcraft",
+          "raw": {
+            "annRetPct": 15.8,
+            "sharpe": 1.58,
+            "maxDDPct": 12.2
+          },
+          "volTargeted": {
+            "annRetPct": 17.6,
+            "sharpe": 1.58,
+            "maxDDPct": 16.4
+          },
+          "avgWeights": [
+            0.559,
+            0.441
+          ],
+          "avgDM": 1.39,
+          "rebalances": 124
+        },
+        {
+          "name": "erc",
+          "raw": {
+            "annRetPct": 15.2,
+            "sharpe": 1.48,
+            "maxDDPct": 11.9
+          },
+          "volTargeted": {
+            "annRetPct": 18.1,
+            "sharpe": 1.45,
+            "maxDDPct": 17.3
+          },
+          "avgWeights": [
+            0.473,
+            0.527
+          ],
+          "avgDM": 1.4,
+          "rebalances": 124
+        },
+        {
+          "name": "mvshrunk",
+          "raw": {
+            "annRetPct": 15.3,
+            "sharpe": 1.49,
+            "maxDDPct": 12.1
+          },
+          "volTargeted": {
+            "annRetPct": 17.1,
+            "sharpe": 1.47,
+            "maxDDPct": 16.9
+          },
+          "avgWeights": [
+            0.501,
+            0.499
+          ],
+          "avgDM": 1.39,
+          "rebalances": 124
+        }
+      ],
+      "bootstrapVsEW": {
+        "handcraft": {
+          "meanDiff": 0.05,
+          "pct5": -0.01,
+          "probAWins": 91.9
+        },
+        "erc": {
+          "meanDiff": -0.05,
+          "pct5": -0.1,
+          "probAWins": 3.9
+        },
+        "mvshrunk": {
+          "meanDiff": -0.04,
+          "pct5": -0.09,
+          "probAWins": 10
+        }
+      }
+    },
+    {
+      "label": "UNIVERSE C — retail-friction book",
+      "names": [
+        "crypto",
+        "sessionBookRetail",
+        "f2f"
+      ],
+      "window": {
+        "start": "2023-05-29",
+        "end": "2026-01-08",
+        "days": 933
+      },
+      "sleeveStats": {
+        "crypto": {
+          "annRetPct": 18.8,
+          "sharpe": 1.88,
+          "maxDDPct": 12.6
+        },
+        "sessionBookRetail": {
+          "annRetPct": 14.2,
+          "sharpe": 1.34,
+          "maxDDPct": 12.5
+        },
+        "f2f": {
+          "annRetPct": 14.4,
+          "sharpe": 1.15,
+          "maxDDPct": 6
+        }
+      },
+      "methods": [
+        {
+          "name": "ew",
+          "raw": {
+            "annRetPct": 27,
+            "sharpe": 2.48,
+            "maxDDPct": 6.8
+          },
+          "volTargeted": {
+            "annRetPct": 32,
+            "sharpe": 2.21,
+            "maxDDPct": 9.6
+          },
+          "avgWeights": [
+            0.333,
+            0.333,
+            0.333
+          ],
+          "avgDM": 1.72,
+          "rebalances": 24
+        },
+        {
+          "name": "handcraft",
+          "raw": {
+            "annRetPct": 26.4,
+            "sharpe": 2.5,
+            "maxDDPct": 7.9
+          },
+          "volTargeted": {
+            "annRetPct": 31,
+            "sharpe": 2.26,
+            "maxDDPct": 9.5
+          },
+          "avgWeights": [
+            0.377,
+            0.302,
+            0.321
+          ],
+          "avgDM": 1.71,
+          "rebalances": 24
+        },
+        {
+          "name": "erc",
+          "raw": {
+            "annRetPct": 27.6,
+            "sharpe": 2.46,
+            "maxDDPct": 6.6
+          },
+          "volTargeted": {
+            "annRetPct": 33.8,
+            "sharpe": 2.16,
+            "maxDDPct": 9.3
+          },
+          "avgWeights": [
+            0.325,
+            0.328,
+            0.348
+          ],
+          "avgDM": 1.71,
+          "rebalances": 24
+        },
+        {
+          "name": "mvshrunk",
+          "raw": {
+            "annRetPct": 27.3,
+            "sharpe": 2.45,
+            "maxDDPct": 8
+          },
+          "volTargeted": {
+            "annRetPct": 34.4,
+            "sharpe": 2.23,
+            "maxDDPct": 9.6
+          },
+          "avgWeights": [
+            0.376,
+            0.29,
+            0.334
+          ],
+          "avgDM": 1.69,
+          "rebalances": 24
+        }
+      ],
+      "bootstrapVsEW": {
+        "handcraft": {
+          "meanDiff": 0.02,
+          "pct5": -0.11,
+          "probAWins": 58.8
+        },
+        "erc": {
+          "meanDiff": -0.02,
+          "pct5": -0.15,
+          "probAWins": 38.1
+        },
+        "mvshrunk": {
+          "meanDiff": -0.04,
+          "pct5": -0.23,
+          "probAWins": 36.1
+        }
+      }
+    },
+    {
+      "label": "UNIVERSE D — review-preview upgraded book",
+      "names": [
+        "crypto",
+        "sessionBookUpgraded",
+        "f2f"
+      ],
+      "window": {
+        "start": "2023-05-29",
+        "end": "2026-01-08",
+        "days": 933
+      },
+      "sleeveStats": {
+        "crypto": {
+          "annRetPct": 18.8,
+          "sharpe": 1.88,
+          "maxDDPct": 12.6
+        },
+        "sessionBookUpgraded": {
+          "annRetPct": 17.6,
+          "sharpe": 1.64,
+          "maxDDPct": 12
+        },
+        "f2f": {
+          "annRetPct": 14.4,
+          "sharpe": 1.15,
+          "maxDDPct": 6
+        }
+      },
+      "methods": [
+        {
+          "name": "ew",
+          "raw": {
+            "annRetPct": 28.9,
+            "sharpe": 2.62,
+            "maxDDPct": 7.1
+          },
+          "volTargeted": {
+            "annRetPct": 35.6,
+            "sharpe": 2.44,
+            "maxDDPct": 9.1
+          },
+          "avgWeights": [
+            0.333,
+            0.333,
+            0.333
+          ],
+          "avgDM": 1.71,
+          "rebalances": 24
+        },
+        {
+          "name": "handcraft",
+          "raw": {
+            "annRetPct": 27.9,
+            "sharpe": 2.62,
+            "maxDDPct": 8
+          },
+          "volTargeted": {
+            "annRetPct": 33,
+            "sharpe": 2.41,
+            "maxDDPct": 9.3
+          },
+          "avgWeights": [
+            0.377,
+            0.308,
+            0.315
+          ],
+          "avgDM": 1.7,
+          "rebalances": 24
+        },
+        {
+          "name": "erc",
+          "raw": {
+            "annRetPct": 29.4,
+            "sharpe": 2.59,
+            "maxDDPct": 7
+          },
+          "volTargeted": {
+            "annRetPct": 38,
+            "sharpe": 2.37,
+            "maxDDPct": 8.9
+          },
+          "avgWeights": [
+            0.331,
+            0.318,
+            0.351
+          ],
+          "avgDM": 1.7,
+          "rebalances": 24
+        },
+        {
+          "name": "mvshrunk",
+          "raw": {
+            "annRetPct": 28.9,
+            "sharpe": 2.56,
+            "maxDDPct": 8
+          },
+          "volTargeted": {
+            "annRetPct": 36.7,
+            "sharpe": 2.29,
+            "maxDDPct": 9.1
+          },
+          "avgWeights": [
+            0.372,
+            0.294,
+            0.335
+          ],
+          "avgDM": 1.68,
+          "rebalances": 24
+        }
+      ],
+      "bootstrapVsEW": {
+        "handcraft": {
+          "meanDiff": -0.01,
+          "pct5": -0.13,
+          "probAWins": 47.7
+        },
+        "erc": {
+          "meanDiff": -0.04,
+          "pct5": -0.15,
+          "probAWins": 30
+        },
+        "mvshrunk": {
+          "meanDiff": -0.06,
+          "pct5": -0.24,
+          "probAWins": 26.1
+        }
+      }
+    }
+  ]
+}

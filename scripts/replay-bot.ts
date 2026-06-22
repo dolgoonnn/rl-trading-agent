@@ -32,6 +32,33 @@ import {
 } from '../src/lib/bot';
 import { db } from '../src/lib/data/db';
 import { botState, botPositions, botTrades, botEquitySnapshots, botCandles } from '../src/lib/data/schema';
+import type { BotMode } from '../src/types/bot';
+
+// ============================================
+// Backtest-dump hard gate (Knight dead-code lesson)
+// ============================================
+
+/**
+ * replay-bot bulk-inserts historical (backtest) trades into bot_trades. That is
+ * fine for a `paper` sandbox, but a FORWARD run (`paper-forward`) or a `live`
+ * run must NEVER have its real-time track record re-polluted by replayed
+ * backtest trades. This gate hard-refuses to run under those modes.
+ *
+ * Mode is read from BOT_MODE (defaults to 'paper'); the forward daemon
+ * (`bot:start`) sets BOT_MODE=paper-forward, so accidentally pointing the
+ * replayer at the same DB while a forward run is live aborts loudly.
+ */
+function assertBacktestDumpAllowed(): void {
+  const mode = (process.env.BOT_MODE ?? 'paper') as BotMode;
+  if (mode === 'live' || mode === 'paper-forward') {
+    console.error(
+      `replay-bot is a backtest-dump path and is DISABLED in mode '${mode}'. ` +
+      `It would re-pollute bot_trades for a forward/live track record. ` +
+      `Run it only with BOT_MODE=paper (or unset).`,
+    );
+    process.exit(1);
+  }
+}
 
 // ============================================
 // Data Loading
@@ -66,7 +93,32 @@ interface ReplayConfig {
   verbose: boolean;
   startDate: number | null; // epoch ms
   fresh: boolean;
+  confirmWipe: boolean; // required to actually wipe a NON-EMPTY shared forward DB
   compare: boolean; // Run backtest sim in parallel and compare divergences
+}
+
+/**
+ * Guard the destructive --fresh wipe. resetBotTables() clears bot_trades in the
+ * SHARED dev DB (data/ict-trading.db) — the same DB the forward paper bot writes
+ * its real track record into. A `--fresh` replay would silently erase that
+ * record. So: a wipe of a NON-EMPTY table requires explicit `--confirm-wipe`.
+ * Pure + testable (no DB/IO).
+ */
+export function resetWipeGuard(
+  fresh: boolean,
+  confirmWipe: boolean,
+  existingTradeCount: number,
+): { allowed: boolean; reason?: string } {
+  if (!fresh) return { allowed: true }; // no wipe requested
+  if (existingTradeCount === 0) return { allowed: true }; // nothing to lose
+  if (confirmWipe) return { allowed: true }; // explicit consent
+  return {
+    allowed: false,
+    reason:
+      `--fresh would WIPE ${existingTradeCount} bot_trades rows in the SHARED DB ` +
+      `(data/ict-trading.db) — this erases the forward paper track record. ` +
+      `Re-run with --confirm-wipe if you really mean it, or back up the DB first.`,
+  };
 }
 
 function parseArgs(): ReplayConfig {
@@ -79,6 +131,7 @@ function parseArgs(): ReplayConfig {
     verbose: false,
     startDate: null,
     fresh: false,
+    confirmWipe: false,
     compare: false,
   };
 
@@ -106,6 +159,9 @@ function parseArgs(): ReplayConfig {
       }
       case '--fresh':
         config.fresh = true;
+        break;
+      case '--confirm-wipe':
+        config.confirmWipe = true;
         break;
       case '--compare':
         config.compare = true;
@@ -689,6 +745,9 @@ async function runReplay(config: ReplayConfig): Promise<void> {
 // ============================================
 
 async function main(): Promise<void> {
+  // Hard-gate: refuse to dump backtest trades into a forward/live track record.
+  assertBacktestDumpAllowed();
+
   const config = parseArgs();
 
   console.log('='.repeat(70));
@@ -708,13 +767,23 @@ async function main(): Promise<void> {
   }
 
   if (config.fresh) {
+    const existingTradeCount = db.select().from(botTrades).all().length;
+    const guard = resetWipeGuard(config.fresh, config.confirmWipe, existingTradeCount);
+    if (!guard.allowed) {
+      console.error(`\n⛔ ${guard.reason}\n`);
+      process.exit(1);
+    }
     resetBotTables();
   }
 
   await runReplay(config);
 }
 
-main().catch((err) => {
-  console.error('Fatal error:', err);
-  process.exit(1);
-});
+// Guard: only run when invoked directly (so tests can import resetWipeGuard
+// without executing a replay). Matches the pattern in run-allocator.ts.
+if (require.main === module) {
+  main().catch((err) => {
+    console.error('Fatal error:', err);
+    process.exit(1);
+  });
+}

@@ -39,8 +39,30 @@ import {
   DEFAULT_FUNDING_ARB_CONFIG,
 } from '../src/lib/bot';
 import { LTFConfirmation } from '../src/lib/bot/ltf-confirmation';
+import {
+  ExchangeExitManager,
+  closeSideFor,
+  decideExchangeReconcile,
+  computePartialReduceQty,
+  selectFlattenQty,
+} from '../src/lib/bot/exchange-exit-manager';
+import { EXCHANGE_EXIT_CONFIG } from '../src/lib/bot/config';
+import { RestClientV5 } from 'bybit-api';
+import type { LiveGuardInputs } from '../src/lib/bot/order-manager';
+import { computePositionSize } from '../src/lib/bot/guards';
+import { shouldSnapshot } from '../src/lib/bot/snapshot';
+import { logSkippedSignal, appendDecisionLog } from '../src/lib/bot/decision-log';
+import { isKilled, setKillFlag, type KillFlag } from '../src/lib/bot/kill-switch';
+import {
+  evaluateRetirementHalt,
+  resolveEffectiveKill,
+} from '../src/lib/bot/retirement';
+import { RETIREMENT_CONFIG, SAFETY_GATE_CONFIG, SYMBOL_ALLOCATION } from '../src/lib/bot/config';
+import { db } from '../src/lib/data/db';
+import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import type { BotConfig, BotSymbol, BotPosition, LTFConfig } from '../src/types/bot';
 import type { Candle } from '../src/types/candle';
+import type { FundingSettlementSeries } from '../src/lib/cost/funding-ledger';
 
 // ============================================
 // Parse CLI arguments
@@ -53,6 +75,7 @@ function parseArgs(): {
   fundingArbEnabled: boolean;
   arbOnly: boolean;
   limitOrdersEnabled: boolean;
+  exchangeExitsEnabled: boolean;
 } {
   const args = process.argv.slice(2);
   const config = { ...DEFAULT_BOT_CONFIG };
@@ -61,6 +84,7 @@ function parseArgs(): {
   let fundingArbEnabled = false;
   let arbOnly = false;
   let limitOrdersEnabled = false;
+  let exchangeExitsEnabled = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -107,10 +131,13 @@ function parseArgs(): {
       case '--limit-orders':
         limitOrdersEnabled = true;
         break;
+      case '--exchange-exits':
+        exchangeExitsEnabled = true;
+        break;
     }
   }
 
-  return { config, resume, ltfEnabled, fundingArbEnabled, arbOnly, limitOrdersEnabled };
+  return { config, resume, ltfEnabled, fundingArbEnabled, arbOnly, limitOrdersEnabled, exchangeExitsEnabled };
 }
 
 // ============================================
@@ -129,6 +156,14 @@ class TradingBot {
   private tickInterval: ReturnType<typeof setInterval> | null = null;
   private dailyResetInterval: ReturnType<typeof setInterval> | null = null;
 
+  // Hourly equity-snapshot checkpoint. We snapshot ONCE per UTC hour (deduped
+  // by floor(now/3_600_000)); this stores the last recorded hour bucket so a
+  // 30s tick that lands in the same hour does not re-snapshot.
+  private lastSnapshotHourBucket: number | null = null;
+  // Latest close per symbol, updated each tick — used to mark-to-market the
+  // hourly snapshot (realized equity + unrealized PnL of open positions).
+  private latestPrices: Partial<Record<BotSymbol, number>> = {};
+
   // LTF entry timing
   private ltfConfirmation: LTFConfirmation | null = null;
   private ltfConfig: LTFConfig;
@@ -140,6 +175,44 @@ class TradingBot {
   // Limit order execution
   private limitOrderExecutor: LimitOrderExecutor | null = null;
 
+  // Exchange-native protective exits (SL/TP on Bybit)
+  private exchangeExitManager: ExchangeExitManager | null = null;
+
+  // Retirement kill-switch. We read the latched flag (fs sentinel + env + DB row)
+  // BEFORE processing any symbol each tick. `killAlerted` dedupes the alert so a
+  // sustained halt does not spam Telegram every 30s.
+  private killAlerted = false;
+  // Heartbeat: latches a stale_feed halt once the feed goes quiet past the
+  // configured timeout. Reset only after a fresh feed update + manual review.
+  private heartbeatAlerted = false;
+
+  // ---- Automatic retirement halt (Issue 2, Task 5b) ----
+  // Sustained-DSR breach counter (Issue B): carried across ticks so k consecutive
+  // sub-floor deflated-Sharpe checks escalate to a HARD halt. Reset on any clear.
+  private dsrBreachConsecutive = 0;
+  // Consecutive charter-p5 path breaches (yellow→red). INERT: declared =0 and
+  // never mutated because no charter-p5 cumulative-PnL-vs-path probe is wired yet.
+  // The charter legs are therefore gated OFF via RETIREMENT_CONFIG.charterPathHaltEnabled
+  // = false (FIX-3) — even this stale 0 (or any nonzero) value can NOT trip the
+  // charter RED/YELLOW legs while that flag is false. To activate: wire a probe
+  // that increments this when live cumulative PnL drops below the p5 MC path, then
+  // flip charterPathHaltEnabled to true.
+  private charterBreachConsecutive = 0;
+  // De-risk gross-exposure multiplier carried INTO sizing for the current tick
+  // when the retirement decision is 'derisk'. 1 = full size. Recomputed each tick.
+  private retirementMultiplier = 1;
+  // Dedupes the retirement HALT alert/log so a sustained halt does not spam.
+  private retirementAlerted = false;
+  // NOTE (Issue A / FIX-3): an EDGE-TRIGGERED regime/mechanism cause would be
+  // memoed here (last-seen regime tag) so we raise regimeCause only on a FRESH
+  // decay transition, never as a sticky level. No regime-decay detector feeds the
+  // tick yet, so consumeRegimeCause() returns a hardcoded false and the regime
+  // legs are gated OFF via RETIREMENT_CONFIG.regimeHaltEnabled = false — even a
+  // stray/stale regimeCause=true can NOT trip a halt or de-risk while that flag is
+  // false. The sustained-DSR streak (Issue B) carries the durable-edge-collapse
+  // signal. To activate: wire the detector to feed regimeCause, then flip
+  // regimeHaltEnabled to true.
+
   constructor(
     config: BotConfig,
     resume: boolean,
@@ -147,6 +220,7 @@ class TradingBot {
     fundingArbEnabled: boolean,
     arbOnly: boolean,
     limitOrdersEnabled = false,
+    exchangeExitsEnabled = false,
   ) {
     this.config = config;
     this.arbOnly = arbOnly;
@@ -157,6 +231,23 @@ class TradingBot {
     this.orderManager = new OrderManager(
       config.mode,
       RUN20_STRATEGY_CONFIG,
+      // Persist guard rejects to skipped_signals. Non-crashing: logSkippedSignal
+      // is wrapped by OrderManager.emitSkip, and we also guard here so a DB
+      // hiccup can never break the order path.
+      (info) => {
+        try {
+          logSkippedSignal(db, {
+            ts: info.ts,
+            symbol: info.symbol,
+            reason: info.reason,
+            signalEntry: info.signalEntry,
+            score: info.score,
+            detail: info.detail,
+          });
+        } catch (err) {
+          console.warn('[run-bot] failed to persist skipped_signal:', err);
+        }
+      },
     );
     this.tracker = new PositionTracker(config.initialCapital);
     this.riskEngine = new RiskEngine({
@@ -196,6 +287,32 @@ class TradingBot {
       }
     }
 
+    // Exchange-native protective exits (requires API keys)
+    if (exchangeExitsEnabled) {
+      const apiKey = process.env.BYBIT_API_KEY;
+      const apiSecret = process.env.BYBIT_API_SECRET;
+      if (apiKey && apiSecret) {
+        const client = new RestClientV5({ key: apiKey, secret: apiSecret, testnet: false });
+        this.exchangeExitManager = new ExchangeExitManager(client, {
+          ...EXCHANGE_EXIT_CONFIG,
+          enabled: true,
+        });
+        console.log('[exchange-exits] ENABLED — SL/TP will be placed on Bybit at fill');
+        // The only real-exchange-fill path is processLimitOrder (--limit-orders).
+        // Without it (or with --ltf, which opens shadow-only positions), no real
+        // position is ever created, so exchange exits arm NOTHING — warn loudly so
+        // the "ENABLED" line above is not mistaken for actual protection.
+        if (!limitOrdersEnabled) {
+          console.warn(
+            '[exchange-exits] INERT: requires --limit-orders to create real exchange fills. ' +
+            'Without it (e.g. --ltf or paper-forward shadow fills) nothing is armed on Bybit.',
+          );
+        }
+      } else {
+        console.warn('--exchange-exits requires BYBIT_API_KEY and BYBIT_API_SECRET env vars');
+      }
+    }
+
     // Attempt to resume from saved state
     if (resume) {
       const loaded = this.tracker.loadState();
@@ -228,6 +345,22 @@ class TradingBot {
     }
     if (this.arbOnly) {
       console.log(`Mode: ARB ONLY (no directional trading)`);
+    }
+    // FIX-3: be HONEST about which retirement halt legs can actually fire. Two
+    // legs (regime/mechanism + charter-p5 path) are DISABLED-pending-inputs, so
+    // an operator is not misled into thinking 5 protections are live.
+    const activeHalts = [
+      'absolute-DD hard halt',
+      `sustained-DSR streak hard halt (k=${RETIREMENT_CONFIG.dsrBreachK}, n>=${RETIREMENT_CONFIG.minTrackRecordLength})`,
+      'soft de-risk band (eMaxDD→hardKillDD, ×0.5)',
+    ];
+    const disabledHalts = [
+      ...(RETIREMENT_CONFIG.regimeHaltEnabled ? [] : ['regime/mechanism (no detector wired)']),
+      ...(RETIREMENT_CONFIG.charterPathHaltEnabled ? [] : ['charter-p5 path (no cumulative-PnL probe wired)']),
+    ];
+    console.log(`Retirement ACTIVE halts: ${activeHalts.join('; ')}`);
+    if (disabledHalts.length > 0) {
+      console.log(`Retirement DISABLED-pending-inputs: ${disabledHalts.join('; ')}`);
     }
     console.log('='.repeat(60));
 
@@ -288,13 +421,47 @@ class TradingBot {
       await this.limitOrderExecutor.cancelAll();
     }
 
+    // Exchange-native exits: graceful shutdown flattens real positions and clears
+    // their stops. A hard crash instead leaves these stops armed on Bybit to
+    // protect open positions.
+    if (this.exchangeExitManager?.isEnabled) {
+      console.log('[exchange-exits] graceful shutdown — flattening real positions and clearing exchange stops (a hard crash instead leaves these stops armed on Bybit to protect open positions)');
+    }
+
     // Close all open positions on shutdown
     const openPositions = this.tracker.getOpenPositions();
     for (const position of openPositions) {
       try {
         const price = await this.dataFeed.getLatestPrice(position.symbol);
+        if (price === null) {
+          console.error(`No price available to close ${position.symbol} on shutdown`);
+          continue;
+        }
+        if (this.exchangeExitManager?.isEnabled) {
+          // Fail CLOSED: only clear the protective stop once flat is confirmed/forced.
+          // If the venue state is unknown or the flatten fails, leave the stop armed
+          // (a hard crash would too) rather than orphan an unprotected position.
+          const live = await this.exchangeExitManager.getOpenSize(position.symbol);
+          if (live === null) {
+            console.error(`  ${position.symbol}: venue state UNKNOWN on shutdown — leaving exchange stop armed`);
+          } else if (live.size > 0) {
+            const flat = await this.exchangeExitManager.marketClose(
+              position.symbol, closeSideFor(position.direction), live.size.toString(),
+            );
+            if (flat.ok) {
+              await this.exchangeExitManager.clearExits(position.symbol);
+            } else {
+              console.error(`  ${position.symbol}: shutdown flatten failed (${flat.reason}) — leaving exchange stop armed`);
+            }
+          } else {
+            await this.exchangeExitManager.clearExits(position.symbol);
+          }
+        }
         const result = this.orderManager.forceClose(position, price, 'shutdown');
-        this.tracker.closePosition(result.position);
+        // Same realized-funding wiring as the live exit path: book the real
+        // signed funding leg (fail-safe ⇒ 0 + log if history is empty/errors).
+        const fundingSeries = await this.buildFundingSeries(result.position);
+        this.tracker.closePosition(result.position, fundingSeries);
         await this.alerts.positionClosed(result.position);
       } catch (err) {
         console.error(`Failed to close ${position.symbol} position on shutdown:`, err);
@@ -318,8 +485,50 @@ class TradingBot {
       // Cleanup expired circuit breakers
       this.riskEngine.cleanupExpiredBreakers(this.tracker);
 
+      const nowMs = Date.now();
+
+      // 0. Hourly mark-to-market equity snapshot FIRST (deduped by UTC hour
+      // bucket) so the retirement evaluation below reads the freshest equity
+      // curve (drawdown + rolling deflated Sharpe) before deciding to halt.
+      this.recordHourlySnapshot();
+
+      // 0a. LATCHED kill flag — read the out-of-band sources (data/KILL sentinel,
+      // env KILL_SWITCH, bot_kill_switch DB row) BEFORE touching any symbol. When
+      // halted we skip ALL new-entry processing (reduce-only). Open positions are
+      // still managed by manageOpenPosition inside processSymbol, so we DO NOT
+      // return early — we pass the kill flag down so only NEW entries are blocked.
+      let killFlag = isKilled(db, { nowMs });
+      await this.handleKillFlag(killFlag);
+
+      // 0b. AUTOMATIC retirement halt (Issue 2). Compute the confluence decision
+      // from REAL inputs; on 'halt' latch the durable DB kill flag (so it blocks
+      // entries on THIS tick and every subsequent tick via isKilled→canTrade); on
+      // 'derisk' carry the multiplier into this tick's sizing.
+      await this.evaluateRetirement(nowMs);
+      // Re-read the latched flag in case the retirement halt just tripped it.
+      if (!killFlag.halted) {
+        killFlag = isKilled(db, { nowMs });
+        if (killFlag.halted) await this.handleKillFlag(killFlag);
+      }
+
+      // 0c. Heartbeat — a stale feed BLOCKS new entries (Issue 1). The stale gate
+      // is TRANSIENT (auto-resumes on feed recovery — see resolveEffectiveKill),
+      // so it is NOT persisted via setKillFlag; we fold it into an effectiveKill
+      // that is passed down to block entries while the feed is wedged.
+      const heartbeat = this.riskEngine.checkHeartbeat({
+        nowMs,
+        lastFeedUpdate: this.dataFeed.lastFeedUpdate,
+        heartbeatTimeoutMs: RETIREMENT_CONFIG.heartbeatTimeoutMs,
+      });
+      await this.handleHeartbeat(heartbeat);
+
+      // effectiveKill = latched flag if halted, else a transient heartbeat gate
+      // when the feed is stale. Entries are blocked under either; open-position
+      // management still runs (reduce-only).
+      const effectiveKill = resolveEffectiveKill(killFlag, heartbeat);
+
       for (const symbol of this.config.symbols) {
-        await this.processSymbol(symbol);
+        await this.processSymbol(symbol, effectiveKill);
       }
     } catch (err) {
       console.error('Tick error:', err);
@@ -336,7 +545,236 @@ class TradingBot {
     }
   }
 
-  private async processSymbol(symbol: BotSymbol): Promise<void> {
+  /**
+   * Record an equity snapshot at most once per UTC hour.
+   *
+   * The tick fires every 30s but snapshots are HOURLY — deduped by
+   * floor(now/3_600_000). Equity is MARK-TO-MARKET: realized equity plus the
+   * unrealized PnL of every open position valued at the latest candle close.
+   * This is what makes the equity curve dense enough for getRollingSharpe to
+   * annualize correctly (one snapshot per hour, not 2 lifetime rows).
+   */
+  private recordHourlySnapshot(): void {
+    const nowMs = Date.now();
+    const decision = shouldSnapshot(this.lastSnapshotHourBucket, nowMs);
+    if (!decision.snapshot) return;
+    this.lastSnapshotHourBucket = decision.bucket;
+    this.tracker.recordSnapshot(this.latestPrices, nowMs);
+  }
+
+  /**
+   * Latched kill-flag handler. On a fresh trip, append an immutable decision_log
+   * row + fire one critical alert. Deduped so a sustained halt does not spam.
+   */
+  private async handleKillFlag(killFlag: KillFlag): Promise<void> {
+    if (killFlag.halted) {
+      if (!this.killAlerted) {
+        this.killAlerted = true;
+        try {
+          appendDecisionLog(db, {
+            type: 'halt',
+            detail: {
+              kind: 'kill_switch',
+              source: killFlag.source,
+              reason: killFlag.reason,
+            },
+          });
+        } catch (err) {
+          console.warn('[run-bot] failed to append kill-switch decision_log:', err);
+        }
+        await this.alerts.circuitBreakerTriggered(
+          'kill_switch',
+          `KILL SWITCH active (${killFlag.source ?? 'unknown'}): ${killFlag.reason ?? 'manual review required'} — reduce-only (new entries blocked)`,
+        );
+      }
+    } else {
+      // Manual reset detected (flag cleared) — log the resume once.
+      if (this.killAlerted) {
+        this.killAlerted = false;
+        try {
+          appendDecisionLog(db, { type: 'resume', detail: { kind: 'kill_switch' } });
+        } catch (err) {
+          console.warn('[run-bot] failed to append kill-switch resume decision_log:', err);
+        }
+      }
+    }
+  }
+
+  /**
+   * Automatic retirement halt evaluation (Issue 2, Task 5b).
+   *
+   * Gathers REAL inputs each tick — drawdown from peak, the SCALE-CONSISTENT
+   * per-observation deflated Sharpe (Issue D), the snapshot/observation count,
+   * the charter-path breach count, and an EDGE-TRIGGERED regime cause (Issue A) —
+   * runs the pure confluence decision, then ACTS:
+   *   - 'halt'   → setKillFlag(source:'retirement') durable latch + decision_log +
+   *                one deduped critical alert. The latch then blocks entries via
+   *                isKilled→canTrade on this and every subsequent tick.
+   *   - 'derisk' → carry decision.multiplier into this tick's sizing.
+   *   - 'trade'  → full size; clears the de-risk and resets the alert dedupe.
+   */
+  private async evaluateRetirement(nowMs: number): Promise<void> {
+    const trialCount = 236; // independent trials counted in DSR validation (MEMORY.md)
+
+    // Scale-consistent per-observation deflated Sharpe + observation count (Issue D).
+    const obs = this.tracker.getRollingDeflatedSharpeObs(trialCount);
+    const deflatedSharpe = obs?.deflatedSharpe ?? null;
+    const snapshotCount = obs?.n ?? 0;
+
+    const result = evaluateRetirementHalt({
+      nowMs,
+      drawdown: this.tracker.getDrawdown(),
+      deflatedSharpe,
+      snapshotCount,
+      regimeCause: this.consumeRegimeCause(),
+      charterBreachConsecutive: this.charterBreachConsecutive,
+      dsrBreachConsecutive: this.dsrBreachConsecutive,
+      config: RETIREMENT_CONFIG,
+    });
+
+    // Persist the advanced sustained-DSR counter for the next tick.
+    this.dsrBreachConsecutive = result.dsrBreachConsecutive;
+
+    if (result.decision.action === 'halt') {
+      // Latch the durable DB kill flag — blocks entries here AND on every future
+      // tick (reduce-only). Idempotent: setKillFlag writes the singleton row id=1.
+      setKillFlag(db, {
+        halted: true,
+        source: 'retirement',
+        reason: result.decision.cause,
+        nowMs,
+      });
+      this.retirementMultiplier = 0;
+      if (!this.retirementAlerted) {
+        this.retirementAlerted = true;
+        try {
+          appendDecisionLog(db, {
+            type: 'halt',
+            detail: {
+              kind: 'retirement',
+              cause: result.decision.cause,
+              drawdown: this.tracker.getDrawdown(),
+              hardKillDD: result.hardKillDD,
+              deflatedSharpe,
+              snapshotCount,
+            },
+            nowMs,
+          });
+        } catch (err) {
+          console.warn('[run-bot] failed to append retirement halt decision_log:', err);
+        }
+        await this.alerts.circuitBreakerTriggered(
+          'retirement',
+          `RETIREMENT HALT: ${result.decision.cause} — reduce-only (new entries blocked, manual review required)`,
+        );
+      }
+      return;
+    }
+
+    // Not a hard halt — clear the alert dedupe so a future trip re-alerts.
+    this.retirementAlerted = false;
+
+    if (result.decision.action === 'derisk') {
+      this.retirementMultiplier = result.decision.multiplier; // 0.5
+      if (this.config.verbose) {
+        console.log(`  RETIREMENT DE-RISK: ${result.decision.cause} → sizing × ${result.decision.multiplier}`);
+      }
+    } else {
+      this.retirementMultiplier = 1;
+    }
+  }
+
+  /**
+   * EDGE-TRIGGERED regime/mechanism cause (Issue A).
+   *
+   * Returns true ONLY on the tick where a FRESH regime-decay transition is newly
+   * detected (a suppressed/downtrend regime appearing where the prior regime was
+   * different), never as a sticky level. Today the bot has no standalone regime
+   * decay detector wired into the tick, so this is a conservative one-shot edge
+   * derived from the last-seen regime tag; it defaults to false so a healthy book
+   * is never pinned at 0.5× by a latched level.
+   *
+   * TODO (Issue A follow-up): replace `lastRegimeSeen` heuristic with the regime
+   * decay detector's fresh-transition event once that probe (Task 7) lands.
+   */
+  private consumeRegimeCause(): boolean {
+    // No regime-decay detector feeds the tick yet → no edge to raise. Returning
+    // false here keeps the contract (edge-triggered, not latched) honest: we do
+    // not invent a cause, and the sustained-DSR escalation (Issue B) is what
+    // carries a durable-edge-collapse signal across ticks.
+    return false;
+  }
+
+  /** Stale-feed heartbeat handler — alert + decision_log once per stale episode. */
+  private async handleHeartbeat(heartbeat: { stale: boolean; reason: string }): Promise<void> {
+    if (heartbeat.stale && !this.heartbeatAlerted) {
+      this.heartbeatAlerted = true;
+      try {
+        appendDecisionLog(db, {
+          type: 'halt',
+          detail: { kind: 'stale_feed', reason: heartbeat.reason },
+        });
+      } catch (err) {
+        console.warn('[run-bot] failed to append stale_feed decision_log:', err);
+      }
+      await this.alerts.circuitBreakerTriggered('stale_feed', heartbeat.reason);
+    } else if (!heartbeat.stale && this.heartbeatAlerted) {
+      this.heartbeatAlerted = false;
+    }
+  }
+
+  /**
+   * Fetch the LIVE pre-trade guard inputs (mark price + L2 orderbook) at
+   * INTENDED-ENTRY time — called only right before an entry would open, never
+   * every tick, so the tickers/orderbook endpoints aren't hammered (both feeds
+   * are 5s-cached in DataFeed regardless).
+   *
+   * FAIL SAFE: if either fetch throws or returns a bad value we log + return
+   * `null`, and the caller SKIPS the entry rather than entering blind. The
+   * built signal candle is the latest closed candle (the same bar that produced
+   * the signal), and `nowMs` is injected so the guard is deterministic.
+   */
+  private async fetchLiveGuardInputs(
+    symbol: BotSymbol,
+    signalCandle: Candle,
+    nowMs: number,
+  ): Promise<LiveGuardInputs | null> {
+    try {
+      const markPrice = await this.dataFeed.getMarkPrice(symbol, nowMs);
+      const orderbook = await this.dataFeed.getOrderbook(symbol, nowMs);
+      if (!Number.isFinite(markPrice) || markPrice <= 0 || !orderbook) {
+        console.warn(
+          `[run-bot] ${symbol}: invalid mark/orderbook — skipping entry (mark=${markPrice})`,
+        );
+        return null;
+      }
+      return {
+        orderbook,
+        markGuard: {
+          markPrice,
+          candleHigh: signalCandle.high,
+          candleLow: signalCandle.low,
+          candleClose: signalCandle.close,
+          candleCloseMs: signalCandle.timestamp,
+          nowMs,
+        },
+      };
+    } catch (err) {
+      console.warn(
+        `[run-bot] ${symbol}: mark/orderbook fetch failed — skipping entry (fail-safe):`,
+        err,
+      );
+      return null;
+    }
+  }
+
+  /** Latest cached candle for a symbol, or null if the cache is empty. */
+  private async latestCachedCandle(symbol: BotSymbol): Promise<Candle | null> {
+    const cached = await this.dataFeed.getCachedCandles(symbol);
+    return cached.length > 0 ? cached[cached.length - 1]! : null;
+  }
+
+  private async processSymbol(symbol: BotSymbol, killFlag?: KillFlag): Promise<void> {
     // Process pending limit orders first
     if (this.limitOrderExecutor?.hasPendingOrder(symbol)) {
       await this.processLimitOrder(symbol);
@@ -353,6 +791,9 @@ class TradingBot {
     const { allCandles, latestCandle, isNew } = await this.dataFeed.processNewCandle(symbol);
 
     if (!latestCandle || !isNew) return;
+
+    // Record latest close for mark-to-market hourly snapshots.
+    this.latestPrices[symbol] = latestCandle.close;
 
     // Skip if already processed
     const lastProcessed = this.tracker.getLastProcessedTimestamp(symbol);
@@ -373,8 +814,10 @@ class TradingBot {
       return; // Don't open new position while one is open for this symbol
     }
 
-    // 2. Check if trading is allowed (circuit breakers)
-    const blocker = this.riskEngine.canTrade(this.tracker);
+    // 2. Check if trading is allowed (kill flag FIRST, then circuit breakers).
+    // Reduce-only: this gate blocks NEW entries; the open-position management
+    // above (manageOpenPosition) already ran, so existing positions still exit.
+    const blocker = this.riskEngine.canTrade(this.tracker, { nowMs: Date.now(), killFlag });
     if (blocker) {
       if (this.config.verbose) {
         console.log(`  ${symbol}: trading blocked — ${blocker.reason}`);
@@ -383,6 +826,45 @@ class TradingBot {
     }
 
     if (!this.riskEngine.canTradeSymbol(this.tracker, symbol)) return;
+
+    // 2b. Per-symbol entry cap (independent of strategy cooldownBars). Caps NEW
+    // entries to maxEntriesPerDay per symbol over a rolling 24h window; this
+    // pauses ONE symbol, never the whole book.
+    const nowMs = Date.now();
+    const entriesInWindow = this.tracker.getEntriesInWindow(symbol, 24 * 3_600_000, nowMs);
+    const capCheck = this.riskEngine.perSymbolEntryCap({
+      symbol,
+      entriesInWindow,
+      maxEntriesPerDay: RETIREMENT_CONFIG.maxEntriesPerDay,
+    });
+    if (!capCheck.ok) {
+      if (this.config.verbose) console.log(`  ${symbol}: ${capCheck.reason}`);
+      try {
+        logSkippedSignal(db, { ts: nowMs, symbol, reason: 'per_symbol_entry_cap', detail: { entriesInWindow } });
+      } catch (err) {
+        console.warn('[run-bot] failed to persist per_symbol_entry_cap skip:', err);
+      }
+      return;
+    }
+
+    // 2c. Per-symbol consecutive-loss pause (Issue 4). Pauses ONE symbol after
+    // maxConsecutiveLossesPerSymbol losing trades in a row on THAT symbol —
+    // independent of the global circuit breaker, so the rest of the book trades.
+    const symConsecLosses = this.tracker.getSymbolConsecutiveLosses(symbol);
+    if (this.riskEngine.isSymbolPaused({
+      consecutiveLosses: symConsecLosses,
+      maxConsecutiveLossesPerSymbol: RETIREMENT_CONFIG.maxConsecutiveLossesPerSymbol,
+    })) {
+      if (this.config.verbose) {
+        console.log(`  ${symbol}: paused — ${symConsecLosses} consecutive losses (cap ${RETIREMENT_CONFIG.maxConsecutiveLossesPerSymbol})`);
+      }
+      try {
+        logSkippedSignal(db, { ts: nowMs, symbol, reason: 'per_symbol_loss_pause', detail: { consecutiveLosses: symConsecLosses } });
+      } catch (err) {
+        console.warn('[run-bot] failed to persist per_symbol_loss_pause skip:', err);
+      }
+      return;
+    }
 
     // 3. Evaluate signal (SignalEngine auto-routes to correct strategy per symbol)
     const result = this.signalEngine.evaluate(allCandles, symbol);
@@ -437,9 +919,13 @@ class TradingBot {
       openSymbols, symbol, candlesBySymbol,
     );
 
-    // Apply quarter-Kelly if enough trade history, otherwise use base risk
+    // Apply quarter-Kelly if enough trade history, otherwise use base risk.
+    // The retirement de-risk multiplier (Issue 2) is folded in here so a 'derisk'
+    // decision halves gross exposure for this tick (1.0 when trading normally,
+    // 0 is impossible to reach here because a halt latches the kill flag and
+    // canTrade above already blocked the entry).
     const baseRisk = this.riskEngine.getKellyAdjustedRisk(this.tracker, this.config.riskPerTrade);
-    const adjustedRisk = baseRisk * multiplier * corrMultiplier;
+    const adjustedRisk = baseRisk * multiplier * corrMultiplier * this.retirementMultiplier;
 
     // 6. Open position (limit order or immediate paper fill)
     if (this.limitOrderExecutor?.isEnabled) {
@@ -450,9 +936,37 @@ class TradingBot {
         : result.signal.signal.stopLoss - entryPrice;
       if (riskDistance <= 0) return;
 
-      const symbolAlloc = 0.33; // Will be refined later
-      const riskAmount = this.tracker.getEquity() * adjustedRisk * symbolAlloc;
-      const qty = (riskAmount / riskDistance).toFixed(4);
+      // Route the placed qty through the SAME safety sizing as openPosition so
+      // the limit order is itself notional-capped + stop-floored (no unbounded
+      // qty = riskAmount/riskDistance). Hard-reject (max_notional) → skip + log.
+      const symbolAlloc = SYMBOL_ALLOCATION[symbol] ?? 0.33;
+      const sizing = computePositionSize({
+        equity: this.tracker.getEquity(),
+        riskPerTrade: adjustedRisk,
+        symbolAlloc,
+        riskDistance,
+        entryPrice,
+        maxNotionalPctEquity: SAFETY_GATE_CONFIG.maxNotionalPctEquity,
+        minStopPct: SAFETY_GATE_CONFIG.minStopPct,
+      });
+      if (!sizing.ok) {
+        console.warn(`  ${symbol}: LIMIT ORDER rejected — ${sizing.reason}`);
+        try {
+          logSkippedSignal(db, {
+            ts: nowMs,
+            symbol,
+            reason: sizing.reason,
+            signalEntry: entryPrice,
+            score: result.signal.totalScore,
+            regime: result.regime,
+            detail: { path: 'limitOrder', riskDistance },
+          });
+        } catch (err) {
+          console.warn('[run-bot] failed to persist limit-order sizing skip:', err);
+        }
+        return;
+      }
+      const qty = sizing.size.toFixed(4);
 
       const pending = await this.limitOrderExecutor.placeOrder(
         result.signal, symbol, qty, entryPrice,
@@ -465,17 +979,31 @@ class TradingBot {
       return;
     }
 
-    // Paper mode: immediate fill
+    // Fetch LIVE guard inputs (mark + L2 book) AT intended-entry time. Fail-safe:
+    // on fetch failure we skip the entry rather than enter blind.
+    const liveGuards = await this.fetchLiveGuardInputs(symbol, latestCandle, nowMs);
+    if (!liveGuards) {
+      if (this.config.verbose) {
+        console.log(`  ${symbol}: skipped entry — could not fetch mark/orderbook`);
+      }
+      return;
+    }
+
+    // Immediate fill — pre-trade guards (mark collar + stale/crossed candle) and
+    // the L2 tradeability gate run inside openPosition with these live inputs.
     const position = this.orderManager.openPosition(
       result.signal,
       symbol,
       this.tracker.getEquity(),
       adjustedRisk,
       allCandles.length - 1,
+      liveGuards,
     );
 
     if (!position) {
-      console.log(`  ${symbol}: signal detected but position creation failed`);
+      // Null here may be a guard reject (already logged to skipped_signals) or a
+      // sizing failure — either way, do not open.
+      console.log(`  ${symbol}: signal detected but position not opened (guard/sizing reject)`);
       return;
     }
 
@@ -484,6 +1012,8 @@ class TradingBot {
 
     // Track and alert
     this.tracker.addPosition(position);
+    // Record the entry for the rolling per-symbol entry cap.
+    this.tracker.recordEntry(symbol, position.entryTimestamp);
     await this.alerts.signalDetected(
       symbol,
       result.signal.totalScore,
@@ -508,7 +1038,21 @@ class TradingBot {
     if (!result) return;
 
     if (result.status === 'confirmed') {
-      // Open position with LTF-tightened entry/SL
+      // Fetch LIVE guard inputs at intended-entry time (fail-safe → skip entry).
+      const nowMs = Date.now();
+      const ltfCandle = await this.latestCachedCandle(symbol);
+      if (!ltfCandle) {
+        console.log(`  ${symbol}: LTF confirmed but no cached candle — skipped`);
+        return;
+      }
+      const liveGuards = await this.fetchLiveGuardInputs(symbol, ltfCandle, nowMs);
+      if (!liveGuards) {
+        console.log(`  ${symbol}: LTF confirmed but could not fetch mark/orderbook — skipped`);
+        return;
+      }
+
+      // Open position with LTF-tightened entry/SL — pre-trade + L2 guards run
+      // inside openLTFPosition with these live inputs.
       const position = this.orderManager.openLTFPosition(
         result.signal,
         symbol,
@@ -517,6 +1061,7 @@ class TradingBot {
         0, // barIndex not meaningful for LTF
         result.ltfEntry,
         result.ltfStopLoss,
+        liveGuards,
       );
 
       if (position) {
@@ -545,13 +1090,25 @@ class TradingBot {
       }
     } else if (result.status === 'expired') {
       if (this.ltfConfig.onTimeout === 'fallback') {
-        // Fall back to 1H entry
+        // Fall back to 1H entry — fetch LIVE guard inputs (fail-safe → skip).
+        const nowMs = Date.now();
+        const fbCandle = await this.latestCachedCandle(symbol);
+        if (!fbCandle) {
+          console.log(`  ${symbol}: LTF fallback but no cached candle — skipped`);
+          return;
+        }
+        const liveGuards = await this.fetchLiveGuardInputs(symbol, fbCandle, nowMs);
+        if (!liveGuards) {
+          console.log(`  ${symbol}: LTF fallback but could not fetch mark/orderbook — skipped`);
+          return;
+        }
         const position = this.orderManager.openPosition(
           result.signal,
           symbol,
           this.tracker.getEquity(),
           this.config.riskPerTrade,
           0,
+          liveGuards,
         );
         if (position) {
           this.tracker.addPosition(position);
@@ -571,11 +1128,119 @@ class TradingBot {
     }
   }
 
+  /**
+   * Build a realized-funding series for a position about to close, so
+   * `PositionTracker.closePosition` debits the SAME signed funding leg the
+   * funding-charged backtest charges (zero sim/live mismatch — Task 4 keystone).
+   *
+   * Fetches Bybit's realized funding over the position's holding window
+   * `(entryTimestamp, exitTimestamp]` and returns a `rateAt(settlementMs)` lookup
+   * that maps each crossed 00/08/16 UTC settlement instant to its realized rate.
+   *
+   * FAIL-SAFE: if the position has no exit timestamp, or the exchange returns no
+   * settlements (empty history / fetch error → DataFeed already returns []), this
+   * returns `undefined` so the close books 0 funding — and we log it. Never
+   * throws: a funding lookup must not be able to crash a position close.
+   */
+  private async buildFundingSeries(
+    position: BotPosition,
+  ): Promise<FundingSettlementSeries | undefined> {
+    const exitMs = position.exitTimestamp;
+    if (exitMs === undefined || !(exitMs > position.entryTimestamp)) {
+      return undefined;
+    }
+
+    let settlements: { settlementMs: number; fundingRate: number }[] = [];
+    try {
+      settlements = await this.dataFeed.getFundingHistory(
+        position.symbol,
+        position.entryTimestamp,
+        exitMs,
+      );
+    } catch (err) {
+      // DataFeed is already fail-safe ([] on error), but belt-and-suspenders:
+      // never let a funding fetch crash a close.
+      console.warn(
+        `  ${position.symbol}: funding history fetch threw for ${position.id}; booking 0 funding:`,
+        err,
+      );
+      return undefined;
+    }
+
+    if (settlements.length === 0) {
+      console.log(
+        `  ${position.symbol}: no realized funding for ${position.id} ` +
+          `[${new Date(position.entryTimestamp).toISOString()} → ${new Date(exitMs).toISOString()}] — booking 0 funding`,
+      );
+      return undefined;
+    }
+
+    // Map each settlement instant to its realized rate. The funding-ledger asks
+    // for rates at the canonical 00/08/16 UTC instants it crosses; an instant
+    // with no published rate resolves to 0 (no charge for that settlement).
+    const rateByInstant = new Map<number, number>();
+    for (const s of settlements) rateByInstant.set(s.settlementMs, s.fundingRate);
+
+    return { rateAt: (settlementMs: number): number => rateByInstant.get(settlementMs) ?? 0 };
+  }
+
+  /**
+   * When `--exchange-exits` is on: detect that the venue has flattened a position
+   * our shadow still holds open (its SL/TP fired on Bybit) and close the shadow at
+   * the REAL exchange exit price. Returns true if it reconciled (caller returns).
+   * Reason is inferred from proximity to currentSL vs takeProfit. Gated/null-safe.
+   */
+  private async reconcileExchangeClose(
+    position: BotPosition,
+  ): Promise<'reconciled' | 'pending' | 'proceed'> {
+    if (!this.exchangeExitManager?.isEnabled) return 'proceed';
+    const live = await this.exchangeExitManager.getOpenSize(position.symbol);
+    if (live === null) return 'proceed'; // venue state UNKNOWN → let the in-process path (fail-closed) handle it
+    if (live.size > 0) return 'proceed'; // still open on the venue → manage normally
+
+    // Venue is CONFIRMED flat. Book at the real exit price IF the close record is
+    // available (decideExchangeReconcile requires a record post-dating entry, so a
+    // transient getOpenSize error — which returns null above, not size 0 — can't
+    // reach here spuriously).
+    const realized = await this.exchangeExitManager.getRealizedClose(position.symbol);
+    const decision = decideExchangeReconcile({
+      openSize: 0,
+      realized,
+      entryTimestamp: position.entryTimestamp,
+      takeProfit: position.takeProfit,
+      currentSL: position.currentSL,
+    });
+    // Venue flat but the closed-PnL record hasn't surfaced yet (Bybit is eventually
+    // consistent) → do NOT fall through to the in-process check (which would manage a
+    // phantom position); wait and retry next tick.
+    if (!decision) return 'pending';
+
+    const result = this.orderManager.forceClose(position, decision.exitPrice, decision.reason);
+    const fundingSeries = await this.buildFundingSeries(result.position);
+    this.tracker.closePosition(result.position, fundingSeries);
+    await this.alerts.positionClosed(result.position);
+    await this.exchangeExitManager.clearExits(position.symbol);
+    console.log(`  ${position.symbol}: RECONCILED exchange close @ $${decision.exitPrice} (${decision.reason})`);
+
+    const triggered = this.riskEngine.evaluateAfterTrade(this.tracker);
+    for (const cb of triggered) await this.alerts.circuitBreakerTriggered(cb.type, cb.reason);
+    this.tracker.saveState();
+    this.tracker.recordSnapshot();
+    return 'reconciled';
+  }
+
   private async manageOpenPosition(
     position: BotPosition,
     candle: { timestamp: number; open: number; high: number; low: number; close: number; volume: number },
     currentBarIndex: number,
   ): Promise<void> {
+    // If the exchange already closed this position (its SL/TP fired on Bybit),
+    // reconcile the shadow at the REAL exit price and skip the in-process check this
+    // tick. 'pending' (venue flat but the closed-PnL record hasn't surfaced yet) also
+    // skips — we must not manage a position that is already flat on the venue. Only
+    // 'proceed' (venue still open, or state unknown/disabled) runs the in-process path.
+    if ((await this.reconcileExchangeClose(position)) !== 'proceed') return;
+
     const wasPT = position.partialTaken;
 
     const exitResult = this.orderManager.checkPositionExit(position, candle, currentBarIndex);
@@ -585,13 +1250,77 @@ class TradingBot {
       this.tracker.updatePosition(position);
       await this.alerts.partialTPTaken(position, position.partialPnlPercent);
       console.log(`  ${position.symbol}: Partial TP taken, SL moved to $${position.currentSL.toFixed(2)}`);
+      if (this.exchangeExitManager?.isEnabled) {
+        // Phase 2b: reduce the REAL venue position by the partial fraction (market
+        // reduce-only) at the SAME candle-close moment the shadow takes its partial,
+        // so the venue realizes the partial too — closes the residual post-partial
+        // divergence (without this the venue holds 100% and a reversal-to-BE sells
+        // 100% at BE while the shadow already booked the partial profit). No intrabar
+        // parity change: the trigger is still candle-close.
+        const partialFraction = RUN20_STRATEGY_CONFIG.partialTP.fraction;
+        const liveBeforeReduce = await this.exchangeExitManager.getOpenSize(position.symbol);
+        // computePartialReduceQty rounds DOWN to the symbol's qtyStep (avoids the
+        // Bybit qty-precision reject) and returns null when there's nothing to reduce.
+        const reduceQty = liveBeforeReduce
+          ? computePartialReduceQty(liveBeforeReduce.size, partialFraction, position.symbol)
+          : null;
+        if (reduceQty) {
+          const reduced = await this.exchangeExitManager.marketClose(
+            position.symbol, closeSideFor(position.direction), reduceQty,
+          );
+          if (!reduced.ok) {
+            // Venue keeps full size; it is still PROTECTED by the re-arm below, but the
+            // shadow already booked the partial → accounting diverges (reconcile vs balance).
+            console.error(`  ${position.symbol}: partial venue-reduce failed (${reduced.reason}) — venue still holds full size; reconcile PnL vs Bybit balance`);
+          } else {
+            console.log(`  ${position.symbol}: reduced venue position by ${reduceQty} (partial ${(partialFraction * 100).toFixed(0)}%)`);
+          }
+        }
+        // Re-arm SL(BE)+TP for the now-reduced remainder (tpslMode Full covers it).
+        const reArmed = await this.exchangeExitManager.armExits(
+          position.symbol, position.currentSL, position.takeProfit,
+        );
+        if (!reArmed.ok) {
+          console.error(`  ${position.symbol}: BE re-arm failed (${reArmed.reason}) — exchange SL still at original level`);
+        } else {
+          console.log(`  ${position.symbol}: exchange SL re-armed to BE ${position.currentSL}`);
+        }
+      }
     }
 
     if (!exitResult) return; // Still open
 
-    // Position closed
+    // Position closed. Fetch the realized funding over the holding window and
+    // pass it so closePosition debits a REAL signed funding leg (−long/+short),
+    // matching the funding-charged backtest. Empty/failed history ⇒ undefined ⇒
+    // 0 funding booked + logged (fail-safe, never crashes the close).
     const closedPos = exitResult.position;
-    this.tracker.closePosition(closedPos);
+    if (this.exchangeExitManager?.isEnabled) {
+      // ALWAYS reconcile the venue to flat before clearing the stop — on EVERY exit
+      // reason, not just time-exits. The shadow detects SL/TP from LastPrice klines but
+      // the venue stop triggers on MarkPrice, so a wick can close the shadow while the
+      // venue is still open; if we cleared the stop assuming "the venue already fired",
+      // we'd orphan a real, unprotected position. Fail CLOSED: if the venue state is
+      // unknown, leave the stop armed; only clear once flat is confirmed/forced.
+      const live = await this.exchangeExitManager.getOpenSize(closedPos.symbol);
+      if (live === null) {
+        console.error(`  ${closedPos.symbol}: venue state UNKNOWN on close — leaving exchange stop armed (reconcile later)`);
+      } else if (live.size > 0) {
+        const flat = await this.exchangeExitManager.marketClose(
+          closedPos.symbol, closeSideFor(closedPos.direction), live.size.toString(),
+        );
+        if (flat.ok) {
+          await this.exchangeExitManager.clearExits(closedPos.symbol);
+        } else {
+          console.error(`  ${closedPos.symbol}: close flatten failed (${flat.reason}) — leaving exchange stop armed`);
+        }
+      } else {
+        // Venue already flat (its stop fired) — clear any residual stop.
+        await this.exchangeExitManager.clearExits(closedPos.symbol);
+      }
+    }
+    const fundingSeries = await this.buildFundingSeries(closedPos);
+    this.tracker.closePosition(closedPos, fundingSeries);
     await this.alerts.positionClosed(closedPos);
 
     const pnlStr = (closedPos.pnlUSDT ?? 0) >= 0 ? '+' : '';
@@ -637,17 +1366,69 @@ class TradingBot {
     const result = await this.limitOrderExecutor.checkOrder(symbol, currentBarIndex);
 
     if (result.status === 'filled' && result.fillPrice) {
-      // Create position from the filled order
+      // Fetch LIVE guard inputs at fill time (fail-safe → skip opening the
+      // position; the maker order already filled so we log loudly).
+      const nowMs = Date.now();
+      const fillCandle = allCandles.length > 0 ? allCandles[allCandles.length - 1]! : null;
+      if (!fillCandle) {
+        console.warn(`  ${symbol}: LIMIT FILLED but no candle to guard — position NOT tracked`);
+        return;
+      }
+      const liveGuards = await this.fetchLiveGuardInputs(symbol, fillCandle, nowMs);
+      if (!liveGuards) {
+        console.warn(`  ${symbol}: LIMIT FILLED but mark/orderbook unavailable — position NOT tracked`);
+        return;
+      }
+
+      // Create position from the filled order — pre-trade + L2 guards run inside.
       const position = this.orderManager.openPosition(
         result.order.signal,
         symbol,
         this.tracker.getEquity(),
         result.order.riskPerTrade,
         currentBarIndex,
+        liveGuards,
       );
 
       if (position) {
         position.regime = result.order.regime;
+
+        // Arm the protective SL+TP on Bybit BEFORE we consider the position "tracked".
+        if (this.exchangeExitManager?.isEnabled) {
+          const armed = await this.exchangeExitManager.armExits(
+            symbol, position.stopLoss, position.takeProfit,
+          );
+          if (!armed.ok) {
+            // Cannot protect the position → flatten immediately (reduce-only market).
+            // selectFlattenQty prefers the venue's real (step-aligned) size and falls
+            // back to a step-rounded notional/price estimate when the size is unknown.
+            const liveQty = await this.exchangeExitManager.getOpenSize(symbol);
+            const qty = selectFlattenQty(
+              liveQty ? liveQty.size : null, position.positionSizeUSDT, result.fillPrice, symbol,
+            );
+            // "Already confirmed flat" (liveQty.size===0) counts as flattened.
+            let flatOk = liveQty !== null && liveQty.size === 0;
+            if (qty) {
+              const flat = await this.exchangeExitManager.marketClose(
+                symbol, closeSideFor(position.direction), qty,
+              );
+              flatOk = flat.ok;
+              if (flat.ok) await this.exchangeExitManager.clearExits(symbol);
+            }
+            if (flatOk) {
+              console.error(`  ${symbol}: ARM FAILED (${armed.reason}) — flattened ok; position NOT tracked`);
+            } else {
+              // Catastrophic: a real position is open on the venue, we could neither
+              // arm a stop NOR flatten it. Make it LOUD — never silently orphan.
+              // TODO(before-live): latch the kill-switch + retry flatten on later ticks
+              // + push a critical Telegram alert (needs the db handle threaded here).
+              console.error(`  ${symbol}: CRITICAL — ARM FAILED (${armed.reason}) AND flatten failed — REAL UNPROTECTED POSITION on Bybit; manual intervention required`);
+            }
+            return;
+          }
+          console.log(`  ${symbol}: exchange SL=${position.stopLoss} TP=${position.takeProfit} armed`);
+        }
+
         this.tracker.addPosition(position);
         await this.alerts.positionOpened(position);
         console.log(`  ${symbol}: LIMIT FILLED — ${position.direction.toUpperCase()} @ $${result.fillPrice.toFixed(2)} (maker)`);
@@ -731,8 +1512,14 @@ const HOUR_MS = 3_600_000;
 // ============================================
 
 async function main(): Promise<void> {
-  const { config, resume, ltfEnabled, fundingArbEnabled, arbOnly, limitOrdersEnabled } = parseArgs();
-  const bot = new TradingBot(config, resume, ltfEnabled, fundingArbEnabled, arbOnly, limitOrdersEnabled);
+  // Migrate-on-startup: apply any pending migrations before the loop runs so
+  // it never trades against a stale schema. The dev DB already records
+  // migrations 0000–0004, so this is a clean no-op there; on a fresh DB it
+  // creates every table. Relies on a non-empty __drizzle_migrations table.
+  migrate(db, { migrationsFolder: './drizzle' });
+
+  const { config, resume, ltfEnabled, fundingArbEnabled, arbOnly, limitOrdersEnabled, exchangeExitsEnabled } = parseArgs();
+  const bot = new TradingBot(config, resume, ltfEnabled, fundingArbEnabled, arbOnly, limitOrdersEnabled, exchangeExitsEnabled);
 
   // Graceful shutdown handlers (PM2 compatible)
   const shutdown = async (signal: string) => {

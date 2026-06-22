@@ -1,0 +1,222 @@
+{
+  "generatedAt": "2026-06-14T07:57:28.436Z",
+  "grounding": {
+    "luccaMoench2015": {
+      "window": "24h ending 15min before announce",
+      "meanBp": 49,
+      "sample": "1994-09..2011-03",
+      "share": "~80% of annual equity returns"
+    },
+    "kurovGilbertWolfe2021": {
+      "finding": "disappears post-2015 ZLB liftoff",
+      "postMeanPct": "~0.1",
+      "significant": false,
+      "driver": "reduced uncertainty (VIX 17.7->14.7)"
+    },
+    "nyFed2018": {
+      "presserDaysBp": 40,
+      "nonPresserDaysBp": 0,
+      "sample": "2011-04..2018"
+    }
+  },
+  "reproduced": {
+    "window": "ours (T-1 14:00->T 13:55)",
+    "friction": "0.5bp/side",
+    "n": 90,
+    "meanBp": 16.840166307565394,
+    "t": 2.6110786803400905,
+    "wr": 57.77777777777777,
+    "totalPct": 15.156149676808855,
+    "sharpe": 2.6110786803400905
+  },
+  "publishedWindow": {
+    "window": "LM (T-1 13:45->T 13:45)",
+    "n": 90,
+    "meanBp": 16.396891010013736,
+    "t": 2.564670035225253,
+    "wr": 58.88888888888889,
+    "totalPct": 14.757201909012363,
+    "sharpe": 2.5646700352252534
+  },
+  "outOfSample": {
+    "pre-2016 (ZLB era)": {
+      "n": 8,
+      "meanBp": 12.094200487142789,
+      "t": 0.6512632320929053,
+      "wr": 50,
+      "totalPct": 0.967536038971423,
+      "sharpe": 0.6512632320929052
+    },
+    "post-2016 (after liftoff)": {
+      "n": 82,
+      "meanBp": 17.303187363216377,
+      "t": 2.5178829955956745,
+      "wr": 58.536585365853654,
+      "totalPct": 14.188613637837427,
+      "sharpe": 2.5178829955956745
+    },
+    "2015-2018 (some non-pres)": {
+      "n": 32,
+      "meanBp": 11.104286645567186,
+      "t": 1.732536602208213,
+      "wr": 50,
+      "totalPct": 3.5533717265814992,
+      "sharpe": 1.7325366022082127
+    },
+    "2019+ (all press-conf)": {
+      "n": 58,
+      "meanBp": 20.004789569357502,
+      "t": 2.13298258064911,
+      "wr": 62.06896551724138,
+      "totalPct": 11.60277795022735,
+      "sharpe": 2.13298258064911
+    },
+    "pre-2020 (script h1)": {
+      "n": 40,
+      "meanBp": 6.785714627271026,
+      "t": 1.149077052947809,
+      "wr": 45,
+      "totalPct": 2.7142858509084102,
+      "sharpe": 1.1490770529478087
+    },
+    "2020+ (script h2)": {
+      "n": 50,
+      "meanBp": 24.883727651800875,
+      "t": 2.3637981134652883,
+      "wr": 68,
+      "totalPct": 12.44186382590044,
+      "sharpe": 2.3637981134652883
+    },
+    "2022+ (post hiking start)": {
+      "n": 35,
+      "meanBp": 29.83553445426665,
+      "t": 2.6001091155666205,
+      "wr": 71.42857142857143,
+      "totalPct": 10.442437058993328,
+      "sharpe": 2.6001091155666205
+    }
+  },
+  "pressConference": {
+    "presser": {
+      "n": 74,
+      "meanBp": 18.800957097468054,
+      "t": 2.471673370632378,
+      "wr": 59.45945945945946,
+      "totalPct": 13.912708252126361,
+      "sharpe": 2.471673370632378
+    },
+    "nonPresser": {
+      "n": 16,
+      "meanBp": 7.771508904265566,
+      "t": 0.8728604207904843,
+      "wr": 50,
+      "totalPct": 1.2434414246824905,
+      "sharpe": 0.8728604207904843
+    },
+    "pre19Presser": {
+      "n": 16,
+      "meanBp": 14.437064386868803,
+      "t": 1.5299934950326715,
+      "wr": 50,
+      "totalPct": 2.3099303018990085,
+      "sharpe": 1.5299934950326715
+    },
+    "pre19NonPresser": {
+      "n": 16,
+      "meanBp": 7.771508904265566,
+      "t": 0.8728604207904843,
+      "wr": 50,
+      "totalPct": 1.2434414246824905,
+      "sharpe": 0.8728604207904843
+    }
+  },
+  "volGate": {
+    "n": 32,
+    "meanBp": 36.50451120159997,
+    "t": 2.849976948251278,
+    "wr": 75,
+    "totalPct": 11.68144358451199,
+    "sharpe": 2.849976948251278,
+    "trialsAssumed": 8,
+    "bonferroniCritT": 2.7343687889295634,
+    "harveyLiuHaircut": 2.039333980337618,
+    "tDeflated": 0.81064296791366,
+    "survivesBonferroni": true,
+    "survivesHLDeflation": false
+  },
+  "cost": {
+    "grossMeanBp": 17.840166307565397,
+    "breakevenPerSideBp": 8.920083153782699,
+    "netByFrictionBp": {
+      "0.0bpPerSide": 17.840166307565397,
+      "0.5bpPerSide": 16.840166307565394,
+      "1.0bpPerSide": 15.840166307565392,
+      "2.0bpPerSide": 13.84016630756539,
+      "5.0bpPerSide": 7.840166307565386
+    }
+  },
+  "placebo": {
+    "all 2015+": {
+      "fomc": {
+        "n": 90,
+        "meanBp": 16.840166307565394,
+        "t": 2.6110786803400905,
+        "wr": 57.77777777777777,
+        "totalPct": 15.156149676808855,
+        "sharpe": 2.6110786803400905
+      },
+      "other": {
+        "n": 2750,
+        "meanBp": 3.0179025936999926,
+        "t": 1.505411136989774,
+        "wr": 54.47272727272727,
+        "totalPct": 82.9923213267498,
+        "sharpe": 1.505411136989774
+      }
+    },
+    "2020+": {
+      "fomc": {
+        "n": 50,
+        "meanBp": 24.883727651800875,
+        "t": 2.3637981134652883,
+        "wr": 68,
+        "totalPct": 12.44186382590044,
+        "sharpe": 2.3637981134652883
+      },
+      "other": {
+        "n": 1556,
+        "meanBp": 3.4426791779745196,
+        "t": 1.146137917988944,
+        "wr": 54.37017994858612,
+        "totalPct": 53.56808800928352,
+        "sharpe": 1.1461379179889442
+      }
+    },
+    "2022+": {
+      "fomc": {
+        "n": 35,
+        "meanBp": 29.83553445426665,
+        "t": 2.6001091155666205,
+        "wr": 71.42857142857143,
+        "totalPct": 10.442437058993328,
+        "sharpe": 2.6001091155666205
+      },
+      "other": {
+        "n": 1069,
+        "meanBp": 1.5883889622922593,
+        "t": 0.4973806209708237,
+        "wr": 52.19831618334892,
+        "totalPct": 16.979878006904254,
+        "sharpe": 0.49738062097082375
+      }
+    }
+  },
+  "overlapPrior": {
+    "note": "From runs/fomc-overlap-results.json: 82.4% of the effect is the overnight segment already captured by deployed leg J; corr(full,overnight)=0.78; non-overnight remainder +1.1bp t=0.29.",
+    "overnightSharePct": 82.36,
+    "corrFullOvernight": 0.78,
+    "remainderBp": 1.1,
+    "remainderT": 0.29
+  },
+  "verdict": "CLOSED as standalone leg: effect is REAL and FOMC-specific (placebo clears baseline) but DECAYED to ~1/3 of paper magnitude and ~82% already harvested by deployed leg J; vol-gate headline fails Harvey-Liu multiple-testing deflation. No new leg."
+}

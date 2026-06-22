@@ -23,18 +23,29 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import Database from 'better-sqlite3';
+import { drizzle } from 'drizzle-orm/better-sqlite3';
+import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { RestClientV5 } from 'bybit-api';
 import type { Candle } from '../src/types/candle';
 import { AlertManager } from '../src/lib/bot/alerts';
+import { isKilled, type KillDb } from '../src/lib/bot/kill-switch';
+import * as dbSchema from '../src/lib/data/schema';
 import {
   generateSignals,
   computePositionWeight,
+  goldEntryAllowed,
+  persistGoldPaperTrade,
+  persistGoldEquitySnapshot,
   F2F_FIXED_PARAMS,
   type F2FOptimizedParams,
   type F2FTrainStats,
   type F2FSignal,
+  type F2FTrade,
   type RegimeFilterType,
 } from '../src/lib/gold';
+
+type GoldDb = ReturnType<typeof drizzle<typeof dbSchema>>;
 
 // ============================================
 // Constants
@@ -54,6 +65,8 @@ const STATE_FILE = path.resolve(__dirname, '..', 'data', 'gold-bot-state.json');
 interface GoldBotState {
   equity: number;
   initialCapital: number;
+  /** Highwater equity for drawdown tracking (forward review). */
+  peakEquity?: number;
   position: GoldBotPosition | null;
   trades: GoldBotTradeRecord[];
   lastTickTimestamp: number;
@@ -176,11 +189,57 @@ function loadState(capital: number): GoldBotState {
   return {
     equity: capital,
     initialCapital: capital,
+    peakEquity: capital,
     position: null,
     trades: [],
     lastTickTimestamp: 0,
     rolling30dReturns: [],
     startedAt: Date.now(),
+  };
+}
+
+// ============================================
+// DB Persistence (forward track record for Sept charter review)
+// ============================================
+
+/**
+ * Open the same SQLite DB the crypto forward loop writes to and migrate-on-start
+ * so a fresh checkout has the bot tables. Returns null if the DB can't be opened
+ * (paper bot must never crash on a persistence hiccup).
+ */
+function openForwardDb(): GoldDb | null {
+  try {
+    const dbPath = path.resolve(__dirname, '..', 'data', 'ict-trading.db');
+    const sqlite = new Database(dbPath);
+    sqlite.pragma('journal_mode = WAL');
+    const db = drizzle(sqlite, { schema: dbSchema });
+    migrate(db, { migrationsFolder: path.resolve(__dirname, '..', 'drizzle') });
+    return db;
+  } catch (err) {
+    console.warn(`  Warning: forward DB unavailable, JSON-only track record: ${err}`);
+    return null;
+  }
+}
+
+/** Build an F2FTrade from the bot's closed record + entry context for the sleeve mapper. */
+function recordToF2FTrade(rec: GoldBotTradeRecord, pos: GoldBotPosition): F2FTrade {
+  return {
+    entryIndex: 0,
+    entryTimestamp: rec.entryTimestamp,
+    entryPrice: rec.entryPrice,
+    exitIndex: 0,
+    exitTimestamp: rec.exitTimestamp,
+    exitPrice: rec.exitPrice,
+    exitReason: rec.exitReason as F2FTrade['exitReason'],
+    direction: 'long',
+    weight: rec.weight,
+    pnlPercent: rec.pnlPercent,
+    daysHeld: rec.daysHeld,
+    pBullAtEntry: pos.pBullAtEntry,
+    atrAtEntry: pos.atrAtEntry,
+    hardStop: pos.hardStop,
+    trailingStop: pos.trailingStop,
+    peakPrice: pos.peakPrice,
   };
 }
 
@@ -254,6 +313,7 @@ function processTick(
   candles: Candle[],
   state: GoldBotState,
   opts: BotOptions,
+  db: GoldDb | null = null,
 ): { signal: F2FSignal; action: string } {
   const fp = F2F_FIXED_PARAMS;
 
@@ -312,8 +372,9 @@ function processTick(
 
       dailyReturn = netReturn;
       state.equity *= 1 + netReturn;
+      state.peakEquity = Math.max(state.peakEquity ?? state.equity, state.equity);
 
-      state.trades.push({
+      const closedRecord: GoldBotTradeRecord = {
         entryTimestamp: state.position.entryTimestamp,
         exitTimestamp: signal.timestamp,
         entryPrice: state.position.entryPrice,
@@ -322,7 +383,21 @@ function processTick(
         weight: state.position.weight,
         pnlPercent: netReturn,
         daysHeld: state.position.daysHeld,
-      });
+      };
+      state.trades.push(closedRecord);
+
+      // Mirror the closed PAPER trade into bot_trades for the charter review.
+      if (db) {
+        try {
+          const f2fTrade = recordToF2FTrade(closedRecord, state.position);
+          persistGoldPaperTrade(db, f2fTrade, {
+            equity: state.equity,
+            peakEquity: state.peakEquity ?? state.equity,
+          }, state.initialCapital);
+        } catch (err) {
+          console.warn(`  Warning: failed to persist gold trade to DB: ${err}`);
+        }
+      }
 
       action = `exit_${exitReason}`;
       state.position = null;
@@ -335,23 +410,40 @@ function processTick(
     }
   }
 
-  // Check entry
+  // Check entry — gated by the shared kill switch + the sleeve's drawdown breaker.
+  // REDUCE-ONLY: a halt/DD breach only blocks OPENING here; any open position was
+  // already managed/closed above. We never force-liquidate.
   if (state.position === null && signal.isLongEntry && !opts.dryRun) {
-    const weight = computePositionWeight(signal);
+    // Shared global stop: data/KILL sentinel, KILL_SWITCH env, or bot_kill_switch row.
+    const killFlag = db ? isKilled(db as KillDb, { nowMs: Date.now() }) : { halted: false };
+    // Pure gate: halted OR drawdown >= GOLD_MAX_DRAWDOWN blocks new entries.
+    const gate = goldEntryAllowed({
+      halted: killFlag.halted,
+      equity: state.equity,
+      peakEquity: state.peakEquity ?? state.equity,
+    });
 
-    if (weight > 0.01) {
-      state.position = {
-        entryPrice: signal.close,
-        entryTimestamp: signal.timestamp,
-        weight,
-        hardStop: signal.close - fp.hardStopAtrMultiple * signal.atr,
-        trailingStop: signal.close - fp.trailingStopAtrMultiple * signal.atr,
-        peakPrice: signal.close,
-        daysHeld: 0,
-        pBullAtEntry: signal.pBull,
-        atrAtEntry: signal.atr,
-      };
-      action = 'entry_long';
+    if (!gate.allowed) {
+      // Log once per blocked tick; do NOT crash, do NOT close the (absent) position.
+      console.log(`  [SAFETY] new gold entry skipped — ${gate.reason}${killFlag.reason ? ` (${killFlag.reason})` : ''}`);
+      action = 'entry_blocked';
+    } else {
+      const weight = computePositionWeight(signal);
+
+      if (weight > 0.01) {
+        state.position = {
+          entryPrice: signal.close,
+          entryTimestamp: signal.timestamp,
+          weight,
+          hardStop: signal.close - fp.hardStopAtrMultiple * signal.atr,
+          trailingStop: signal.close - fp.trailingStopAtrMultiple * signal.atr,
+          peakPrice: signal.close,
+          daysHeld: 0,
+          pBullAtEntry: signal.pBull,
+          atrAtEntry: signal.atr,
+        };
+        action = 'entry_long';
+      }
     }
   } else if (state.position === null && signal.isLongEntry && opts.dryRun) {
     action = 'dry_entry_long';
@@ -364,6 +456,23 @@ function processTick(
   }
 
   state.lastTickTimestamp = signal.timestamp;
+  state.peakEquity = Math.max(state.peakEquity ?? state.equity, state.equity);
+
+  // Record a forward equity snapshot each processed daily tick (charter review).
+  if (db) {
+    try {
+      persistGoldEquitySnapshot(db, {
+        timestamp: signal.timestamp,
+        equity: state.equity,
+        peakEquity: state.peakEquity,
+        openPositions: state.position ? 1 : 0,
+        dailyPnl: dailyReturn,
+        cumulativePnl: state.equity / state.initialCapital - 1,
+      });
+    } catch (err) {
+      console.warn(`  Warning: failed to persist gold equity snapshot to DB: ${err}`);
+    }
+  }
 
   return { signal, action };
 }
@@ -395,8 +504,15 @@ async function main(): Promise<void> {
 
   const client = new RestClientV5({});
 
+  // Forward track-record DB (bot_trades / bot_equity_snapshots) — null in dry-run.
+  const forwardDb = opts.dryRun ? null : openForwardDb();
+  if (forwardDb) {
+    console.log(`  Forward record: data/ict-trading.db (strategy=f2f_gold, symbol=${SYMBOL})`);
+  }
+
   // Load persisted state or create new
   const state = loadState(opts.capital);
+  if (state.peakEquity === undefined) state.peakEquity = state.equity;
 
   // Graceful shutdown
   let running = true;
@@ -450,7 +566,7 @@ async function main(): Promise<void> {
         }
       } else {
         // Process tick
-        const { signal, action } = processTick(candles, state, opts);
+        const { signal, action } = processTick(candles, state, opts, forwardDb);
 
         // Log
         const posStatus = state.position
@@ -590,7 +706,11 @@ function printSummary(state: GoldBotState): void {
   }
 }
 
-main().catch((err) => {
-  console.error('Fatal error:', err);
-  process.exit(1);
-});
+// Only launch the daemon when run directly — importing this module (e.g. for tests)
+// must NOT start the loop (matches run-allocator.ts / replay-bot.ts).
+if (require.main === module) {
+  main().catch((err) => {
+    console.error('Fatal error:', err);
+    process.exit(1);
+  });
+}

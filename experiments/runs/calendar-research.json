@@ -1,0 +1,1041 @@
+{
+  "goldTurnOfMonth": {
+    "ToM window (-1..+3)": {
+      "2005-15": {
+        "n": 528,
+        "meanBps": 1.51,
+        "t": 0.3,
+        "totalPct": 7.97
+      },
+      "2016-26": {
+        "n": 488,
+        "meanBps": 8.3,
+        "t": 1.81,
+        "totalPct": 40.49
+      },
+      "all": {
+        "n": 1016,
+        "meanBps": 4.77,
+        "t": 1.4,
+        "totalPct": 48.47
+      }
+    },
+    "last day (-1)": {
+      "2005-15": {
+        "n": 132,
+        "meanBps": -0.86,
+        "t": -0.09,
+        "totalPct": -1.14
+      },
+      "2016-26": {
+        "n": 122,
+        "meanBps": -14.46,
+        "t": -1.27,
+        "totalPct": -17.64
+      },
+      "all": {
+        "n": 254,
+        "meanBps": -7.39,
+        "t": -0.99,
+        "totalPct": -18.78
+      }
+    },
+    "first day (+1)": {
+      "2005-15": {
+        "n": 132,
+        "meanBps": -2.13,
+        "t": -0.2,
+        "totalPct": -2.81
+      },
+      "2016-26": {
+        "n": 122,
+        "meanBps": 18.14,
+        "t": 2.76,
+        "totalPct": 22.13
+      },
+      "all": {
+        "n": 254,
+        "meanBps": 7.6,
+        "t": 1.19,
+        "totalPct": 19.32
+      }
+    },
+    "days +1..+3": {
+      "2005-15": {
+        "n": 396,
+        "meanBps": 2.3,
+        "t": 0.39,
+        "totalPct": 9.11
+      },
+      "2016-26": {
+        "n": 366,
+        "meanBps": 15.88,
+        "t": 3.37,
+        "totalPct": 58.13
+      },
+      "all": {
+        "n": 762,
+        "meanBps": 8.82,
+        "t": 2.32,
+        "totalPct": 67.24
+      }
+    },
+    "last 4 days (-4..-1)": {
+      "2005-15": {
+        "n": 528,
+        "meanBps": -1.05,
+        "t": -0.24,
+        "totalPct": -5.57
+      },
+      "2016-26": {
+        "n": 488,
+        "meanBps": -2.41,
+        "t": -0.56,
+        "totalPct": -11.74
+      },
+      "all": {
+        "n": 1016,
+        "meanBps": -1.7,
+        "t": -0.55,
+        "totalPct": -17.31
+      }
+    },
+    "mid-month (+8..-8)": {
+      "2005-15": {
+        "n": 1587,
+        "meanBps": 1.94,
+        "t": 0.65,
+        "totalPct": 30.86
+      },
+      "2016-26": {
+        "n": 1441,
+        "meanBps": 5.78,
+        "t": 2.5,
+        "totalPct": 83.24
+      },
+      "all": {
+        "n": 3028,
+        "meanBps": 3.77,
+        "t": 1.97,
+        "totalPct": 114.1
+      }
+    },
+    "all days": {
+      "2005-15": {
+        "n": 3435,
+        "meanBps": 2.58,
+        "t": 1.35,
+        "totalPct": 88.62
+      },
+      "2016-26": {
+        "n": 3149,
+        "meanBps": 4.92,
+        "t": 3.1,
+        "totalPct": 154.82
+      },
+      "all": {
+        "n": 6584,
+        "meanBps": 3.7,
+        "t": 2.95,
+        "totalPct": 243.44
+      }
+    }
+  },
+  "crypto": {
+    "BTCUSDT": {
+      "range": "2023-02-24→2026-02-23",
+      "hourStats": [
+        {
+          "hour": 0,
+          "n": 1095,
+          "meanBps": -0.56,
+          "t": -0.37,
+          "totalPct": -6.08
+        },
+        {
+          "hour": 1,
+          "n": 1095,
+          "meanBps": -1.13,
+          "t": -0.65,
+          "totalPct": -12.41
+        },
+        {
+          "hour": 2,
+          "n": 1095,
+          "meanBps": 0.93,
+          "t": 0.65,
+          "totalPct": 10.22
+        },
+        {
+          "hour": 3,
+          "n": 1095,
+          "meanBps": 0.69,
+          "t": 0.61,
+          "totalPct": 7.6
+        },
+        {
+          "hour": 4,
+          "n": 1095,
+          "meanBps": 0.21,
+          "t": 0.19,
+          "totalPct": 2.31
+        },
+        {
+          "hour": 5,
+          "n": 1094,
+          "meanBps": 0.13,
+          "t": 0.12,
+          "totalPct": 1.42
+        },
+        {
+          "hour": 6,
+          "n": 1095,
+          "meanBps": 0.85,
+          "t": 0.68,
+          "totalPct": 9.33
+        },
+        {
+          "hour": 7,
+          "n": 1095,
+          "meanBps": -1.68,
+          "t": -1.37,
+          "totalPct": -18.44
+        },
+        {
+          "hour": 8,
+          "n": 1095,
+          "meanBps": 2.79,
+          "t": 2.22,
+          "totalPct": 30.57
+        },
+        {
+          "hour": 9,
+          "n": 1095,
+          "meanBps": 1.4,
+          "t": 1.24,
+          "totalPct": 15.28
+        },
+        {
+          "hour": 10,
+          "n": 1095,
+          "meanBps": 0.7,
+          "t": 0.65,
+          "totalPct": 7.68
+        },
+        {
+          "hour": 11,
+          "n": 1095,
+          "meanBps": 1.78,
+          "t": 1.61,
+          "totalPct": 19.44
+        },
+        {
+          "hour": 12,
+          "n": 1095,
+          "meanBps": 0.31,
+          "t": 0.23,
+          "totalPct": 3.34
+        },
+        {
+          "hour": 13,
+          "n": 1094,
+          "meanBps": -1.91,
+          "t": -1.1,
+          "totalPct": -20.93
+        },
+        {
+          "hour": 14,
+          "n": 1095,
+          "meanBps": -1.07,
+          "t": -0.46,
+          "totalPct": -11.75
+        },
+        {
+          "hour": 15,
+          "n": 1095,
+          "meanBps": -0.29,
+          "t": -0.14,
+          "totalPct": -3.2
+        },
+        {
+          "hour": 16,
+          "n": 1095,
+          "meanBps": -1.1,
+          "t": -0.65,
+          "totalPct": -12.07
+        },
+        {
+          "hour": 17,
+          "n": 1095,
+          "meanBps": 2.55,
+          "t": 1.38,
+          "totalPct": 27.88
+        },
+        {
+          "hour": 18,
+          "n": 1095,
+          "meanBps": 0.84,
+          "t": 0.49,
+          "totalPct": 9.16
+        },
+        {
+          "hour": 19,
+          "n": 1095,
+          "meanBps": -2.96,
+          "t": -1.65,
+          "totalPct": -32.46
+        },
+        {
+          "hour": 20,
+          "n": 1095,
+          "meanBps": -0.22,
+          "t": -0.14,
+          "totalPct": -2.44
+        },
+        {
+          "hour": 21,
+          "n": 1095,
+          "meanBps": 3.32,
+          "t": 2.2,
+          "totalPct": 36.31
+        },
+        {
+          "hour": 22,
+          "n": 1095,
+          "meanBps": 5.94,
+          "t": 3.91,
+          "totalPct": 65.05
+        },
+        {
+          "hour": 23,
+          "n": 1095,
+          "meanBps": -2.39,
+          "t": -2,
+          "totalPct": -26.18
+        }
+      ],
+      "dow": [
+        {
+          "dow": 0,
+          "n": 3768,
+          "meanBps": 0.88,
+          "t": 1.44,
+          "totalPct": 33.33
+        },
+        {
+          "dow": 1,
+          "n": 3749,
+          "meanBps": 1.28,
+          "t": 1.32,
+          "totalPct": 48.14
+        },
+        {
+          "dow": 2,
+          "n": 3744,
+          "meanBps": 0.09,
+          "t": 0.1,
+          "totalPct": 3.48
+        },
+        {
+          "dow": 3,
+          "n": 3744,
+          "meanBps": 1.48,
+          "t": 1.65,
+          "totalPct": 55.34
+        },
+        {
+          "dow": 4,
+          "n": 3744,
+          "meanBps": -1.55,
+          "t": -1.81,
+          "totalPct": -58.02
+        },
+        {
+          "dow": 5,
+          "n": 3761,
+          "meanBps": 0.59,
+          "t": 0.66,
+          "totalPct": 22.33
+        },
+        {
+          "dow": 6,
+          "n": 3768,
+          "meanBps": -0.13,
+          "t": -0.27,
+          "totalPct": -4.97
+        }
+      ]
+    },
+    "ETHUSDT": {
+      "range": "2023-02-24→2026-02-23",
+      "hourStats": [
+        {
+          "hour": 0,
+          "n": 1095,
+          "meanBps": -0.49,
+          "t": -0.23,
+          "totalPct": -5.37
+        },
+        {
+          "hour": 1,
+          "n": 1095,
+          "meanBps": -2.3,
+          "t": -0.9,
+          "totalPct": -25.14
+        },
+        {
+          "hour": 2,
+          "n": 1095,
+          "meanBps": 1.05,
+          "t": 0.55,
+          "totalPct": 11.5
+        },
+        {
+          "hour": 3,
+          "n": 1095,
+          "meanBps": 2.94,
+          "t": 1.88,
+          "totalPct": 32.14
+        },
+        {
+          "hour": 4,
+          "n": 1095,
+          "meanBps": 1.63,
+          "t": 1.14,
+          "totalPct": 17.89
+        },
+        {
+          "hour": 5,
+          "n": 1094,
+          "meanBps": 0.33,
+          "t": 0.21,
+          "totalPct": 3.62
+        },
+        {
+          "hour": 6,
+          "n": 1095,
+          "meanBps": -0.85,
+          "t": -0.5,
+          "totalPct": -9.26
+        },
+        {
+          "hour": 7,
+          "n": 1095,
+          "meanBps": -0.67,
+          "t": -0.38,
+          "totalPct": -7.31
+        },
+        {
+          "hour": 8,
+          "n": 1095,
+          "meanBps": 2.59,
+          "t": 1.43,
+          "totalPct": 28.39
+        },
+        {
+          "hour": 9,
+          "n": 1095,
+          "meanBps": 2.14,
+          "t": 1.36,
+          "totalPct": 23.42
+        },
+        {
+          "hour": 10,
+          "n": 1095,
+          "meanBps": -1,
+          "t": -0.69,
+          "totalPct": -10.98
+        },
+        {
+          "hour": 11,
+          "n": 1095,
+          "meanBps": 1.54,
+          "t": 0.98,
+          "totalPct": 16.9
+        },
+        {
+          "hour": 12,
+          "n": 1095,
+          "meanBps": -0.22,
+          "t": -0.12,
+          "totalPct": -2.37
+        },
+        {
+          "hour": 13,
+          "n": 1094,
+          "meanBps": -5.09,
+          "t": -2.32,
+          "totalPct": -55.66
+        },
+        {
+          "hour": 14,
+          "n": 1095,
+          "meanBps": -3.31,
+          "t": -1.17,
+          "totalPct": -36.22
+        },
+        {
+          "hour": 15,
+          "n": 1095,
+          "meanBps": -2.98,
+          "t": -1.12,
+          "totalPct": -32.61
+        },
+        {
+          "hour": 16,
+          "n": 1095,
+          "meanBps": -1.13,
+          "t": -0.49,
+          "totalPct": -12.36
+        },
+        {
+          "hour": 17,
+          "n": 1095,
+          "meanBps": 1.93,
+          "t": 0.77,
+          "totalPct": 21.13
+        },
+        {
+          "hour": 18,
+          "n": 1095,
+          "meanBps": -1.41,
+          "t": -0.66,
+          "totalPct": -15.48
+        },
+        {
+          "hour": 19,
+          "n": 1095,
+          "meanBps": -2.23,
+          "t": -0.95,
+          "totalPct": -24.37
+        },
+        {
+          "hour": 20,
+          "n": 1095,
+          "meanBps": -1.73,
+          "t": -0.79,
+          "totalPct": -18.89
+        },
+        {
+          "hour": 21,
+          "n": 1095,
+          "meanBps": 5.62,
+          "t": 2.67,
+          "totalPct": 61.5
+        },
+        {
+          "hour": 22,
+          "n": 1095,
+          "meanBps": 7.04,
+          "t": 3.47,
+          "totalPct": 77.03
+        },
+        {
+          "hour": 23,
+          "n": 1095,
+          "meanBps": -2.31,
+          "t": -1.54,
+          "totalPct": -25.3
+        }
+      ],
+      "dow": [
+        {
+          "dow": 0,
+          "n": 3768,
+          "meanBps": 0.35,
+          "t": 0.39,
+          "totalPct": 13.37
+        },
+        {
+          "dow": 1,
+          "n": 3749,
+          "meanBps": 0.35,
+          "t": 0.27,
+          "totalPct": 13.29
+        },
+        {
+          "dow": 2,
+          "n": 3744,
+          "meanBps": -1.2,
+          "t": -1.03,
+          "totalPct": -44.9
+        },
+        {
+          "dow": 3,
+          "n": 3744,
+          "meanBps": 1.65,
+          "t": 1.47,
+          "totalPct": 61.71
+        },
+        {
+          "dow": 4,
+          "n": 3744,
+          "meanBps": -1.67,
+          "t": -1.49,
+          "totalPct": -62.51
+        },
+        {
+          "dow": 5,
+          "n": 3761,
+          "meanBps": 0.52,
+          "t": 0.44,
+          "totalPct": 19.63
+        },
+        {
+          "dow": 6,
+          "n": 3768,
+          "meanBps": 0.31,
+          "t": 0.42,
+          "totalPct": 11.59
+        }
+      ]
+    },
+    "SOLUSDT": {
+      "range": "2023-02-24→2026-02-23",
+      "hourStats": [
+        {
+          "hour": 0,
+          "n": 1095,
+          "meanBps": 2.14,
+          "t": 0.65,
+          "totalPct": 23.44
+        },
+        {
+          "hour": 1,
+          "n": 1095,
+          "meanBps": 3.6,
+          "t": 1.14,
+          "totalPct": 39.41
+        },
+        {
+          "hour": 2,
+          "n": 1095,
+          "meanBps": 1.84,
+          "t": 0.69,
+          "totalPct": 20.19
+        },
+        {
+          "hour": 3,
+          "n": 1095,
+          "meanBps": 4.21,
+          "t": 1.69,
+          "totalPct": 46.13
+        },
+        {
+          "hour": 4,
+          "n": 1095,
+          "meanBps": 2.95,
+          "t": 1.09,
+          "totalPct": 32.35
+        },
+        {
+          "hour": 5,
+          "n": 1094,
+          "meanBps": 0.42,
+          "t": 0.18,
+          "totalPct": 4.57
+        },
+        {
+          "hour": 6,
+          "n": 1095,
+          "meanBps": 1.4,
+          "t": 0.57,
+          "totalPct": 15.32
+        },
+        {
+          "hour": 7,
+          "n": 1095,
+          "meanBps": -1.95,
+          "t": -0.82,
+          "totalPct": -21.3
+        },
+        {
+          "hour": 8,
+          "n": 1095,
+          "meanBps": 4.36,
+          "t": 1.61,
+          "totalPct": 47.78
+        },
+        {
+          "hour": 9,
+          "n": 1095,
+          "meanBps": 3.81,
+          "t": 1.61,
+          "totalPct": 41.77
+        },
+        {
+          "hour": 10,
+          "n": 1095,
+          "meanBps": 0.08,
+          "t": 0.03,
+          "totalPct": 0.84
+        },
+        {
+          "hour": 11,
+          "n": 1095,
+          "meanBps": 3.41,
+          "t": 1.43,
+          "totalPct": 37.38
+        },
+        {
+          "hour": 12,
+          "n": 1095,
+          "meanBps": -2.91,
+          "t": -1.07,
+          "totalPct": -31.89
+        },
+        {
+          "hour": 13,
+          "n": 1094,
+          "meanBps": -6.59,
+          "t": -2.01,
+          "totalPct": -72.14
+        },
+        {
+          "hour": 14,
+          "n": 1095,
+          "meanBps": -2.89,
+          "t": -0.78,
+          "totalPct": -31.68
+        },
+        {
+          "hour": 15,
+          "n": 1095,
+          "meanBps": -4.77,
+          "t": -1.24,
+          "totalPct": -52.26
+        },
+        {
+          "hour": 16,
+          "n": 1095,
+          "meanBps": -6.8,
+          "t": -2.19,
+          "totalPct": -74.5
+        },
+        {
+          "hour": 17,
+          "n": 1095,
+          "meanBps": 4.53,
+          "t": 1.34,
+          "totalPct": 49.57
+        },
+        {
+          "hour": 18,
+          "n": 1095,
+          "meanBps": 2.51,
+          "t": 0.82,
+          "totalPct": 27.47
+        },
+        {
+          "hour": 19,
+          "n": 1095,
+          "meanBps": -5.09,
+          "t": -1.62,
+          "totalPct": -55.72
+        },
+        {
+          "hour": 20,
+          "n": 1095,
+          "meanBps": -1.85,
+          "t": -0.65,
+          "totalPct": -20.26
+        },
+        {
+          "hour": 21,
+          "n": 1095,
+          "meanBps": 5.11,
+          "t": 1.82,
+          "totalPct": 55.93
+        },
+        {
+          "hour": 22,
+          "n": 1095,
+          "meanBps": 8.01,
+          "t": 2.72,
+          "totalPct": 87.72
+        },
+        {
+          "hour": 23,
+          "n": 1095,
+          "meanBps": -4.77,
+          "t": -2.09,
+          "totalPct": -52.27
+        }
+      ],
+      "dow": [
+        {
+          "dow": 0,
+          "n": 3768,
+          "meanBps": 1,
+          "t": 0.72,
+          "totalPct": 37.5
+        },
+        {
+          "dow": 1,
+          "n": 3749,
+          "meanBps": -1.48,
+          "t": -0.87,
+          "totalPct": -55.48
+        },
+        {
+          "dow": 2,
+          "n": 3744,
+          "meanBps": -0.38,
+          "t": -0.23,
+          "totalPct": -14.14
+        },
+        {
+          "dow": 3,
+          "n": 3744,
+          "meanBps": 1.85,
+          "t": 1.15,
+          "totalPct": 69.08
+        },
+        {
+          "dow": 4,
+          "n": 3744,
+          "meanBps": -0.82,
+          "t": -0.52,
+          "totalPct": -30.62
+        },
+        {
+          "dow": 5,
+          "n": 3761,
+          "meanBps": 2.23,
+          "t": 1.33,
+          "totalPct": 83.89
+        },
+        {
+          "dow": 6,
+          "n": 3768,
+          "meanBps": 0.73,
+          "t": 0.56,
+          "totalPct": 27.65
+        }
+      ]
+    },
+    "pooled": {
+      "hours": [
+        {
+          "hour": 0,
+          "n": 3285,
+          "meanBps": 0.36,
+          "t": 0.26,
+          "totalPct": 11.99
+        },
+        {
+          "hour": 1,
+          "n": 3285,
+          "meanBps": 0.06,
+          "t": 0.04,
+          "totalPct": 1.86
+        },
+        {
+          "hour": 2,
+          "n": 3285,
+          "meanBps": 1.28,
+          "t": 1.07,
+          "totalPct": 41.91
+        },
+        {
+          "hour": 3,
+          "n": 3285,
+          "meanBps": 2.61,
+          "t": 2.49,
+          "totalPct": 85.88
+        },
+        {
+          "hour": 4,
+          "n": 3285,
+          "meanBps": 1.6,
+          "t": 1.48,
+          "totalPct": 52.56
+        },
+        {
+          "hour": 5,
+          "n": 3282,
+          "meanBps": 0.29,
+          "t": 0.29,
+          "totalPct": 9.6
+        },
+        {
+          "hour": 6,
+          "n": 3285,
+          "meanBps": 0.47,
+          "t": 0.43,
+          "totalPct": 15.39
+        },
+        {
+          "hour": 7,
+          "n": 3285,
+          "meanBps": -1.43,
+          "t": -1.35,
+          "totalPct": -47.05
+        },
+        {
+          "hour": 8,
+          "n": 3285,
+          "meanBps": 3.25,
+          "t": 2.8,
+          "totalPct": 106.74
+        },
+        {
+          "hour": 9,
+          "n": 3285,
+          "meanBps": 2.45,
+          "t": 2.4,
+          "totalPct": 80.46
+        },
+        {
+          "hour": 10,
+          "n": 3285,
+          "meanBps": -0.07,
+          "t": -0.08,
+          "totalPct": -2.46
+        },
+        {
+          "hour": 11,
+          "n": 3285,
+          "meanBps": 2.24,
+          "t": 2.2,
+          "totalPct": 73.72
+        },
+        {
+          "hour": 12,
+          "n": 3285,
+          "meanBps": -0.94,
+          "t": -0.8,
+          "totalPct": -30.92
+        },
+        {
+          "hour": 13,
+          "n": 3282,
+          "meanBps": -4.53,
+          "t": -3.15,
+          "totalPct": -148.73
+        },
+        {
+          "hour": 14,
+          "n": 3285,
+          "meanBps": -2.42,
+          "t": -1.4,
+          "totalPct": -79.65
+        },
+        {
+          "hour": 15,
+          "n": 3285,
+          "meanBps": -2.68,
+          "t": -1.56,
+          "totalPct": -88.07
+        },
+        {
+          "hour": 16,
+          "n": 3285,
+          "meanBps": -3.01,
+          "t": -2.13,
+          "totalPct": -98.94
+        },
+        {
+          "hour": 17,
+          "n": 3285,
+          "meanBps": 3,
+          "t": 1.96,
+          "totalPct": 98.57
+        },
+        {
+          "hour": 18,
+          "n": 3285,
+          "meanBps": 0.64,
+          "t": 0.47,
+          "totalPct": 21.15
+        },
+        {
+          "hour": 19,
+          "n": 3285,
+          "meanBps": -3.43,
+          "t": -2.38,
+          "totalPct": -112.54
+        },
+        {
+          "hour": 20,
+          "n": 3285,
+          "meanBps": -1.27,
+          "t": -0.97,
+          "totalPct": -41.58
+        },
+        {
+          "hour": 21,
+          "n": 3285,
+          "meanBps": 4.68,
+          "t": 3.67,
+          "totalPct": 153.75
+        },
+        {
+          "hour": 22,
+          "n": 3285,
+          "meanBps": 7,
+          "t": 5.4,
+          "totalPct": 229.8
+        },
+        {
+          "hour": 23,
+          "n": 3285,
+          "meanBps": -3.16,
+          "t": -3.18,
+          "totalPct": -103.74
+        }
+      ],
+      "dow": [
+        {
+          "day": "Sun",
+          "n": 11304,
+          "meanBps": 0.74,
+          "t": 1.26,
+          "totalPct": 84.2
+        },
+        {
+          "day": "Mon",
+          "n": 11247,
+          "meanBps": 0.05,
+          "t": 0.07,
+          "totalPct": 5.95
+        },
+        {
+          "day": "Tue",
+          "n": 11232,
+          "meanBps": -0.49,
+          "t": -0.68,
+          "totalPct": -55.57
+        },
+        {
+          "day": "Wed",
+          "n": 11232,
+          "meanBps": 1.66,
+          "t": 2.31,
+          "totalPct": 186.13
+        },
+        {
+          "day": "Thu",
+          "n": 11232,
+          "meanBps": -1.35,
+          "t": -1.91,
+          "totalPct": -151.15
+        },
+        {
+          "day": "Fri",
+          "n": 11283,
+          "meanBps": 1.12,
+          "t": 1.49,
+          "totalPct": 125.86
+        },
+        {
+          "day": "Sat",
+          "n": 11304,
+          "meanBps": 0.3,
+          "t": 0.58,
+          "totalPct": 34.27
+        }
+      ]
+    }
+  }
+}

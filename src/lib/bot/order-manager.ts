@@ -18,23 +18,101 @@ import type {
   ExitReason,
 } from '@/types/bot';
 import type { ScoredSignal } from '@/lib/rl/strategies/confluence-scorer';
-import type { StrategyConfig } from '@/types/bot';
-import { SYMBOL_ALLOCATION } from './config';
+import type { StrategyConfig, OrderbookSnapshot } from '@/types/bot';
+import { SYMBOL_ALLOCATION, SAFETY_GATE_CONFIG, TRADEABILITY_CONFIG } from './config';
+import { computePositionSize, checkTradeability, checkPreTradeGuards } from './guards';
+import type { RejectReason } from '@/types/bot';
 
 // ============================================
 // Position Manager
 // ============================================
 
+/**
+ * Sink for guard-rejected signals. The caller (run-bot) wires this to
+ * `logSkippedSignal(db, …)` so rejects are persisted to `skipped_signals`. It is
+ * intentionally NOT a DB handle — OrderManager stays DB-free and this seam keeps
+ * the observability concern at the wiring layer. Must never throw (it is invoked
+ * from the hot order path); the wired implementation swallows its own errors.
+ */
+export interface SkipSignalSink {
+  (info: {
+    ts: number;
+    symbol: BotSymbol;
+    reason: RejectReason;
+    signalEntry: number;
+    score: number;
+    detail?: unknown;
+  }): void;
+}
+
+/**
+ * Mark-collar / staleness / OHLC-sanity inputs for the pre-trade guard. Supplied
+ * ONLY on the live path (run-bot fetches mark + clock + the signal candle); when
+ * omitted the guard is skipped so backtest/paper sims that lack a mark feed are
+ * unaffected. All fields are caller-injected so the guard stays deterministic.
+ */
+export interface MarkGuardInputs {
+  /** Current Bybit MARK price (dual-price / liquidation reference). */
+  markPrice: number;
+  /** High of the signal candle. */
+  candleHigh: number;
+  /** Low of the signal candle. */
+  candleLow: number;
+  /** Close of the signal candle. */
+  candleClose: number;
+  /** Close timestamp of the signal candle (ms). */
+  candleCloseMs: number;
+  /** Current wall-clock time (ms) — injected for determinism. */
+  nowMs: number;
+}
+
+/**
+ * Optional LIVE-only guard inputs for {@link OrderManager.openPosition} /
+ * {@link OrderManager.openLTFPosition}. When `markGuard` is present the pre-trade
+ * mark-collar / stale-candle / crossed-candle guard runs; when `orderbook` is
+ * present the L2 tradeability gate runs. Both are omitted by backtest/paper sim
+ * callers, so the Run-20 edge measurement is unchanged.
+ */
+export interface LiveGuardInputs {
+  /** L2 order-book snapshot for the tradeability gate. */
+  orderbook?: OrderbookSnapshot;
+  /** Mark/candle/clock inputs for the pre-trade guard. */
+  markGuard?: MarkGuardInputs;
+}
+
 export class OrderManager {
   private mode: BotMode;
   private defaultConfig: StrategyConfig;
+  /** Optional skipped-signal sink (e.g. persist to skipped_signals). */
+  private onSkip?: SkipSignalSink;
 
   constructor(
     mode: BotMode,
     defaultConfig: StrategyConfig,
+    onSkip?: SkipSignalSink,
   ) {
     this.mode = mode;
     this.defaultConfig = defaultConfig;
+    this.onSkip = onSkip;
+  }
+
+  /**
+   * Emit a skipped-signal record through the wired sink, if any. Never throws —
+   * observability must not break the order path even if the table/db is absent.
+   */
+  private emitSkip(info: {
+    symbol: BotSymbol;
+    reason: RejectReason;
+    signalEntry: number;
+    score: number;
+    detail?: unknown;
+  }): void {
+    if (!this.onSkip) return;
+    try {
+      this.onSkip({ ts: Date.now(), ...info });
+    } catch (err) {
+      console.warn(`[order-manager] skipped-signal sink threw (ignored):`, err);
+    }
   }
 
   /** Get the strategy config (single config path for crypto-only) */
@@ -50,6 +128,10 @@ export class OrderManager {
    * @param equity Current equity for position sizing
    * @param riskPerTrade Risk fraction per trade
    * @param barIndex Current bar index (for tracking)
+   * @param live Optional LIVE-only guard inputs. When `live.markGuard` is
+   *   provided the pre-trade mark-collar / stale-candle / crossed-candle guard
+   *   runs; when `live.orderbook` is provided the L2 tradeability gate runs. Both
+   *   are omitted by tests/backtest so the Run-20 edge measurement is unaffected.
    * @returns The new position, or null if position cannot be created
    */
   openPosition(
@@ -58,12 +140,47 @@ export class OrderManager {
     equity: number,
     riskPerTrade: number,
     barIndex: number,
+    live?: LiveGuardInputs,
   ): BotPosition | null {
     const { entryPrice, stopLoss, takeProfit, direction, strategy } = signal.signal;
     const config = this.getConfig(symbol);
 
     // Apply entry friction (slippage simulation for paper)
     const adjustedEntry = this.applyEntrySlippage(entryPrice, direction, config);
+
+    // LIVE pre-trade guard (mark collar + staleness + OHLC sanity). Runs ONLY
+    // when the live path injects markGuard; checked against the RAW signal entry
+    // (pre-slippage) — that's the price the mark collar is meant to bound.
+    const markGuard = live?.markGuard;
+    if (markGuard) {
+      const guard = checkPreTradeGuards({
+        signalEntry: entryPrice,
+        markPrice: markGuard.markPrice,
+        candleHigh: markGuard.candleHigh,
+        candleLow: markGuard.candleLow,
+        candleClose: markGuard.candleClose,
+        candleCloseMs: markGuard.candleCloseMs,
+        nowMs: markGuard.nowMs,
+        maxDeviationBps: SAFETY_GATE_CONFIG.maxDeviationBps,
+        maxCandleAgeMs: SAFETY_GATE_CONFIG.maxCandleAgeMs,
+      });
+      if (!guard.ok) {
+        console.warn(`[guards] openPosition rejected ${symbol}: ${guard.reason}`);
+        this.emitSkip({
+          symbol,
+          reason: guard.reason,
+          signalEntry: entryPrice,
+          score: signal.totalScore,
+          detail: {
+            path: 'openPosition',
+            markPrice: markGuard.markPrice,
+            candleCloseMs: markGuard.candleCloseMs,
+            nowMs: markGuard.nowMs,
+          },
+        });
+        return null;
+      }
+    }
 
     // Calculate risk distance
     const riskDistance = direction === 'long'
@@ -72,12 +189,63 @@ export class OrderManager {
 
     if (riskDistance <= 0) return null;
 
-    // Position sizing: risk-based with symbol allocation
+    // Position sizing through the pre-trade safety gate: floors riskDistance
+    // (so a tiny stop can't explode size) AND caps notional. Hard-rejects.
     const symbolAlloc = SYMBOL_ALLOCATION[symbol] ?? 0.33;
+    const sizing = computePositionSize({
+      equity,
+      riskPerTrade,
+      symbolAlloc,
+      riskDistance,
+      entryPrice: adjustedEntry,
+      maxNotionalPctEquity: SAFETY_GATE_CONFIG.maxNotionalPctEquity,
+      minStopPct: SAFETY_GATE_CONFIG.minStopPct,
+    });
+    if (!sizing.ok) {
+      // Warn for log visibility AND persist a skipped_signal via the wired sink.
+      console.warn(`[guards] openPosition rejected ${symbol}: ${sizing.reason}`);
+      this.emitSkip({
+        symbol,
+        reason: sizing.reason,
+        signalEntry: adjustedEntry,
+        score: signal.totalScore,
+        detail: { path: 'openPosition', riskDistance },
+      });
+      return null;
+    }
     const riskAmount = equity * riskPerTrade * symbolAlloc;
-    const riskPerUnit = riskDistance;
-    const positionSize = riskAmount / riskPerUnit;
-    const positionSizeUSDT = positionSize * adjustedEntry;
+    const positionSizeUSDT = sizing.notionalUsdt;
+
+    // OPTIONAL L2 tradeability gate (LIVE-only): only runs when a real order-book
+    // snapshot is injected. Cross the ASK on a long, the BID on a short, so the
+    // depth we need is on the side we'd actually take.
+    const orderbook = live?.orderbook;
+    if (orderbook) {
+      const depthUsdt = direction === 'long' ? orderbook.askDepthUsdt : orderbook.bidDepthUsdt;
+      const tradeable = checkTradeability({
+        spreadBps: orderbook.spreadBps,
+        depthUsdt,
+        intendedNotionalUsdt: positionSizeUSDT,
+        maxSpreadBps: TRADEABILITY_CONFIG.maxSpreadBps,
+        depthMultiple: TRADEABILITY_CONFIG.depthMultiple,
+      });
+      if (!tradeable.ok) {
+        console.warn(`[guards] openPosition rejected ${symbol}: ${tradeable.reason}`);
+        this.emitSkip({
+          symbol,
+          reason: tradeable.reason,
+          signalEntry: adjustedEntry,
+          score: signal.totalScore,
+          detail: {
+            path: 'openPosition',
+            spreadBps: orderbook.spreadBps,
+            depthUsdt,
+            intendedNotionalUsdt: positionSizeUSDT,
+          },
+        });
+        return null;
+      }
+    }
 
     const position: BotPosition = {
       id: uuidv4(),
@@ -122,12 +290,46 @@ export class OrderManager {
     barIndex: number,
     ltfEntry: number,
     ltfStopLoss: number,
+    live?: LiveGuardInputs,
   ): BotPosition | null {
     const { takeProfit, direction, strategy } = signal.signal;
     const config = this.getConfig(symbol);
 
     // Apply entry friction to LTF entry
     const adjustedEntry = this.applyEntrySlippage(ltfEntry, direction, config);
+
+    // LIVE pre-trade guard — mark collar is checked against the LTF entry (the
+    // price we'd actually take), staleness/OHLC against the LTF signal candle.
+    const markGuard = live?.markGuard;
+    if (markGuard) {
+      const guard = checkPreTradeGuards({
+        signalEntry: ltfEntry,
+        markPrice: markGuard.markPrice,
+        candleHigh: markGuard.candleHigh,
+        candleLow: markGuard.candleLow,
+        candleClose: markGuard.candleClose,
+        candleCloseMs: markGuard.candleCloseMs,
+        nowMs: markGuard.nowMs,
+        maxDeviationBps: SAFETY_GATE_CONFIG.maxDeviationBps,
+        maxCandleAgeMs: SAFETY_GATE_CONFIG.maxCandleAgeMs,
+      });
+      if (!guard.ok) {
+        console.warn(`[guards] openLTFPosition rejected ${symbol}: ${guard.reason}`);
+        this.emitSkip({
+          symbol,
+          reason: guard.reason,
+          signalEntry: ltfEntry,
+          score: signal.totalScore,
+          detail: {
+            path: 'openLTFPosition',
+            markPrice: markGuard.markPrice,
+            candleCloseMs: markGuard.candleCloseMs,
+            nowMs: markGuard.nowMs,
+          },
+        });
+        return null;
+      }
+    }
 
     // Calculate risk distance from LTF levels (tighter SL)
     const riskDistance = direction === 'long'
@@ -136,11 +338,61 @@ export class OrderManager {
 
     if (riskDistance <= 0) return null;
 
-    // Position sizing: same risk-based approach
+    // Position sizing through the pre-trade safety gate (same as openPosition).
     const symbolAlloc = SYMBOL_ALLOCATION[symbol] ?? 0.33;
+    const sizing = computePositionSize({
+      equity,
+      riskPerTrade,
+      symbolAlloc,
+      riskDistance,
+      entryPrice: adjustedEntry,
+      maxNotionalPctEquity: SAFETY_GATE_CONFIG.maxNotionalPctEquity,
+      minStopPct: SAFETY_GATE_CONFIG.minStopPct,
+    });
+    if (!sizing.ok) {
+      // Warn for log visibility AND persist a skipped_signal via the wired sink.
+      console.warn(`[guards] openLTFPosition rejected ${symbol}: ${sizing.reason}`);
+      this.emitSkip({
+        symbol,
+        reason: sizing.reason,
+        signalEntry: adjustedEntry,
+        score: signal.totalScore,
+        detail: { path: 'openLTFPosition', riskDistance },
+      });
+      return null;
+    }
     const riskAmount = equity * riskPerTrade * symbolAlloc;
-    const positionSize = riskAmount / riskDistance;
-    const positionSizeUSDT = positionSize * adjustedEntry;
+    const positionSizeUSDT = sizing.notionalUsdt;
+
+    // OPTIONAL L2 tradeability gate (LIVE-only): same as openPosition. Cross the
+    // ASK on a long, the BID on a short, so the depth we need is on our side.
+    const orderbook = live?.orderbook;
+    if (orderbook) {
+      const depthUsdt = direction === 'long' ? orderbook.askDepthUsdt : orderbook.bidDepthUsdt;
+      const tradeable = checkTradeability({
+        spreadBps: orderbook.spreadBps,
+        depthUsdt,
+        intendedNotionalUsdt: positionSizeUSDT,
+        maxSpreadBps: TRADEABILITY_CONFIG.maxSpreadBps,
+        depthMultiple: TRADEABILITY_CONFIG.depthMultiple,
+      });
+      if (!tradeable.ok) {
+        console.warn(`[guards] openLTFPosition rejected ${symbol}: ${tradeable.reason}`);
+        this.emitSkip({
+          symbol,
+          reason: tradeable.reason,
+          signalEntry: ltfEntry,
+          score: signal.totalScore,
+          detail: {
+            path: 'openLTFPosition',
+            spreadBps: orderbook.spreadBps,
+            depthUsdt,
+            intendedNotionalUsdt: positionSizeUSDT,
+          },
+        });
+        return null;
+      }
+    }
 
     const position: BotPosition = {
       id: uuidv4(),
@@ -307,8 +559,13 @@ export class OrderManager {
     };
   }
 
+  /** True when fills are simulated (paper or paper-forward) vs live exchange fills. */
+  private get simulatesFills(): boolean {
+    return this.mode === 'paper' || this.mode === 'paper-forward';
+  }
+
   private applyEntrySlippage(price: number, direction: 'long' | 'short', config?: StrategyConfig): number {
-    if (this.mode === 'paper') {
+    if (this.simulatesFills) {
       const friction = (config ?? this.defaultConfig).frictionPerSide;
       return direction === 'long'
         ? price * (1 + friction)
@@ -318,7 +575,7 @@ export class OrderManager {
   }
 
   private applyExitSlippage(price: number, direction: 'long' | 'short', config?: StrategyConfig): number {
-    if (this.mode === 'paper') {
+    if (this.simulatesFills) {
       const friction = (config ?? this.defaultConfig).frictionPerSide;
       return direction === 'long'
         ? price * (1 - friction)

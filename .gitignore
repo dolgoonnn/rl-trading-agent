@@ -53,3 +53,23 @@ ict-trading.db
 
 # Worktrees
 .worktrees/
+
+# Portfolio allocator + decay monitor runtime outputs (path A)
+data/allocator-recommendations.json
+data/decay-status.json
+data/decay-alerts-log.json
+
+# 1m candle datasets (100-500MB each — regenerate via scripts/download-gold-1m.ts etc.)
+data/*_1m.json
+data/*_1m_holdout.json
+data/*_1h_holdout.json
+data/.duka-1m-chunks-*/
+data/.gold-1m-chunks/
+# Runtime state/streams
+data/orderflow/
+data/metals-bot-state.json
+data/gold-bot-state.json
+logs/
+
+# Local agent state (Claude Code, Ralph loop) — never commit
+.claude/

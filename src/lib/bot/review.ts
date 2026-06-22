@@ -1,0 +1,418 @@
+/**
+ * Review / observability layer — per-cell P&L decomposition + cold-cohort decay.
+ *
+ * Everything that does analysis is a PURE function over an array of trade rows
+ * (the rows are dependency-injected), so the math is unit-testable without a DB.
+ * Only `materializePnlCells` touches the DB, and it just reads trades, calls the
+ * pure decomposer, and inserts the resulting cells. This module is read-or-append
+ * only: it never participates in the live-trading decision path.
+ */
+
+import { asc, eq } from 'drizzle-orm';
+import { botTrades, pnlCells } from '@/lib/data/schema';
+import { calculateDeflatedSharpe } from '@/lib/rl/utils/deflated-sharpe';
+import type { BotDb } from './decision-log';
+
+// ============================================================================
+// Confluence bucketing
+// ============================================================================
+
+export type ConfluenceBucket = '<5' | '5-6' | '6-7' | '7+';
+
+/**
+ * Bucket a confluence score into the canonical review bands. Left-inclusive:
+ * 5 → '5-6', 6 → '6-7', 7 → '7+'. Below 5 → '<5'.
+ */
+export function bucketConfluence(score: number): ConfluenceBucket {
+  if (score < 5) return '<5';
+  if (score < 6) return '5-6';
+  if (score < 7) return '6-7';
+  return '7+';
+}
+
+// ============================================================================
+// Per-cell decomposition (pure)
+// ============================================================================
+
+/**
+ * The minimal trade-row shape the review math needs. A real `bot_trades` row is
+ * a superset of this, so it satisfies the interface structurally — but keeping
+ * the surface small makes the pure functions trivially testable with fixtures.
+ */
+export interface ReviewTradeRow {
+  id: string;
+  symbol: string;
+  regime: string;
+  exitReason: string;
+  confluenceScore: number;
+  entryTimestamp: number;
+  grossReturn: number;
+  frictionReturn: number;
+  fundingReturn: number;
+  netReturn: number;
+  /**
+   * Legacy realized-return column (`bot_trades.pnl_percent`), always populated.
+   * The 432 rows that predate the cost-column writer (migration 0004) have
+   * grossReturn/frictionReturn/fundingReturn/netReturn == 0 but a real
+   * pnl_percent — so the review MUST fall back to this to report true economics.
+   * Optional so pure fixtures that only set the cost cols stay valid.
+   */
+  pnlPercent?: number;
+}
+
+/**
+ * Resolve a trade's REALIZED net return for review math.
+ *
+ * Cost-decomposed rows (migration 0004 onward) carry a real `netReturn` and we
+ * use it directly. LEGACY rows predate that writer: their cost columns are all
+ * 0 while `pnl_percent` holds the true realized net — so when `netReturn` is
+ * exactly 0 we fall back to `pnlPercent`. This is the difference between every
+ * cell reading a misleading 0.0 and reading the actual P&L.
+ *
+ * gross/friction/funding remain best-effort straight from the cost columns
+ * (0 on legacy rows) — only the headline net is reconstructed, so the additive
+ * decomposition still describes whatever the cost columns recorded.
+ */
+export function realizedNet(t: ReviewTradeRow): number {
+  return t.netReturn !== 0 ? t.netReturn : t.pnlPercent ?? 0;
+}
+
+export interface PnlCell {
+  regime: string;
+  symbol: string;
+  confluenceBucket: ConfluenceBucket;
+  exitReason: string;
+  n: number;
+  meanNet: number;
+  sumNet: number;
+  winRate: number;
+  sumGross: number;
+  sumFunding: number;
+  sumFriction: number;
+  /** |sumFunding| / |sumGross|, guarded to 0 when sumGross is ~0. */
+  fundingPctOfGross: number;
+  /** n < 20 — too few trades to draw a conclusion. */
+  lowConfidence: boolean;
+  /** fundingPctOfGross > 0.35 OR (sumGross > 0 AND sumNet < 0). */
+  costTrap: boolean;
+}
+
+/** Min trades before a cell's conclusion is trusted. */
+export const MIN_CELL_N = 20;
+/** Funding-share-of-gross threshold above which a cell is a cost trap. */
+export const FUNDING_PCT_TRAP = 0.35;
+/** Float guard for div-by-zero on |sumGross|. */
+const GROSS_EPSILON = 1e-12;
+
+interface CellAccumulator {
+  regime: string;
+  symbol: string;
+  confluenceBucket: ConfluenceBucket;
+  exitReason: string;
+  n: number;
+  sumNet: number;
+  wins: number;
+  sumGross: number;
+  sumFunding: number;
+  sumFriction: number;
+}
+
+/**
+ * Group trade rows by (regime × symbol × confluenceBucket × exitReason) and emit
+ * one decomposition cell per group. PURE — no DB, no clock. Flags low-confidence
+ * (n < 20) and cost-trap cells (funding eats >35% of gross, or gross is positive
+ * but net is negative).
+ */
+export function decomposePnlCells(trades: ReviewTradeRow[]): PnlCell[] {
+  const groups = new Map<string, CellAccumulator>();
+
+  for (const t of trades) {
+    const bucket = bucketConfluence(t.confluenceScore);
+    const key = `${t.regime}|${t.symbol}|${bucket}|${t.exitReason}`;
+
+    let acc = groups.get(key);
+    if (!acc) {
+      acc = {
+        regime: t.regime,
+        symbol: t.symbol,
+        confluenceBucket: bucket,
+        exitReason: t.exitReason,
+        n: 0,
+        sumNet: 0,
+        wins: 0,
+        sumGross: 0,
+        sumFunding: 0,
+        sumFriction: 0,
+      };
+      groups.set(key, acc);
+    }
+
+    const net = realizedNet(t);
+    acc.n += 1;
+    acc.sumNet += net;
+    acc.sumGross += t.grossReturn;
+    acc.sumFunding += t.fundingReturn;
+    acc.sumFriction += t.frictionReturn;
+    if (net > 0) acc.wins += 1;
+  }
+
+  return Array.from(groups.values()).map((acc) => {
+    const fundingPctOfGross =
+      Math.abs(acc.sumGross) > GROSS_EPSILON
+        ? Math.abs(acc.sumFunding) / Math.abs(acc.sumGross)
+        : 0;
+
+    const lowConfidence = acc.n < MIN_CELL_N;
+    const costTrap =
+      fundingPctOfGross > FUNDING_PCT_TRAP ||
+      (acc.sumGross > 0 && acc.sumNet < 0);
+
+    return {
+      regime: acc.regime,
+      symbol: acc.symbol,
+      confluenceBucket: acc.confluenceBucket,
+      exitReason: acc.exitReason,
+      n: acc.n,
+      meanNet: acc.n > 0 ? acc.sumNet / acc.n : 0,
+      sumNet: acc.sumNet,
+      winRate: acc.n > 0 ? acc.wins / acc.n : 0,
+      sumGross: acc.sumGross,
+      sumFunding: acc.sumFunding,
+      sumFriction: acc.sumFriction,
+      fundingPctOfGross,
+      lowConfidence,
+      costTrap,
+    };
+  });
+}
+
+// ============================================================================
+// Score-reliability curve (DIAGNOSTIC ONLY — never feeds sizing)
+// ============================================================================
+
+/**
+ * One confluence bucket's realized reliability. PURE summary stat surfaced in
+ * the weekly review so a human can SEE whether higher-confluence buckets really
+ * win more — it is NOT, and must never become, a sizing input. (A guardrail test
+ * asserts position size is independent of this curve.)
+ */
+export interface ScoreReliabilityBin {
+  /** Confluence bucket: '<5' | '5-6' | '6-7' | '7+'. */
+  bucket: ConfluenceBucket;
+  /** Number of trades in the bucket. */
+  n: number;
+  /** Realized win rate (net-positive trades / n). */
+  winRate: number;
+  /** Mean realized net return (net-R) per trade in the bucket. */
+  meanNetR: number;
+}
+
+/**
+ * Bin trades by confluence score into [<5, 5-6, 6-7, 7+] and report realized
+ * win-rate and mean net-R per bin. PURE — no DB, no clock. DIAGNOSTIC ONLY:
+ * this output is read by the weekly review for human eyes; it deliberately has
+ * no path into sizing or signal selection. Empty buckets are omitted.
+ */
+export function scoreReliabilityCurve(trades: ReviewTradeRow[]): ScoreReliabilityBin[] {
+  const order: ConfluenceBucket[] = ['<5', '5-6', '6-7', '7+'];
+  const acc = new Map<ConfluenceBucket, { n: number; wins: number; sumNet: number }>();
+
+  for (const t of trades) {
+    const bucket = bucketConfluence(t.confluenceScore);
+    const net = realizedNet(t);
+    const a = acc.get(bucket) ?? { n: 0, wins: 0, sumNet: 0 };
+    a.n += 1;
+    a.sumNet += net;
+    if (net > 0) a.wins += 1;
+    acc.set(bucket, a);
+  }
+
+  return order
+    .filter((bucket) => acc.has(bucket))
+    .map((bucket) => {
+      const a = acc.get(bucket)!;
+      return {
+        bucket,
+        n: a.n,
+        winRate: a.n > 0 ? a.wins / a.n : 0,
+        meanNetR: a.n > 0 ? a.sumNet / a.n : 0,
+      };
+    });
+}
+
+// ============================================================================
+// Cold-cohort decay scan (pure)
+// ============================================================================
+
+export interface CohortStat {
+  /** Entry-month bucket, e.g. '2026-03' (UTC). */
+  month: string;
+  n: number;
+  meanNet: number;
+  /** Per-trade Sharpe of the cohort's net returns (0 if undefined). */
+  sharpe: number;
+  /**
+   * Deflated Sharpe, treating each cohort as one trial in a multiple-testing
+   * sweep across cohorts. Reuses the project DSR utility (Bailey & de Prado).
+   */
+  deflatedSharpe: number;
+  /** True when the cohort is decaying: deflatedSharpe <= 0 with enough trades. */
+  decaying: boolean;
+}
+
+/** Cohorts with fewer trades than this can't conclude decay. */
+export const MIN_COHORT_N = 10;
+
+/** UTC 'YYYY-MM' month key for a ms timestamp. */
+function monthKeyUtc(ms: number): string {
+  const d = new Date(ms);
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  return `${y}-${m}`;
+}
+
+/** Simple (non-annualized) Sharpe of a sample: mean / population-std. */
+function sampleSharpe(xs: number[]): number {
+  if (xs.length < 2) return 0;
+  const mean = xs.reduce((s, v) => s + v, 0) / xs.length;
+  const variance = xs.reduce((s, v) => s + (v - mean) ** 2, 0) / xs.length;
+  const std = Math.sqrt(variance);
+  if (std === 0) return mean > 0 ? Infinity : 0;
+  return mean / std;
+}
+
+/**
+ * Bucket trades by entry-month (UTC) and compute per-cohort n, meanNet, a
+ * per-trade Sharpe, and a deflated-Sharpe-style stat. A cohort is flagged
+ * `decaying` when its deflated Sharpe is <= 0 with at least MIN_COHORT_N trades.
+ * PURE — no DB, no clock. Cohorts are returned in chronological month order.
+ *
+ * NOTE: this is a per-trade Sharpe (not annualized) — a relative decay signal
+ * across cohorts, not an absolute performance metric. The number of cohorts is
+ * used as the DSR trial count so later (more-selected) cohorts get a larger
+ * haircut, consistent with the selection-bias intuition.
+ */
+export function coldCohortScan(trades: ReviewTradeRow[]): CohortStat[] {
+  const byMonth = new Map<string, number[]>();
+  for (const t of trades) {
+    const key = monthKeyUtc(t.entryTimestamp);
+    const arr = byMonth.get(key) ?? [];
+    arr.push(realizedNet(t));
+    byMonth.set(key, arr);
+  }
+
+  const months = Array.from(byMonth.keys()).sort();
+  const numTrials = Math.max(months.length, 1);
+
+  return months.map((month) => {
+    const nets = byMonth.get(month)!;
+    const n = nets.length;
+    const meanNet = nets.reduce((s, v) => s + v, 0) / n;
+    const sharpe = sampleSharpe(nets);
+
+    // Deflate using the cohort count as the trial count (selection-bias proxy).
+    const finiteSharpe = Number.isFinite(sharpe) ? sharpe : 0;
+    const dsr = calculateDeflatedSharpe(finiteSharpe, n, numTrials);
+
+    // A cohort decays ONLY when there is REAL, SUFFICIENT, genuinely-negative
+    // evidence:
+    //   - n >= MIN_COHORT_N           — enough trades to draw a conclusion;
+    //   - hasEconomics                — not flat/all-zero (legacy rows with no
+    //                                   realized P&L must not masquerade as decay,
+    //                                   where sharpe collapses to 0 and the DSR
+    //                                   haircut alone drives deflatedSharpe <= 0);
+    //   - sharpe < 0 AND dsr <= 0     — an actual negative trend that survives the
+    //                                   multiple-testing haircut (not merely a
+    //                                   zero/positive sharpe deflated below 0).
+    const hasEconomics = nets.some((v) => v !== 0);
+    const decaying =
+      n >= MIN_COHORT_N &&
+      hasEconomics &&
+      finiteSharpe < 0 &&
+      dsr.deflatedSharpe <= 0;
+
+    return {
+      month,
+      n,
+      meanNet,
+      sharpe: finiteSharpe,
+      deflatedSharpe: dsr.deflatedSharpe,
+      decaying,
+    };
+  });
+}
+
+// ============================================================================
+// Materialization (DB)
+// ============================================================================
+
+/** Map a raw bot_trades row to the minimal ReviewTradeRow the math needs. */
+type BotTradeSelectRow = typeof botTrades.$inferSelect;
+
+function toReviewRow(row: BotTradeSelectRow): ReviewTradeRow {
+  return {
+    id: row.id,
+    symbol: row.symbol,
+    regime: row.regime,
+    exitReason: row.exitReason,
+    confluenceScore: row.confluenceScore,
+    entryTimestamp: row.entryTimestamp,
+    grossReturn: row.grossReturn,
+    frictionReturn: row.frictionReturn,
+    fundingReturn: row.fundingReturn,
+    netReturn: row.netReturn,
+    pnlPercent: row.pnlPercent,
+  };
+}
+
+/** Read every bot_trades row as a ReviewTradeRow (chronological). */
+export function readReviewTrades(db: BotDb): ReviewTradeRow[] {
+  return db
+    .select()
+    .from(botTrades)
+    .orderBy(asc(botTrades.entryTimestamp))
+    .all()
+    .map(toReviewRow);
+}
+
+/**
+ * Read all bot_trades, decompose into per-cell rows, and persist them to
+ * `pnl_cells` stamped with `weekOfMs`. Returns the cells inserted so the caller
+ * (the weekly cron) can print a report without re-reading the DB.
+ *
+ * IDEMPOTENT per weekOf: existing `pnl_cells` rows stamped with this exact
+ * `weekOfMs` are DELETED before the fresh cells are inserted. Without this, the
+ * weekly cron is append-only and a re-run (cron retry, manual replay) silently
+ * DOUBLES the table for that week — which is exactly how the live table grew
+ * 238 → 476 with SUM(n) overcounting trades 4×. Cells for OTHER weeks are left
+ * untouched, so the historical weekly snapshots remain intact.
+ */
+export function materializePnlCells(db: BotDb, weekOfMs: number): PnlCell[] {
+  const trades = readReviewTrades(db);
+  const cells = decomposePnlCells(trades);
+
+  // Dedup: clear any prior cells for THIS week so re-running is idempotent.
+  db.delete(pnlCells).where(eq(pnlCells.weekOf, weekOfMs)).run();
+
+  for (const c of cells) {
+    db.insert(pnlCells)
+      .values({
+        weekOf: weekOfMs,
+        regime: c.regime,
+        symbol: c.symbol,
+        confluenceBucket: c.confluenceBucket,
+        exitReason: c.exitReason,
+        n: c.n,
+        meanNet: c.meanNet,
+        sumNet: c.sumNet,
+        winRate: c.winRate,
+        sumGross: c.sumGross,
+        sumFunding: c.sumFunding,
+        sumFriction: c.sumFriction,
+        fundingPctOfGross: c.fundingPctOfGross,
+      })
+      .run();
+  }
+
+  return cells;
+}

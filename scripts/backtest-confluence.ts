@@ -48,6 +48,13 @@ import {
   type TradeResult,
   type WalkForwardResult,
 } from './walk-forward-validate';
+import {
+  applyFundingToPnl,
+  frictionForExitSide,
+  type ExitSide,
+  type MakerTakerConfig,
+} from '../src/lib/cost/trade-cost';
+import { countFundingSettlements } from '../src/lib/cost/funding-ledger';
 
 // ============================================
 // Constants
@@ -98,6 +105,15 @@ const DEFAULT_SLIPPAGE = 0.0005;
 /** Combined friction per side: commission + slippage (overridable via --friction) */
 let FRICTION_PER_SIDE = DEFAULT_COMMISSION + DEFAULT_SLIPPAGE;
 
+/**
+ * Optional maker/taker friction split (Task 8). When set via --maker-bps/--taker-bps
+ * the single blended FRICTION_PER_SIDE is replaced by an asymmetric split: the entry
+ * (market order) and any SL / timeout / strategy exit cross the book as TAKER, while
+ * a passive TP exit rests as MAKER. When null (default) the blended friction is used,
+ * so existing gross results are byte-for-byte unchanged.
+ */
+let MAKER_TAKER: MakerTakerConfig | null = null;
+
 /** Experiment output path */
 const EXPERIMENT_DOC_PATH = 'experiments/iteration-2-confluence-scorer.md';
 
@@ -134,6 +150,22 @@ interface RiskConfig {
   maxWindowDD?: number;
   /** Streak-aware position sizing */
   streakSizing?: StreakSizingConfig;
+}
+
+/** Aggregated funding diagnostics for the --charge-funding PROBE. */
+interface FundingStats {
+  /** Whether funding was actually charged. */
+  enabled: boolean;
+  /** Σ signed funding return across all trades (negative = net paid, as a fraction of notional). */
+  totalFundingReturn: number;
+  /** Total 00/08/16 settlement instants crossed across all trades. */
+  settlementsCrossed: number;
+  /** Number of trades that crossed at least one settlement. */
+  tradesWithFunding: number;
+  /** Σ gross PnL fraction (pre-funding) over all trades — for the mean drag denominator. */
+  sumGrossPnl: number;
+  /** Σ net PnL fraction (post-funding) over all trades. */
+  sumNetPnl: number;
 }
 
 interface SimulatedPosition {
@@ -177,6 +209,8 @@ interface ConfluenceBacktestResult {
   totalSignals: number;
   overallWinRate: number;
   overallPnl: number;
+  /** Funding diagnostics — only meaningful when --charge-funding is set. */
+  fundingStats?: FundingStats;
 }
 
 // ============================================
@@ -188,28 +222,42 @@ interface ConfluenceBacktestResult {
  * For entries: buyer pays more, seller receives less.
  * For exits: buyer pays more, seller receives less.
  */
+/**
+ * Resolve the per-side friction fraction. With no maker/taker split configured,
+ * this is the single blended FRICTION_PER_SIDE (existing behavior). With a split,
+ * the entry and SL/timeout/strategy exits are TAKER; a passive TP exit is MAKER.
+ */
+function resolveFriction(exitSide: ExitSide): number {
+  if (MAKER_TAKER === null) return FRICTION_PER_SIDE;
+  return frictionForExitSide(exitSide, MAKER_TAKER);
+}
+
 function applyEntryFriction(
   price: number,
   direction: 'long' | 'short',
 ): number {
+  // Entry is a market order ⇒ taker leg under a maker/taker split.
+  const friction = resolveFriction('taker');
   if (direction === 'long') {
     // Buying: price goes up by friction
-    return price * (1 + FRICTION_PER_SIDE);
+    return price * (1 + friction);
   }
   // Selling short: price goes down by friction
-  return price * (1 - FRICTION_PER_SIDE);
+  return price * (1 - friction);
 }
 
 function applyExitFriction(
   price: number,
   direction: 'long' | 'short',
+  exitSide: ExitSide = 'taker',
 ): number {
+  const friction = resolveFriction(exitSide);
   if (direction === 'long') {
     // Selling to close long: price goes down by friction
-    return price * (1 - FRICTION_PER_SIDE);
+    return price * (1 - friction);
   }
   // Buying to close short: price goes up by friction
-  return price * (1 + FRICTION_PER_SIDE);
+  return price * (1 + friction);
 }
 
 /**
@@ -342,7 +390,7 @@ function simulatePositionBreakeven(
         };
       }
       if (candle.high >= position.takeProfit) {
-        const adjustedExit = applyExitFriction(position.takeProfit, position.direction);
+        const adjustedExit = applyExitFriction(position.takeProfit, position.direction, 'maker');
         return {
           entryTimestamp: position.entryTimestamp,
           exitTimestamp: candle.timestamp,
@@ -367,7 +415,7 @@ function simulatePositionBreakeven(
         };
       }
       if (candle.low <= position.takeProfit) {
-        const adjustedExit = applyExitFriction(position.takeProfit, position.direction);
+        const adjustedExit = applyExitFriction(position.takeProfit, position.direction, 'maker');
         return {
           entryTimestamp: position.entryTimestamp,
           exitTimestamp: candle.timestamp,
@@ -460,7 +508,7 @@ function simulatePositionPartialTP(
         };
       }
       if (candle.high >= position.takeProfit) {
-        const adjustedExit = applyExitFriction(position.takeProfit, position.direction);
+        const adjustedExit = applyExitFriction(position.takeProfit, position.direction, 'maker');
         const exitPnl = calculatePnlPercent(adjustedEntry, adjustedExit, position.direction);
         const finalPnl = partialTaken
           ? partialConfig.fraction * partialPnl + (1 - partialConfig.fraction) * exitPnl
@@ -493,7 +541,7 @@ function simulatePositionPartialTP(
         };
       }
       if (candle.low <= position.takeProfit) {
-        const adjustedExit = applyExitFriction(position.takeProfit, position.direction);
+        const adjustedExit = applyExitFriction(position.takeProfit, position.direction, 'maker');
         const exitPnl = calculatePnlPercent(adjustedEntry, adjustedExit, position.direction);
         const finalPnl = partialTaken
           ? partialConfig.fraction * partialPnl + (1 - partialConfig.fraction) * exitPnl
@@ -761,7 +809,7 @@ function simulatePositionEnhanced(
         };
       }
       if (candle.high >= currentTP) {
-        const adjustedExit = applyExitFriction(currentTP, position.direction);
+        const adjustedExit = applyExitFriction(currentTP, position.direction, 'maker');
         return {
           entryTimestamp: position.entryTimestamp,
           exitTimestamp: candle.timestamp,
@@ -786,7 +834,7 @@ function simulatePositionEnhanced(
         };
       }
       if (candle.low <= currentTP) {
-        const adjustedExit = applyExitFriction(currentTP, position.direction);
+        const adjustedExit = applyExitFriction(currentTP, position.direction, 'maker');
         return {
           entryTimestamp: position.entryTimestamp,
           exitTimestamp: candle.timestamp,
@@ -921,18 +969,29 @@ function createConfluenceRunner(
   riskConfig?: RiskConfig,
   multiTP?: MultiTPConfig,
   futuresDataMap?: Map<string, { timestamp: number; fundingRate: number }[]>,
+  chargeFunding = false,
 ): {
   runner: WalkForwardStrategyRunner;
   allTrades: TradeResult[];
   signalCounts: Map<string, number>;
   tradeRegimes: Map<number, string>;
   circuitBreakerFirings: number;
+  fundingStats: FundingStats;
 } {
   const allTrades: TradeResult[] = [];
   const signalCounts = new Map<string, number>();
   /** Maps trade entry timestamp to regime label */
   const tradeRegimes = new Map<number, string>();
   let circuitBreakerFirings = 0;
+  /** Accumulated funding diagnostics across all trades (only meaningful when chargeFunding). */
+  const fundingStats: FundingStats = {
+    enabled: chargeFunding,
+    totalFundingReturn: 0,
+    settlementsCrossed: 0,
+    tradesWithFunding: 0,
+    sumGrossPnl: 0,
+    sumNetPnl: 0,
+  };
 
   const modeName = exitMode;
   const cbLabel = circuitBreaker ? `,cb=${circuitBreaker.maxConsecutiveLosses}/${circuitBreaker.cooldownBars}` : '';
@@ -951,10 +1010,19 @@ function createConfluenceRunner(
       });
 
       // Inject futures data for funding rate filtering
+      // Build a per-symbol realized-funding lookup keyed by UTC settlement instant.
+      // The 1h funding series carries the realized rate at each 00/08/16 instant as
+      // an exact key (verified), so we can resolve the rate at each crossed settlement.
+      let fundingRateAt: ((settlementMs: number) => number) | null = null;
       if (futuresDataMap && meta?.symbol) {
         const snapshots = futuresDataMap.get(meta.symbol);
         if (snapshots) {
           scorer.setFuturesData(snapshots);
+          if (chargeFunding) {
+            const rateByTs = new Map<number, number>();
+            for (const s of snapshots) rateByTs.set(s.timestamp, s.fundingRate);
+            fundingRateAt = (ms: number): number => rateByTs.get(ms) ?? 0;
+          }
         }
       }
 
@@ -1063,6 +1131,27 @@ function createConfluenceRunner(
           }
 
           if (trade) {
+            // Charge funding as a REAL cost (Task 8 PROBE) before any sizing scaling.
+            // netPnl = grossPnl + signed fundingReturn at each crossed 00/08/16 settlement.
+            if (chargeFunding && fundingRateAt) {
+              const grossPnl = trade.pnlPercent;
+              const netPnl = applyFundingToPnl({
+                grossPnlPercent: grossPnl,
+                entryMs: trade.entryTimestamp,
+                exitMs: trade.exitTimestamp,
+                direction: trade.direction,
+                rateAt: fundingRateAt,
+              });
+              const fundingContribution = netPnl - grossPnl;
+              const crossed = countFundingSettlements(trade.entryTimestamp, trade.exitTimestamp);
+              fundingStats.totalFundingReturn += fundingContribution;
+              fundingStats.settlementsCrossed += crossed;
+              if (crossed > 0) fundingStats.tradesWithFunding += 1;
+              fundingStats.sumGrossPnl += grossPnl;
+              fundingStats.sumNetPnl += netPnl;
+              trade = { ...trade, pnlPercent: netPnl };
+            }
+
             // Apply risk management adjustments to PnL
             let adjustedPnl = trade.pnlPercent;
 
@@ -1153,7 +1242,7 @@ function createConfluenceRunner(
     },
   };
 
-  return { runner, allTrades, signalCounts, tradeRegimes, circuitBreakerFirings };
+  return { runner, allTrades, signalCounts, tradeRegimes, circuitBreakerFirings, fundingStats };
 }
 
 // ============================================
@@ -1689,6 +1778,9 @@ async function main(): Promise<void> {
   const fundingMaxLongArg = getArg('funding-max-long'); // --funding-max-long 0.0002
   const fundingMinShortArg = getArg('funding-min-short'); // --funding-min-short 0
   const fundingScoringArg = getArg('funding-scoring'); // --funding-scoring contrarian|aligned
+  const chargeFunding = hasFlag('charge-funding'); // --charge-funding to debit realized funding as a real cost (Task 8 PROBE)
+  const makerBpsArg = getArg('maker-bps'); // --maker-bps 2 (passive TP exit leg, per side)
+  const takerBpsArg = getArg('taker-bps'); // --taker-bps 5.5 (entry + SL/timeout exit leg, per side)
 
   // Gold-specific args
   const goldRangeMinArg = getArg('asian-range-min'); // --asian-range-min 0.15 (min Asian range %)
@@ -1789,6 +1881,19 @@ async function main(): Promise<void> {
       console.error('Error: --friction must be a non-negative number (per-side fraction, e.g., 0.0007)');
       process.exit(1);
     }
+  }
+
+  // Optional maker/taker friction split (Task 8). Defaults each leg to the blended
+  // friction (in bps) so an omitted flag reproduces the current single-friction model.
+  if (makerBpsArg !== undefined || takerBpsArg !== undefined) {
+    const blendedBps = FRICTION_PER_SIDE * 1e4;
+    const makerBps = makerBpsArg !== undefined ? parseFloat(makerBpsArg) : blendedBps;
+    const takerBps = takerBpsArg !== undefined ? parseFloat(takerBpsArg) : blendedBps;
+    if (Number.isNaN(makerBps) || Number.isNaN(takerBps) || makerBps < 0 || takerBps < 0) {
+      console.error('Error: --maker-bps / --taker-bps must be non-negative numbers (basis points per side)');
+      process.exit(1);
+    }
+    MAKER_TAKER = { makerBps, takerBps };
   }
 
   // Parse SL placement mode
@@ -2039,7 +2144,7 @@ async function main(): Promise<void> {
   // Load futures data for order flow filtering
   type FuturesSnapshot = { timestamp: number; fundingRate: number };
   let futuresDataMap: Map<string, FuturesSnapshot[]> | undefined;
-  if (withOrderflow || fundingMaxLongArg || fundingMinShortArg || fundingScoringArg) {
+  if (withOrderflow || fundingMaxLongArg || fundingMinShortArg || fundingScoringArg || chargeFunding) {
     futuresDataMap = new Map();
     const symbols = configOverrides.symbols ?? ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'];
     for (const symbol of symbols) {
@@ -2055,8 +2160,8 @@ async function main(): Promise<void> {
   }
 
   // Create the confluence runner
-  const { runner, allTrades, signalCounts, tradeRegimes, circuitBreakerFirings } =
-    createConfluenceRunner(threshold, exitMode, scorerConfig, circuitBreaker, partialTP, regimeSLMultipliers, riskConfig, multiTP, futuresDataMap);
+  const { runner, allTrades, signalCounts, tradeRegimes, circuitBreakerFirings, fundingStats } =
+    createConfluenceRunner(threshold, exitMode, scorerConfig, circuitBreaker, partialTP, regimeSLMultipliers, riskConfig, multiTP, futuresDataMap, chargeFunding);
 
   // Run walk-forward validation
   const walkForwardResult = await runWalkForward(runner, configOverrides, { quiet: jsonOutputMode });
@@ -2101,6 +2206,7 @@ async function main(): Promise<void> {
     totalSignals,
     overallWinRate,
     overallPnl,
+    fundingStats: chargeFunding ? fundingStats : undefined,
   };
 
   // Print results

@@ -14,8 +14,12 @@ import type {
   DrawdownTier,
   RiskConfig,
   LTFConfig,
+  SafetyGateConfig,
+  RetirementConfig,
+  TradeabilityConfig,
 } from '@/types/bot';
 import type { FundingArbConfig } from '@/types/funding-arb';
+import { DEFAULT_EXCHANGE_EXIT_CONFIG, type ExchangeExitConfig } from './exchange-exit-manager';
 
 // ============================================
 // Bot Config Defaults
@@ -166,6 +170,115 @@ export const DEFAULT_FUNDING_ARB_CONFIG: FundingArbConfig = {
   arbSymbols: ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'],
   commissionPerSide: 0.00055, // Bybit taker
   pollIntervalMinutes: 60, // Hourly
+};
+
+// ============================================
+// Exchange-Native Protective Exits (live bot only)
+// ============================================
+
+// `enabled` is flipped on by the --exchange-exits CLI flag in run-bot;
+// default OFF keeps paper/backtest pure.
+export const EXCHANGE_EXIT_CONFIG: ExchangeExitConfig = { ...DEFAULT_EXCHANGE_EXIT_CONFIG };
+
+// ============================================
+// Pre-Trade Safety Gate (live/paper bot only)
+// ============================================
+
+/**
+ * Hard-reject thresholds for the pre-trade safety gate.
+ * - maxNotionalPctEquity 2.0  → cap a single position at 200% of equity
+ * - minStopPct 0.001 (0.10%)  → floor riskDistance so a tiny stop can't blow up size
+ * - maxDeviationBps 50 (0.50%) → mark collar, start loose, tighten via skipped-signal log
+ * - maxCandleAgeMs 5_400_000 (90 min = 1.5× a 1h bar) → reject acting on a stale bar
+ */
+export const SAFETY_GATE_CONFIG: SafetyGateConfig = {
+  maxNotionalPctEquity: 2.0,
+  minStopPct: 0.001,
+  maxDeviationBps: 50,
+  maxCandleAgeMs: 5_400_000,
+};
+
+// ============================================
+// L2 Tradeability Gate (live/paper bot only)
+// ============================================
+
+/**
+ * L2 order-book reject thresholds for majors (BTC/ETH/SOL).
+ * - maxSpreadBps 5 (0.05%) → reject when the bid/ask spread is wider than 5 bps.
+ * - depthMultiple 2        → require 2× the intended notional resting in the
+ *   top-10 levels on the side we'd cross, so a market order can't move the book.
+ *
+ * Live-only: a real L2 snapshot is injected at the order path; tests/backtest
+ * pass no snapshot, so the gate is skipped (it must not shift the Run-20 edge).
+ */
+export const TRADEABILITY_CONFIG: TradeabilityConfig = {
+  maxSpreadBps: 5,
+  depthMultiple: 2,
+};
+
+// ============================================
+// Retirement Kill-Switch (live/paper bot only)
+// ============================================
+
+/**
+ * Frozen-at-deploy retirement parameters.
+ *
+ * hardKillDD is derived (NOT hard-coded) from these inputs:
+ *   E[MaxDD] = sigmaAnnual·√(2·ln(horizonYears·252))/sharpe   (≈0.194 here)
+ *   hardKillDD = 1.5·max(E[MaxDD], bootstrapP5DD)             (≈0.291 here)
+ * Both are far below the raw in-sample 63.3% — we do NOT cut at that depth.
+ *
+ * NOTE (Issue C): `bootstrapP5DD = 0.10` is a PLACEHOLDER. The real value is the
+ * bootstrap MaxDD 5th-percentile produced by the Monte-Carlo validation run
+ * (`scripts/validate-monte-carlo.ts` → `src/lib/rl/utils/monte-carlo.ts`). Today
+ * E[MaxDD] (≈0.194) dominates the `max()` so hardKillDD is insensitive to this
+ * placeholder, but it MUST be wired from the funding-net MC bootstrap before the
+ * bootstrap leg can ever bind. TODO: replace 0.10 with the MC bootstrap p5 MaxDD.
+ *
+ * - minAcceptableSharpe 0.5 → the deflated-Sharpe benchmark `c` (NOT zero): a
+ *   0.3 rolling Sharpe at 100 trials must reduce sizing where raw-Sharpe didn't.
+ * - minTrackRecordLength 50 → until this many live observations accrue, the DSR
+ *   layer may only DE-RISK (never HARD), so we don't cut at the bottom of a
+ *   normal early drawdown.
+ * - maxEntriesPerDay 3/symbol, maxConsecutiveLossesPerSymbol 4 → per-symbol
+ *   throttle independent of strategy cooldownBars; pauses one symbol, not the book.
+ * - heartbeatTimeoutMs 7_200_000 (2× a 1h bar) → stale feed latches a HALT.
+ *
+ * ACTIVE halt legs with this default config (FIX-3 — be HONEST about what fires):
+ *   1. ABSOLUTE drawdown hard halt   (DD >= hardKillDD ≈ 29.93%)
+ *   2. SUSTAINED-DSR streak hard halt (dsrBreachK=3 sub-floor checks, n >= MinTRL)
+ *   3. SOFT de-risk band              (DD in [eMaxDD, hardKillDD) ⇒ ×0.5)
+ * Exactly those three. The other two confluence legs are DISABLED-pending-inputs:
+ *   - regimeHaltEnabled=false      → regime/mechanism legs OFF (no regime-decay
+ *     detector feeds `regimeCause`; run-bot's consumeRegimeCause() returns false).
+ *   - charterPathHaltEnabled=false → charter-p5 path legs OFF (no cumulative-PnL-
+ *     vs-p5 probe feeds `charterBreachConsecutive`; it stays 0 in run-bot).
+ * Each flag carries a one-line TODO (in `RetirementConfig`) of the input to wire
+ * before it may be flipped true.
+ */
+export const RETIREMENT_CONFIG: RetirementConfig = {
+  sigmaAnnual: 0.12,
+  sharpe: 2,
+  horizonYears: 0.75,
+  bootstrapP5DD: 0.10,
+  minAcceptableSharpe: 0.5,
+  psr: 0.95,
+  minTrackRecordLength: 50,
+  maxEntriesPerDay: 3,
+  maxConsecutiveLossesPerSymbol: 4,
+  heartbeatTimeoutMs: 7_200_000,
+  charterBreachK: 3,
+  // dsrBreachK 3 → three consecutive sub-floor deflated-Sharpe checks (each with
+  // n >= MinTRL) escalate the DSR layer to a HARD halt even without a regime
+  // cause. One reading is noise; three sustained breaches are an edge collapse.
+  dsrBreachK: 3,
+  // FIX-3 feature flags — DEFAULT FALSE = leg NOT wired (see RetirementConfig docs).
+  // regimeHaltEnabled: enable AFTER an edge-triggered regime-decay detector feeds
+  //   `regimeCause` (today consumeRegimeCause() in run-bot.ts returns a hardcoded false).
+  regimeHaltEnabled: false,
+  // charterPathHaltEnabled: enable AFTER a charter-p5 cumulative-PnL-vs-path probe
+  //   feeds `charterBreachConsecutive` (today it is declared =0 and never mutated).
+  charterPathHaltEnabled: false,
 };
 
 // ============================================

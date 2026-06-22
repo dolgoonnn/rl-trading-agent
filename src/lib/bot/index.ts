@@ -11,6 +11,57 @@ export { FundingArbBot } from './funding-arb-bot';
 export { LTFConfirmation } from './ltf-confirmation';
 export { LimitOrderExecutor, DEFAULT_LIMIT_ORDER_CONFIG } from './limit-order-executor';
 export type { PendingLimitOrder, LimitOrderConfig } from './limit-order-executor';
+
+// Review / observability layer (read-or-append only — no live-trading path)
+export {
+  bucketConfluence,
+  decomposePnlCells,
+  coldCohortScan,
+  materializePnlCells,
+  readReviewTrades,
+  MIN_CELL_N,
+  FUNDING_PCT_TRAP,
+  MIN_COHORT_N,
+} from './review';
+export type {
+  ConfluenceBucket,
+  ReviewTradeRow,
+  PnlCell,
+  CohortStat,
+} from './review';
+
+// Decision log + skipped-signal logging (append-only API surface)
+export {
+  appendDecisionLog,
+  logSkippedSignal,
+  readDecisionLog,
+  readSkippedSignals,
+} from './decision-log';
+
+// Retirement kill-switch (latched, reduce-only) + pure halt decision
+export {
+  readKillFlag,
+  getKillFlag,
+  setKillFlag,
+  isKilled,
+  killSentinelPath,
+} from './kill-switch';
+export type { KillFlag, KillDb, KillDbRow } from './kill-switch';
+export {
+  expectedMaxDD,
+  hardKillDD,
+  checkRetirementHalt,
+} from './retirement';
+export type {
+  HaltAction,
+  RetirementDecision,
+  RetirementHaltInputs,
+} from './retirement';
+export type {
+  BotDb,
+  AppendDecisionLogArgs,
+  LogSkippedSignalArgs,
+} from './decision-log';
 export {
   DEFAULT_BOT_CONFIG,
   RUN20_STRATEGY_CONFIG,
@@ -19,4 +70,6 @@ export {
   DEFAULT_LTF_CONFIG,
   DEFAULT_FUNDING_ARB_CONFIG,
   SYMBOL_ALLOCATION,
+  RETIREMENT_CONFIG,
+  SAFETY_GATE_CONFIG,
 } from './config';

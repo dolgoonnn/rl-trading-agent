@@ -11,8 +11,15 @@ import type { Candle } from './candle';
 // Bot Configuration
 // ============================================
 
-/** Execution mode: paper simulates fills, live sends orders to exchange */
-export type BotMode = 'paper' | 'live';
+/**
+ * Execution mode.
+ * - `paper`: simulates fills (default; backtest-dump scripts may run).
+ * - `live`: sends real orders to the exchange (never used here — paper only).
+ * - `paper-forward`: a forward paper run that accumulates a real-time track
+ *   record. Like `paper` for fills, but the backtest-dump path is HARD-GATED
+ *   off so a forward run can never re-pollute bot_trades.
+ */
+export type BotMode = 'paper' | 'live' | 'paper-forward';
 
 /** Supported exchanges */
 export type Exchange = 'bybit';
@@ -95,6 +102,138 @@ export interface StrategyConfig {
     fvgSearchWindow: number;
     ceTolerance: number;
   };
+}
+
+// ============================================
+// Pre-Trade Safety Gate (live-only)
+// ============================================
+
+/**
+ * Configuration for the pre-trade safety gate (live/paper bot only).
+ * Hard REJECTS, no clamping. Lives outside the backtest path.
+ */
+export interface SafetyGateConfig {
+  /** Max position notional as a multiple of equity (e.g. 2.0 = 200% of equity) */
+  maxNotionalPctEquity: number;
+  /** Minimum stop distance as a fraction of entry price (floors riskDistance) */
+  minStopPct: number;
+  /** Max allowed |signalEntry - markPrice| deviation in basis points */
+  maxDeviationBps: number;
+  /** Max allowed age of the signal candle in milliseconds */
+  maxCandleAgeMs: number;
+}
+
+/** Reason a pre-trade guard rejected an order */
+export type RejectReason =
+  | 'unbounded_size'
+  | 'max_notional'
+  | 'mark_deviation'
+  | 'stale_candle'
+  | 'crossed_candle'
+  | 'l2_tradeability';
+
+/**
+ * Configuration for the L2 tradeability gate (live/paper bot only).
+ *
+ * Contract: an order is REJECTED when the order book is illiquid relative to
+ * the intended position. `depthMultiple` is a multiple of intended notional —
+ * we require `depthUsdt >= depthMultiple * intendedNotionalUsdt` of resting
+ * liquidity on the side we'd cross (top-N levels). Defaults are tuned for
+ * majors (BTC/ETH/SOL) where book depth is deep.
+ */
+export interface TradeabilityConfig {
+  /** Max allowed spread in basis points (e.g. 5 = 0.05%). */
+  maxSpreadBps: number;
+  /** Required top-N depth as a multiple of intended notional (e.g. 2 = 2×). */
+  depthMultiple: number;
+}
+
+/** An L2 order-book snapshot summarized for the tradeability gate. */
+export interface OrderbookSnapshot {
+  /** Best bid price. */
+  bid: number;
+  /** Best ask price. */
+  ask: number;
+  /** USDT depth resting on the bid side (sum of top-N levels × price). */
+  bidDepthUsdt: number;
+  /** USDT depth resting on the ask side (sum of top-N levels × price). */
+  askDepthUsdt: number;
+  /** (ask - bid) / mid * 1e4. */
+  spreadBps: number;
+}
+
+/** Result of a sizing/guard computation — discriminated on `ok` */
+export type GuardResult =
+  | { ok: true; size: number; notionalUsdt: number }
+  | { ok: false; reason: RejectReason };
+
+// ============================================
+// Retirement Kill-Switch (live/paper bot only)
+// ============================================
+
+/**
+ * Frozen-at-deploy parameters for the retirement kill-switch and risk hardening.
+ * The hard-kill drawdown is anchored to the chosen live volatility via E[MaxDD]
+ * (NOT the raw in-sample 63.3%). All values are pre-committed at deploy.
+ */
+export interface RetirementConfig {
+  /** Annualized volatility target the equity curve is sized to. */
+  sigmaAnnual: number;
+  /** Expected Sharpe used in the E[MaxDD] formula. */
+  sharpe: number;
+  /** Horizon (years) for the E[MaxDD] √(2·ln(T·252)) term. */
+  horizonYears: number;
+  /** Bootstrap 5th-percentile drawdown — the empirical floor for hardKillDD. */
+  bootstrapP5DD: number;
+  /** Benchmark Sharpe `c` the deflated Sharpe must clear (NOT zero). */
+  minAcceptableSharpe: number;
+  /** PSR threshold (probability the true Sharpe beats the benchmark). */
+  psr: number;
+  /** Minimum live observations before the DSR layer may HARD-halt. */
+  minTrackRecordLength: number;
+  /** Max NEW entries per symbol per 24h (independent of strategy cooldownBars). */
+  maxEntriesPerDay: number;
+  /** Consecutive losses per symbol that pause THAT symbol (not the whole book). */
+  maxConsecutiveLossesPerSymbol: number;
+  /** Heartbeat timeout (ms): stale feed beyond this latches a stale_feed HALT. */
+  heartbeatTimeoutMs: number;
+  /** Consecutive charter-p5 breaches that escalate yellow → red (hard halt). */
+  charterBreachK: number;
+  /**
+   * Consecutive DSR-below-floor checks (with n >= MinTRL) that escalate the
+   * deflated-Sharpe layer to a HARD halt even WITHOUT a corroborating regime
+   * cause (mirrors the charter-path yellow→red escalation). A single sub-floor
+   * DSR reading is noisy; `dsrBreachK` sustained breaches make it conclusive.
+   */
+  dsrBreachK: number;
+  /**
+   * Feature flag — is the regime/mechanism halt leg WIRED? Default FALSE.
+   *
+   * Gates BOTH the DSR-conclusive-WITH-regime-cause HARD halt and the standalone
+   * regime de-risk in `checkRetirementHalt`. Today `run-bot.ts:consumeRegimeCause()`
+   * returns a hardcoded `false`, so these legs can never fire — leaving the flag
+   * false makes that INACTIVE state explicit (not dead code masquerading as live)
+   * and provably skips the legs even if a stray/stale `regimeCause=true` is passed.
+   *
+   * TODO to enable: wire an EDGE-TRIGGERED regime-decay / mechanism-break detector
+   * into the tick (fresh-transition event, not a latched level) feeding `regimeCause`,
+   * then flip this to true.
+   */
+  regimeHaltEnabled: boolean;
+  /**
+   * Feature flag — is the charter-p5 cumulative-PnL path halt leg WIRED? Default FALSE.
+   *
+   * Gates BOTH the charter-p5 RED HARD halt and the YELLOW de-risk in
+   * `checkRetirementHalt`. Today `run-bot.ts:charterBreachConsecutive` is declared
+   * `=0` and never mutated, so these legs can never fire — leaving the flag false
+   * makes that INACTIVE state explicit and provably skips the legs even if a nonzero
+   * `charterBreachConsecutive` is passed.
+   *
+   * TODO to enable: wire a charter-p5 cumulative-PnL-vs-path probe that increments
+   * `charterBreachConsecutive` when live cumulative PnL sits below the 5th-percentile
+   * Monte-Carlo path, then flip this to true.
+   */
+  charterPathHaltEnabled: boolean;
 }
 
 // ============================================
@@ -295,7 +434,8 @@ export type AlertEvent =
   | 'arb_position_opened'
   | 'arb_position_closed'
   | 'funding_settlement'
-  | 'arb_daily_summary';
+  | 'arb_daily_summary'
+  | 'degradation_alert';
 
 /** An alert to be sent */
 export interface BotAlert {
