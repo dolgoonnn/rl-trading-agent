@@ -33,9 +33,9 @@ A weighted scoring system selecting strategies based on ICT confluence factors w
 ### Walk-Forward Summary
 | Symbol | Windows | Positive | Avg Sharpe | Worst Sharpe | Status |
 |--------|---------|----------|------------|--------------|--------|
-| BTCUSDT | 37 | 23/37 | 14.97 | -244.11 | FAIL |
-| ETHUSDT | 37 | 22/37 | -27.51 | -728.03 | FAIL |
-| SOLUSDT | 37 | 27/37 | 5.78 | -117.46 | FAIL |
+| BTCUSDT | 37 | 24/37 | 16.51 | -237.25 | FAIL |
+| ETHUSDT | 37 | 21/37 | -29.79 | -801.23 | FAIL |
+| SOLUSDT | 37 | 27/37 | 6.04 | -115.64 | FAIL |
 
 
 **Overall pass rate:** 64.9%
@@ -44,23 +44,23 @@ A weighted scoring system selecting strategies based on ICT confluence factors w
 ### Per-Strategy Breakdown
 | Strategy | Signals | Trades | Wins | Losses | Win Rate | Avg PnL | Total PnL |
 |----------|---------|--------|------|--------|----------|---------|-----------|
-| order_block | 3638 | 657 | 291 | 366 | 44.3% | 0.33% | 218.91% |
+| order_block | 3638 | 657 | 293 | 364 | 44.6% | 0.35% | 231.77% |
 | fvg | 0 | 0 | 0 | 0 | 0.0% | 0.00% | 0.00% |
 | bos_continuation | 0 | 0 | 0 | 0 | 0.0% | 0.00% | 0.00% |
 | choch_reversal | 0 | 0 | 0 | 0 | 0.0% | 0.00% | 0.00% |
 
 
 **Total trades:** 657
-**Overall win rate:** 44.3%
-**Overall PnL:** 262.39%
+**Overall win rate:** 44.6%
+**Overall PnL:** 309.81%
 
 ### Comparison to RL (exp-014)
 _No exp-014 RL results found for comparison. Run walk-forward-validate.ts with the RL model first._
 
 
 ## Key Learnings
-- **Low win rate (44.3%).** May need to increase threshold or add additional filters.
-- **order_block** is the most active strategy (657 trades, 44.3% win rate).
+- **Low win rate (44.6%).** May need to increase threshold or add additional filters.
+- **order_block** is the most active strategy (657 trades, 44.6% win rate).
 - **Dead strategies (0 trades):** fvg, bos_continuation, choch_reversal. These may need looser entry conditions or the confluence threshold may be filtering them out.
 - **Failed symbols:** BTCUSDT, ETHUSDT, SOLUSDT. The confluence scorer may need symbol-specific weight tuning.
 - **Signal-to-trade conversion:** 18.1% (657 trades from 3638 signals above threshold).
@@ -74,5 +74,5 @@ The scorer needs adjustment before proceeding. Focus areas:
 3. Review strategy entry conditions for each failing symbol
 
 ---
-_Generated: 2026-06-14T07:17:14.462Z_
+_Generated: 2026-06-21T17:03:03.100Z_
 _Script: scripts/backtest-confluence.ts_

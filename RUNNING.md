@@ -44,6 +44,57 @@ TELEGRAM_CHAT_ID=...
 ```
 then `pm2 restart all --update-env`. (Alerts no-op silently without it — nothing breaks.)
 
+## Exchange-native protective exits (--exchange-exits)
+
+When this flag is set, the bot places the stop-loss and final take-profit as a **position-attached reduce-only stop on Bybit** (`setTradingStop`, V5, one-way mode) the instant a live limit entry fills. The stop lives on the exchange, so a hard process crash (`kill -9`, OOM, machine reboot) can never leave a position unprotected — the venue still fires the stop.
+
+**Requirements**
+- `BYBIT_API_KEY` and `BYBIT_API_SECRET` env vars (real mainnet keys, or testnet keys with testnet endpoint)
+- Pass `--exchange-exits` on the CLI
+- Default: **OFF** — paper mode, backtests, and the Run-20 validation are completely unaffected
+
+**Behavior**
+
+| Event | What happens |
+|-------|-------------|
+| Limit entry fills | `armExits` → SL + final TP armed on Bybit. If arming fails, position is **immediately flattened** (market reduce-only); the unprotected position is NOT tracked |
+| In-process partial-TP hit | Breakeven SL move is **re-armed** on Bybit via a second `armExits` call |
+| Time-exit (max_bars) or graceful shutdown | Real Bybit position **flattened** (market reduce-only) + exchange stop cleared |
+| Hard crash (`kill -9`) | Process dies; exchange stop **stays armed** and protects the open position |
+
+**Phase 1 caveat — partial-TP stays in-process**
+Only the hard SL and the final TP live on the exchange. The fractional partial-TP (e.g. 50 % @ 1.41 R) continues to be managed in-process, exactly as validated in Run-20. Phase 2 — moving the fractional partial onto the exchange as a resting reduce-only order — is deferred; it requires fill-reconciliation (poll closed-PnL) and introduces an accepted parity change (exchange fills intrabar vs. our candle-close model).
+
+**Phase 2a (DONE) — per-tick close reconciliation**
+Each tick, if the venue has flattened a position the shadow still holds open (its SL/TP fired on Bybit), the bot detects it (`getOpenSize` → flat) and closes the shadow at the **real exchange exit price** (`getClosedPnL.avgExitPrice`), skipping the in-process check for that tick. So the bot no longer "manages" a position that is already closed on the exchange, and an exchange-driven close books at the true venue price.
+
+**Phase 2b (DONE) — partial propagated to the venue**
+When the in-process partial-TP fires, the bot reduces the REAL Bybit position by the same fraction with a **market reduce-only** order at the same candle-close moment, then re-arms SL(BE)+TP for the remainder. So the venue realizes the partial too — a reversal-to-BE now sells only the remainder at BE (the partial was already realized at ~the partial price), matching the shadow's blended PnL. Chosen over a resting reduce-only limit at the partial price specifically to AVOID an intrabar-vs-candle-close parity change — the trigger stays candle-close, so Run-20 needs no re-measurement and the backtest path is untouched.
+
+> ℹ️ **Residual (bounded).** The venue partial fills at a market price ≈ candle-close ± slippage; the shadow books at candle-close × friction. The structural size mismatch is gone; only a bounded slippage-sized price difference on the partial leg remains (same order as modelled friction). Step-rounding on `size × fraction` can leave tiny dust on the remainder. Still sensible to spot-check realized PnL against the Bybit balance when first live.
+
+**Pre-live verification checklist (manual — operator must complete before trusting with real money)**
+
+This procedure has **NOT yet been run**. The flag is not considered validated for real-money use until all steps below are confirmed with evidence (screenshot or `getPositionInfo` output).
+
+```bash
+# 1. Start with testnet keys and limit-orders mode
+BYBIT_API_KEY=<testnet_key> BYBIT_API_SECRET=<testnet_secret> \
+  npx tsx scripts/run-bot.ts --limit-orders --exchange-exits
+
+# 2. After a fill: confirm SL + TP appear on the Bybit testnet position
+#    (check the testnet UI, or poll getPositionInfo — look for stopLoss / takeProfit fields)
+
+# 3. Kill the process hard and confirm the stop survives
+kill -9 <pid>
+#    Check testnet UI / API — SL+TP must STILL be present
+
+# 4. Restart; let an exit occur; confirm the stop is cleared
+#    No orphan reduce-only stop should remain on the position after close
+```
+
+Expected: SL+TP visible post-fill ✓ · survive kill -9 ✓ · cleared after close ✓. Record pass/fail with screenshots or API output before enabling on mainnet.
+
 ## DO NOT do this while it's accumulating
 - **Do not run `npx tsx scripts/replay-bot.ts`** against this DB — a non-`--fresh` run still APPENDS backtest trades into the live forward `bot_trades` (known hole, audit-flagged). Use a separate DB or wait until that's fixed.
 - Don't go live (real keys) — entry-side execution safety (mark collar margin, L2) is paper-validated only.
