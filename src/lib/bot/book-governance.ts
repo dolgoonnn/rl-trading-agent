@@ -5,6 +5,8 @@
  * book is where edge-decay is judged. Catastrophe (book absolute drawdown) is
  * still an unconditional hard halt.
  */
+import * as fs from 'fs';
+import * as path from 'path';
 import { expectedMaxDD, hardKillDD } from '@/lib/bot/retirement';
 import type { BookGovernanceConfig } from '@/lib/bot/config';
 import { BOOK_GOVERNANCE_CONFIG } from '@/lib/bot/config';
@@ -76,4 +78,130 @@ export function decideBookGovernance(inputs: BookGovernanceInputs): BookGovernan
     watch,
     reviewRequired: false,
   };
+}
+
+// ── Task 2: live-returns aggregation + signal IO ──────────────────────────────
+
+export interface SleeveDaily {
+  name: string;
+  byDay: Record<string, number>;
+}
+
+export interface BookGovernanceState {
+  bookSharpe30: number | null;
+  bookSharpe60: number | null;
+  bookDrawdown: number;
+  days: number;
+}
+
+export interface BookGovernanceSignal extends BookGovernanceState {
+  action: BookHaltAction;
+  multiplier: number;
+  reason: string;
+  asOfMs: number;
+}
+
+const SIGNAL_FILE = 'book-governance.json';
+
+// ── Pure math helpers (local; no scripts/ deps) ───────────────────────────────
+
+function mean(xs: number[]): number {
+  return xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : 0;
+}
+
+function std(xs: number[]): number {
+  if (xs.length < 2) return 0;
+  const m = mean(xs);
+  return Math.sqrt(xs.reduce((s, x) => s + (x - m) ** 2, 0) / (xs.length - 1));
+}
+
+function annSharpe(xs: number[]): number {
+  const s = std(xs);
+  return s > 0 ? (mean(xs) / s) * Math.sqrt(252) : 0;
+}
+
+/**
+ * Pure: union-calendar align (0 when a sleeve is flat that day), builds the
+ * weighted book daily series, returns rolling Sharpe and drawdown metrics.
+ *
+ * @param sleeves   Per-sleeve daily-return maps.
+ * @param weights   Sleeve name → weight (should sum to 1, not enforced).
+ * @param trailing  Maximum number of most-recent calendar days to include.
+ * @param min30     Data gate for bookSharpe30 (default 10 obs).
+ * @param min60     Data gate for bookSharpe60 (default 20 obs).
+ */
+export function computeBookGovernanceState(
+  sleeves: SleeveDaily[],
+  weights: Record<string, number>,
+  trailing: number,
+  min30 = 10,
+  min60 = 20,
+): BookGovernanceState {
+  // Union all dates across sleeves, sort ascending, keep only the last `trailing` days.
+  const allDates = new Set<string>();
+  for (const s of sleeves) {
+    for (const d of Object.keys(s.byDay)) allDates.add(d);
+  }
+  const dates = [...allDates].sort().slice(-trailing);
+
+  // Build weighted book daily return series (0 when a sleeve has no entry for that day).
+  const book = dates.map((d) =>
+    sleeves.reduce((acc, s) => acc + (weights[s.name] ?? 0) * (s.byDay[d] ?? 0), 0),
+  );
+
+  // Rolling windows.
+  const last30 = book.slice(-30);
+  const last60 = book.slice(-60);
+
+  // Drawdown from the cumulative-return peak.
+  let eq = 1;
+  let peak = 1;
+  let maxdd = 0;
+  for (const r of book) {
+    eq *= 1 + r;
+    if (eq > peak) peak = eq;
+    const dd = (peak - eq) / peak;
+    if (dd > maxdd) maxdd = dd;
+  }
+
+  return {
+    days: book.length,
+    bookSharpe30: last30.length >= min30 ? annSharpe(last30) : null,
+    bookSharpe60: last60.length >= min60 ? annSharpe(last60) : null,
+    bookDrawdown: maxdd,
+  };
+}
+
+/** Write the book governance signal JSON to `dir/book-governance.json`. */
+export function writeBookGovernanceSignal(dir: string, signal: BookGovernanceSignal): void {
+  fs.writeFileSync(path.join(dir, SIGNAL_FILE), JSON.stringify(signal, null, 2));
+}
+
+/**
+ * Read and validate the book governance signal.
+ * Fail-open: missing / stale / corrupt → null (never throws).
+ *
+ * @param dir       Directory containing `book-governance.json`.
+ * @param nowMs     Current epoch milliseconds (injected for testability).
+ * @param maxAgeMs  Maximum acceptable signal age in milliseconds.
+ */
+export function readBookGovernanceSignal(
+  dir: string,
+  nowMs: number,
+  maxAgeMs: number,
+): BookGovernanceDecision | null {
+  try {
+    const raw = fs.readFileSync(path.join(dir, SIGNAL_FILE), 'utf-8');
+    const s = JSON.parse(raw) as BookGovernanceSignal;
+    if (typeof s.asOfMs !== 'number' || nowMs - s.asOfMs > maxAgeMs) return null;
+    return {
+      action: s.action,
+      multiplier: s.multiplier,
+      reason: s.reason,
+      watch: false,
+      reviewRequired: false,
+    };
+  } catch {
+    return null;
+  }
 }
