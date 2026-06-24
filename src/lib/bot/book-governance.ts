@@ -117,7 +117,7 @@ function std(xs: number[]): number {
 
 function annSharpe(xs: number[]): number {
   const s = std(xs);
-  return s > 0 ? (mean(xs) / s) * Math.sqrt(252) : 0;
+  return s > 1e-10 ? (mean(xs) / s) * Math.sqrt(252) : 0;
 }
 
 /**

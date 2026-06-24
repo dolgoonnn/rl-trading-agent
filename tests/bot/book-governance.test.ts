@@ -60,22 +60,49 @@ describe('decideBookGovernance', () => {
 });
 
 describe('computeBookGovernanceState', () => {
+  // 40 valid ISO dates starting 2025-01-01 (crosses into February)
+  const dates40 = Array.from({ length: 40 }, (_, i) =>
+    new Date(2025, 0, 1 + i).toISOString().slice(0, 10),
+  );
+
   it('weighted book series ⇒ positive Sharpe when sleeves trend up', () => {
-    const mk = (base: number) => Object.fromEntries(
-      Array.from({ length: 40 }, (_, i) => [`2025-01-${String(i + 1).padStart(2, '0')}`.slice(0, 10), base]),
-    );
-    // 40 days of small positive daily returns per sleeve
+    // Upward-trending returns: base + i*0.00005 → mean > 0, std > 0
+    const mkTrend = (base: number) =>
+      Object.fromEntries(dates40.map((d, i) => [d, base + i * 0.00005]));
+
     const sleeves = [
-      { name: 'crypto', byDay: mk(0.002) },
-      { name: 'sessionBookRetail', byDay: mk(0.0015) },
-      { name: 'f2f', byDay: mk(0.001) },
+      { name: 'crypto', byDay: mkTrend(0.002) },
+      { name: 'sessionBookRetail', byDay: mkTrend(0.0015) },
+      { name: 'f2f', byDay: mkTrend(0.001) },
     ];
-    const st = computeBookGovernanceState(sleeves, { crypto: 0.5, sessionBookRetail: 0.3, f2f: 0.2 }, 365);
+    const st = computeBookGovernanceState(
+      sleeves,
+      { crypto: 0.5, sessionBookRetail: 0.3, f2f: 0.2 },
+      365,
+    );
     expect(st.days).toBe(40);
-    expect(st.bookSharpe30).not.toBeNull();
-    // 40 days >= min60 gate of 20 obs, so bookSharpe60 is non-null
-    expect(st.bookSharpe60).not.toBeNull();
+    expect(st.bookSharpe30).toBeGreaterThan(0);
+    // 40 days >= min60 gate of 20 obs
+    expect(st.bookSharpe60).toBeGreaterThan(0);
     expect(st.bookDrawdown).toBeGreaterThanOrEqual(0);
+  });
+
+  it('constant-return series ⇒ bookSharpe30 === 0 (Fix 1: zero-std fp-noise guard)', () => {
+    // All returns identical → std ≈ 8.8e-19 (IEEE-754 fp noise), must clamp to 0
+    const mkFlat = (val: number) => Object.fromEntries(dates40.map((d) => [d, val]));
+
+    const sleeves = [
+      { name: 'crypto', byDay: mkFlat(0.002) },
+      { name: 'sessionBookRetail', byDay: mkFlat(0.0015) },
+      { name: 'f2f', byDay: mkFlat(0.001) },
+    ];
+    const st = computeBookGovernanceState(
+      sleeves,
+      { crypto: 0.5, sessionBookRetail: 0.3, f2f: 0.2 },
+      365,
+    );
+    expect(st.bookSharpe30).toBe(0);
+    expect(st.bookSharpe60).toBe(0);
   });
 });
 
