@@ -360,14 +360,17 @@ class TradingBot {
     // FIX-3: be HONEST about which retirement halt legs can actually fire. Two
     // legs (regime/mechanism + charter-p5 path) are DISABLED-pending-inputs, so
     // an operator is not misled into thinking 5 protections are live.
+    // NOTE: dsrBreachK is overridden to 0 in the live call path (see evaluateRetirement),
+    // so the sleeve sustained-DSR streak hard halt can NEVER fire — edge-decay is now
+    // governed at the BOOK level via the book-governance signal instead.
     const activeHalts = [
       'absolute-DD hard halt',
-      `sustained-DSR streak hard halt (k=${RETIREMENT_CONFIG.dsrBreachK}, n>=${RETIREMENT_CONFIG.minTrackRecordLength})`,
       'soft de-risk band (eMaxDD→hardKillDD, ×0.5)',
     ];
     const disabledHalts = [
       ...(RETIREMENT_CONFIG.regimeHaltEnabled ? [] : ['regime/mechanism (no detector wired)']),
       ...(RETIREMENT_CONFIG.charterPathHaltEnabled ? [] : ['charter-p5 path (no cumulative-PnL probe wired)']),
+      `sleeve sustained-DSR streak — RE-SCOPED to book level (dsrBreachK overridden to 0; edge-decay now governed by the book-governance signal, source book-governance)`,
     ];
     console.log(`Retirement ACTIVE halts: ${activeHalts.join('; ')}`);
     if (disabledHalts.length > 0) {
@@ -717,6 +720,8 @@ class TradingBot {
       console.log(
         `  RETIREMENT DE-RISK (${combined.source}): ${cause} → sizing × ${combined.multiplier}`,
       );
+    } else if (this.config.verbose) {
+      console.log(`  RETIREMENT: all clear — full size`);
     }
   }
 
