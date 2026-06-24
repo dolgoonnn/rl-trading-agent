@@ -73,3 +73,6 @@ logs/
 
 # Local agent state (Claude Code, Ralph loop) — never commit
 .claude/
+.superpowers/
+data/*.db.bak*
+simulation-report.html
