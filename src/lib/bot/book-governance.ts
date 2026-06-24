@@ -205,3 +205,37 @@ export function readBookGovernanceSignal(
     return null;
   }
 }
+
+// ── Task 5: combine local sleeve + book-level governance (most conservative wins) ──
+
+export interface LocalGovernance {
+  localMultiplier: number;
+  localHalt: boolean;
+}
+
+export interface CombinedGovernance {
+  multiplier: number;
+  halt: boolean;
+  source: 'local' | 'book';
+}
+
+/**
+ * Most-conservative-wins: the book signal can only TIGHTEN, never loosen, the
+ * local (sleeve-level) decision.
+ *
+ * Priority:
+ *   1. Local halt          → halt (source='local'), regardless of book.
+ *   2. book === null       → fail-open; keep local multiplier (source='local').
+ *   3. book.action='halt'  → halt (source='book').
+ *   4. Otherwise           → min(local, book) multiplier; source='book' if book tightens.
+ */
+export function combineGovernance(
+  local: LocalGovernance,
+  book: BookGovernanceDecision | null,
+): CombinedGovernance {
+  if (local.localHalt) return { multiplier: 0, halt: true, source: 'local' };
+  if (book === null) return { multiplier: local.localMultiplier, halt: false, source: 'local' };
+  if (book.action === 'halt') return { multiplier: 0, halt: true, source: 'book' };
+  const m = Math.min(local.localMultiplier, book.multiplier);
+  return { multiplier: m, halt: false, source: m < local.localMultiplier ? 'book' : 'local' };
+}
