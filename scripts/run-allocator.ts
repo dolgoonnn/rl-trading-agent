@@ -31,6 +31,12 @@ import * as path from 'path';
 import { getCppiExposureMultiplier } from '../src/lib/bot/risk-engine';
 import { expectedMaxDD, hardKillDD } from '../src/lib/bot/retirement';
 import { RETIREMENT_CONFIG } from '../src/lib/bot/config';
+import {
+  computeBookGovernanceState,
+  decideBookGovernance,
+  writeBookGovernanceSignal,
+} from '../src/lib/bot/book-governance';
+import { BOOK_GOVERNANCE_CONFIG } from '../src/lib/bot/config';
 
 // ============================================
 // Config
@@ -243,43 +249,49 @@ function rollingFromDaily(byDay: Map<string, number>): SleeveLive {
   };
 }
 
-function liveSessionBook(): SleeveLive {
-  const p = path.resolve(__dirname, '..', 'data', 'metals-bot-state.json');
-  const out: SleeveLive = { sleeve: 'sessionBookRetail', days: 0, cumPnlPct: 0, sharpe30: null, sharpe60: null, status: 'NO DATA' };
-  try {
-    const st = JSON.parse(fs.readFileSync(p, 'utf-8')) as { trades: Array<{ exitTime: string; pnlPct: number }> };
-    const byDay = new Map<string, number>();
-    for (const t of st.trades) {
-      const d = t.exitTime.slice(0, 10);
-      byDay.set(d, (byDay.get(d) ?? 0) + t.pnlPct / 100);
-    }
-    Object.assign(out, rollingFromDaily(byDay), { sleeve: 'sessionBookRetail' });
-    out.status = statusOf(out.sharpe30, out.sharpe60, out.days);
-  } catch { /* no data */ }
-  return out;
+interface SleeveResult {
+  live: SleeveLive;
+  byDay: Record<string, number>;
 }
 
-function liveF2F(): SleeveLive {
+function liveSessionBook(): SleeveResult {
+  const p = path.resolve(__dirname, '..', 'data', 'metals-bot-state.json');
+  const out: SleeveLive = { sleeve: 'sessionBookRetail', days: 0, cumPnlPct: 0, sharpe30: null, sharpe60: null, status: 'NO DATA' };
+  const byDayMap = new Map<string, number>();
+  try {
+    const st = JSON.parse(fs.readFileSync(p, 'utf-8')) as { trades: Array<{ exitTime: string; pnlPct: number }> };
+    for (const t of st.trades) {
+      const d = t.exitTime.slice(0, 10);
+      byDayMap.set(d, (byDayMap.get(d) ?? 0) + t.pnlPct / 100);
+    }
+    Object.assign(out, rollingFromDaily(byDayMap), { sleeve: 'sessionBookRetail' });
+    out.status = statusOf(out.sharpe30, out.sharpe60, out.days);
+  } catch { /* no data */ }
+  return { live: out, byDay: Object.fromEntries(byDayMap) };
+}
+
+function liveF2F(): SleeveResult {
   const p = path.resolve(__dirname, '..', 'data', 'gold-bot-state.json');
   const out: SleeveLive = { sleeve: 'f2f', days: 0, cumPnlPct: 0, sharpe30: null, sharpe60: null, status: 'NO DATA' };
+  const byDayMap = new Map<string, number>();
   try {
     const st = JSON.parse(fs.readFileSync(p, 'utf-8')) as { equity?: number; initialCapital?: number; trades?: Array<{ exitTime?: string; pnlPercent?: number }> };
-    const byDay = new Map<string, number>();
     for (const t of st.trades ?? []) {
       if (t.exitTime && typeof t.pnlPercent === 'number') {
         const d = t.exitTime.slice(0, 10);
-        byDay.set(d, (byDay.get(d) ?? 0) + t.pnlPercent);
+        byDayMap.set(d, (byDayMap.get(d) ?? 0) + t.pnlPercent);
       }
     }
-    Object.assign(out, rollingFromDaily(byDay), { sleeve: 'f2f' });
+    Object.assign(out, rollingFromDaily(byDayMap), { sleeve: 'f2f' });
     if (st.equity && st.initialCapital) out.cumPnlPct = Math.round((st.equity / st.initialCapital - 1) * 1e4) / 100;
     out.status = statusOf(out.sharpe30, out.sharpe60, out.days);
   } catch { /* no data */ }
-  return out;
+  return { live: out, byDay: Object.fromEntries(byDayMap) };
 }
 
-function liveCrypto(): SleeveLive {
+function liveCrypto(): SleeveResult {
   const out: SleeveLive = { sleeve: 'crypto', days: 0, cumPnlPct: 0, sharpe30: null, sharpe60: null, status: 'NO DATA' };
+  const byDayMap = new Map<string, number>();
   try {
     // best-effort dynamic require so the allocator works even if the DB is locked/full
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -294,20 +306,19 @@ function liveCrypto(): SleeveLive {
     for (const r of rows) {
       eqByDay.set(new Date(r.timestamp).toISOString().slice(0, 10), r.equity);
     }
-    const days = [...eqByDay.keys()].sort();
-    const byDay = new Map<string, number>();
-    for (let i = 1; i < days.length; i++) {
-      const prev = eqByDay.get(days[i - 1]!)!;
-      const cur = eqByDay.get(days[i]!)!;
-      if (prev > 0) byDay.set(days[i]!, cur / prev - 1);
+    const eqDays = [...eqByDay.keys()].sort();
+    for (let i = 1; i < eqDays.length; i++) {
+      const prev = eqByDay.get(eqDays[i - 1]!)!;
+      const cur = eqByDay.get(eqDays[i]!)!;
+      if (prev > 0) byDayMap.set(eqDays[i]!, cur / prev - 1);
     }
-    Object.assign(out, rollingFromDaily(byDay), { sleeve: 'crypto' });
-    const first = eqByDay.get(days[0]!);
-    const last = eqByDay.get(days[days.length - 1]!);
+    Object.assign(out, rollingFromDaily(byDayMap), { sleeve: 'crypto' });
+    const first = eqByDay.get(eqDays[0]!);
+    const last = eqByDay.get(eqDays[eqDays.length - 1]!);
     if (first && last && first > 0) out.cumPnlPct = Math.round((last / first - 1) * 1e4) / 100;
     out.status = statusOf(out.sharpe30, out.sharpe60, out.days);
   } catch { /* DB unavailable */ }
-  return out;
+  return { live: out, byDay: Object.fromEntries(byDayMap) };
 }
 
 // ============================================
@@ -338,13 +349,40 @@ function main(): void {
 
   console.log('Live sleeve monitor (paper bots):');
   console.log('sleeve            | days | cumPnL% | 30d Sharpe | 60d Sharpe | status');
-  const lives = [liveCrypto(), liveSessionBook(), liveF2F()];
+  const cryptoResult = liveCrypto();
+  const sessionResult = liveSessionBook();
+  const f2fResult = liveF2F();
+  const lives = [cryptoResult.live, sessionResult.live, f2fResult.live];
   for (const l of lives) {
     console.log(
       `${l.sleeve.padEnd(17)} | ${String(l.days).padStart(4)} | ${String(l.cumPnlPct).padStart(7)} | ${String(l.sharpe30 ?? '—').padStart(10)} | ${String(l.sharpe60 ?? '—').padStart(10)} | ${l.status}`,
     );
   }
   console.log('\nRules: WATCH = 30d Sharpe < 0 (normal, observe). BREACH = 60d Sharpe < −1 (review before kill).');
+
+  // ── Book-level governance ─────────────────────────────────────────────────
+  const bookState = computeBookGovernanceState(
+    [
+      { name: 'crypto', byDay: cryptoResult.byDay },
+      { name: 'sessionBookRetail', byDay: sessionResult.byDay },
+      { name: 'f2f', byDay: f2fResult.byDay },
+    ],
+    CLUSTER_WEIGHTS,
+    365,
+    BOOK_GOVERNANCE_CONFIG.min30,
+    BOOK_GOVERNANCE_CONFIG.min60,
+  );
+  const bookDecision = decideBookGovernance({ ...bookState, config: BOOK_GOVERNANCE_CONFIG });
+  const nowMs = Number(process.env.GOV_NOW_MS) || Date.now();
+  writeBookGovernanceSignal(path.resolve(__dirname, '..', 'data'), {
+    ...bookState,
+    action: bookDecision.action,
+    multiplier: bookDecision.multiplier,
+    reason: bookDecision.reason,
+    asOfMs: nowMs,
+  });
+  console.log(`\nBOOK GOVERNANCE: ${bookDecision.action.toUpperCase()} ×${bookDecision.multiplier} — ${bookDecision.reason}`);
+  console.log(`  book: 30d Sharpe ${bookState.bookSharpe30 ?? '—'}, 60d Sharpe ${bookState.bookSharpe60 ?? '—'}, DD ${(bookState.bookDrawdown * 100).toFixed(1)}%, days ${bookState.days}`);
 
   const outPath = path.resolve(__dirname, '..', 'experiments', 'runs', 'allocator-report.json');
   fs.writeFileSync(outPath, JSON.stringify({
