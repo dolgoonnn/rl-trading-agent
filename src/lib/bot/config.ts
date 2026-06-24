@@ -268,9 +268,9 @@ export const RETIREMENT_CONFIG: RetirementConfig = {
   maxConsecutiveLossesPerSymbol: 4,
   heartbeatTimeoutMs: 7_200_000,
   charterBreachK: 3,
-  // dsrBreachK 3 → three consecutive sub-floor deflated-Sharpe checks (each with
-  // n >= MinTRL) escalate the DSR layer to a HARD halt even without a regime
-  // cause. One reading is noise; three sustained breaches are an edge collapse.
+  // dsrBreachK 3 → per-sleeve sustained-DSR HARD halt. As of book-governance
+  // (2026-06-24) run-bot.ts overrides this to 0 at the call site: edge-decay is
+  // judged at the BOOK level; the sleeve keeps only its absolute-DD hard stop.
   dsrBreachK: 3,
   // FIX-3 feature flags — DEFAULT FALSE = leg NOT wired (see RetirementConfig docs).
   // regimeHaltEnabled: enable AFTER an edge-triggered regime-decay detector feeds

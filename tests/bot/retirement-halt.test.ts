@@ -315,6 +315,37 @@ describe('checkRetirementHalt — FIX-3 active halt set (default config, both fl
   });
 });
 
+describe('checkRetirementHalt — dsrBreachK=0 re-scopes sustained-DSR to soft de-risk', () => {
+  it('with dsrBreachK=0 a sustained sub-floor DSR DE-RISKS (not hard halt)', () => {
+    const base = {
+      nowMs: 0,
+      drawdown: 0.02,
+      rollingSharpe: 0.1,
+      snapshotCount: 80,
+      minTrackRecordLength: 50,
+      regimeCause: false,
+      charterBreachConsecutive: 0,
+      dsrBreachConsecutive: 99,
+      eMaxDD: 0.19,
+      hardKillDD: 0.30,
+      trialCount: 200,
+      minAcceptableSharpe: 0.5,
+      psr: 0.95,
+      charterBreachK: 3,
+      regimeHaltEnabled: false,
+      charterPathHaltEnabled: false,
+    };
+
+    const halted = checkRetirementHalt({ ...base, dsrBreachK: 3 });
+    expect(halted.action).toBe('halt'); // current sleeve behaviour
+    expect(halted.multiplier).toBe(0);
+
+    const rescoped = checkRetirementHalt({ ...base, dsrBreachK: 0 });
+    expect(rescoped.action).toBe('derisk'); // new behaviour: soft, not hard
+    expect(rescoped.multiplier).toBe(0.5);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // minTrackRecordLength helper
 // ---------------------------------------------------------------------------
