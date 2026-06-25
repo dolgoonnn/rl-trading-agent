@@ -81,6 +81,7 @@ import type { SimPosition, SimConfig } from './types';
 import type { FillModel } from './fill-model';
 import { simulatePosition } from './simulator';
 import type { Candle } from '@/types/candle';
+import { resolveSimConfig } from './resolve-config';
 
 // Drizzle DB type scoped to the project schema
 type DrizzleDB = BetterSQLite3Database<typeof schema>;
@@ -125,4 +126,22 @@ export function replayTrade(
   // entryIndex = i). Entering at a bar's close means that already-closed bar
   // cannot fill the position — checking it would manufacture false sim/live drift.
   return simulatePosition(position, candles, startIndex + 1, { fillModel, config });
+}
+
+/**
+ * Replay a live bot trade using the exact SimConfig the strategy ran with.
+ *
+ * This is the seam that fixes the pre-fix bug where every row was replayed
+ * through a hardcoded `simple` config regardless of strategy. Now each row's
+ * strategy is resolved to its deployed config (e.g. order_block → partial_tp),
+ * so the blend math in simulatePosition matches what the live bot did.
+ *
+ * Pure (no DB, no Date.now, no fetch) — delegates to replayTrade.
+ */
+export function replayLiveRow(
+  row: BotTradeRow,
+  candles: Candle[],
+  fillModel: FillModel,
+): SimTradeResult | null {
+  return replayTrade(row, candles, fillModel, resolveSimConfig(row.strategy));
 }
