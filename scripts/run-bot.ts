@@ -57,7 +57,12 @@ import {
   evaluateRetirementHalt,
   resolveEffectiveKill,
 } from '../src/lib/bot/retirement';
-import { RETIREMENT_CONFIG, SAFETY_GATE_CONFIG, SYMBOL_ALLOCATION } from '../src/lib/bot/config';
+import { RETIREMENT_CONFIG, SAFETY_GATE_CONFIG, SYMBOL_ALLOCATION, BOOK_GOVERNANCE_CONFIG } from '../src/lib/bot/config';
+import {
+  readBookGovernanceSignal,
+  combineGovernance,
+} from '../src/lib/bot/book-governance';
+import path from 'node:path';
 import { db } from '../src/lib/data/db';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import type { BotConfig, BotSymbol, BotPosition, LTFConfig } from '../src/types/bot';
@@ -203,6 +208,9 @@ class TradingBot {
   private retirementMultiplier = 1;
   // Dedupes the retirement HALT alert/log so a sustained halt does not spam.
   private retirementAlerted = false;
+  // Directory where the book-governance.json signal is written by the governor
+  // (same base dir as data/ict-trading.db — resolved once at construction).
+  private dataDir: string;
   // NOTE (Issue A / FIX-3): an EDGE-TRIGGERED regime/mechanism cause would be
   // memoed here (last-seen regime tag) so we raise regimeCause only on a FRESH
   // decay transition, never as a sticky level. No regime-decay detector feeds the
@@ -224,6 +232,9 @@ class TradingBot {
   ) {
     this.config = config;
     this.arbOnly = arbOnly;
+    // Same base dir as data/ict-trading.db (process.cwd()/data) — the governor
+    // writes book-governance.json here; we read it on each retirement tick.
+    this.dataDir = path.join(process.cwd(), 'data');
 
     // Initialize components
     this.dataFeed = new DataFeed();
@@ -349,14 +360,17 @@ class TradingBot {
     // FIX-3: be HONEST about which retirement halt legs can actually fire. Two
     // legs (regime/mechanism + charter-p5 path) are DISABLED-pending-inputs, so
     // an operator is not misled into thinking 5 protections are live.
+    // NOTE: dsrBreachK is overridden to 0 in the live call path (see evaluateRetirement),
+    // so the sleeve sustained-DSR streak hard halt can NEVER fire — edge-decay is now
+    // governed at the BOOK level via the book-governance signal instead.
     const activeHalts = [
       'absolute-DD hard halt',
-      `sustained-DSR streak hard halt (k=${RETIREMENT_CONFIG.dsrBreachK}, n>=${RETIREMENT_CONFIG.minTrackRecordLength})`,
       'soft de-risk band (eMaxDD→hardKillDD, ×0.5)',
     ];
     const disabledHalts = [
       ...(RETIREMENT_CONFIG.regimeHaltEnabled ? [] : ['regime/mechanism (no detector wired)']),
       ...(RETIREMENT_CONFIG.charterPathHaltEnabled ? [] : ['charter-p5 path (no cumulative-PnL probe wired)']),
+      `sleeve sustained-DSR streak — RE-SCOPED to book level (dsrBreachK overridden to 0; edge-decay now governed by the book-governance signal, source book-governance)`,
     ];
     console.log(`Retirement ACTIVE halts: ${activeHalts.join('; ')}`);
     if (disabledHalts.length > 0) {
@@ -621,6 +635,9 @@ class TradingBot {
     const deflatedSharpe = obs?.deflatedSharpe ?? null;
     const snapshotCount = obs?.n ?? 0;
 
+    // dsrBreachK overridden to 0: edge-decay is judged at the BOOK level via
+    // combineGovernance below. The sleeve keeps only the absolute-DD hard halt
+    // (which lives inside evaluateRetirementHalt and is unaffected by dsrBreachK).
     const result = evaluateRetirementHalt({
       nowMs,
       drawdown: this.tracker.getDrawdown(),
@@ -629,19 +646,38 @@ class TradingBot {
       regimeCause: this.consumeRegimeCause(),
       charterBreachConsecutive: this.charterBreachConsecutive,
       dsrBreachConsecutive: this.dsrBreachConsecutive,
-      config: RETIREMENT_CONFIG,
+      config: { ...RETIREMENT_CONFIG, dsrBreachK: 0 },
     });
 
     // Persist the advanced sustained-DSR counter for the next tick.
     this.dsrBreachConsecutive = result.dsrBreachConsecutive;
 
-    if (result.decision.action === 'halt') {
+    // Read the book-level governance signal (fail-open: null if stale/missing).
+    const book = readBookGovernanceSignal(
+      this.dataDir,
+      nowMs,
+      BOOK_GOVERNANCE_CONFIG.signalMaxAgeMs,
+    );
+
+    // Most-conservative-wins: book can only tighten the local (sleeve) decision.
+    const localHalt = result.decision.action === 'halt';
+    const combined = combineGovernance(
+      { localMultiplier: result.decision.multiplier, localHalt },
+      book,
+    );
+
+    if (combined.halt) {
       // Latch the durable DB kill flag — blocks entries here AND on every future
       // tick (reduce-only). Idempotent: setKillFlag writes the singleton row id=1.
+      const killSource = combined.source === 'book' ? 'book-governance' : 'retirement';
+      const killCause =
+        combined.source === 'book'
+          ? (book?.reason ?? 'book hard halt')
+          : result.decision.cause;
       setKillFlag(db, {
         halted: true,
-        source: 'retirement',
-        reason: result.decision.cause,
+        source: killSource,
+        reason: killCause,
         nowMs,
       });
       this.retirementMultiplier = 0;
@@ -652,7 +688,7 @@ class TradingBot {
             type: 'halt',
             detail: {
               kind: 'retirement',
-              cause: result.decision.cause,
+              cause: killCause,
               drawdown: this.tracker.getDrawdown(),
               hardKillDD: result.hardKillDD,
               deflatedSharpe,
@@ -664,8 +700,8 @@ class TradingBot {
           console.warn('[run-bot] failed to append retirement halt decision_log:', err);
         }
         await this.alerts.circuitBreakerTriggered(
-          'retirement',
-          `RETIREMENT HALT: ${result.decision.cause} — reduce-only (new entries blocked, manual review required)`,
+          killSource,
+          `RETIREMENT HALT (${killSource}): ${killCause} — reduce-only (new entries blocked, manual review required)`,
         );
       }
       return;
@@ -674,13 +710,18 @@ class TradingBot {
     // Not a hard halt — clear the alert dedupe so a future trip re-alerts.
     this.retirementAlerted = false;
 
-    if (result.decision.action === 'derisk') {
-      this.retirementMultiplier = result.decision.multiplier; // 0.5
-      if (this.config.verbose) {
-        console.log(`  RETIREMENT DE-RISK: ${result.decision.cause} → sizing × ${result.decision.multiplier}`);
-      }
-    } else {
-      this.retirementMultiplier = 1;
+    // Apply the most-conservative multiplier from either layer.
+    this.retirementMultiplier = combined.multiplier; // 1, 0.5, or book-driven value
+    if (this.config.verbose && combined.multiplier < 1) {
+      const cause =
+        combined.source === 'book'
+          ? (book?.reason ?? 'book de-risk')
+          : result.decision.cause;
+      console.log(
+        `  RETIREMENT DE-RISK (${combined.source}): ${cause} → sizing × ${combined.multiplier}`,
+      );
+    } else if (this.config.verbose) {
+      console.log(`  RETIREMENT: all clear — full size`);
     }
   }
 

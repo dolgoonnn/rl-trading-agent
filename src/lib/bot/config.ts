@@ -268,9 +268,9 @@ export const RETIREMENT_CONFIG: RetirementConfig = {
   maxConsecutiveLossesPerSymbol: 4,
   heartbeatTimeoutMs: 7_200_000,
   charterBreachK: 3,
-  // dsrBreachK 3 → three consecutive sub-floor deflated-Sharpe checks (each with
-  // n >= MinTRL) escalate the DSR layer to a HARD halt even without a regime
-  // cause. One reading is noise; three sustained breaches are an edge collapse.
+  // dsrBreachK 3 → per-sleeve sustained-DSR HARD halt. As of book-governance
+  // (2026-06-24) run-bot.ts overrides this to 0 at the call site: edge-decay is
+  // judged at the BOOK level; the sleeve keeps only its absolute-DD hard stop.
   dsrBreachK: 3,
   // FIX-3 feature flags — DEFAULT FALSE = leg NOT wired (see RetirementConfig docs).
   // regimeHaltEnabled: enable AFTER an edge-triggered regime-decay detector feeds
@@ -279,6 +279,49 @@ export const RETIREMENT_CONFIG: RetirementConfig = {
   // charterPathHaltEnabled: enable AFTER a charter-p5 cumulative-PnL-vs-path probe
   //   feeds `charterBreachConsecutive` (today it is declared =0 and never mutated).
   charterPathHaltEnabled: false,
+};
+
+// ============================================
+// Book-Level Governance
+// ============================================
+
+/**
+ * BOOK-LEVEL governance (the central "risk team" over the sleeves).
+ * Thresholds copied verbatim from scripts/run-allocator.ts:statusOf so the
+ * automatic governor matches the documented monitor:
+ *   WATCH  = 30d annualised Sharpe < 0   → OBSERVE only (a flat stretch is normal)
+ *   BREACH = 60d annualised Sharpe < -1  → auto de-risk ×0.5 + flag for human review
+ *   book DD >= hardKillDD                 → HARD halt (catastrophe; reuses frozen DD bounds)
+ * minDays/min30/min60 mirror rollingFromDaily's data gates (10/10/20).
+ */
+export interface BookGovernanceConfig {
+  watchSharpe30: number;
+  breachSharpe60: number;
+  deriskMultiplier: number;
+  minDays: number;
+  min30: number;
+  min60: number;
+  /** Reused frozen DD inputs (same family as RETIREMENT_CONFIG). */
+  sigmaAnnual: number;
+  sharpe: number;
+  horizonYears: number;
+  bootstrapP5DD: number;
+  /** A signal older than this (ms) is treated as STALE ⇒ fail-open. */
+  signalMaxAgeMs: number;
+}
+
+export const BOOK_GOVERNANCE_CONFIG: BookGovernanceConfig = {
+  watchSharpe30: 0,
+  breachSharpe60: -1.0,
+  deriskMultiplier: 0.5,
+  minDays: 10,
+  min30: 10,
+  min60: 20,
+  sigmaAnnual: RETIREMENT_CONFIG.sigmaAnnual,
+  sharpe: RETIREMENT_CONFIG.sharpe,
+  horizonYears: RETIREMENT_CONFIG.horizonYears,
+  bootstrapP5DD: RETIREMENT_CONFIG.bootstrapP5DD,
+  signalMaxAgeMs: 90 * 60 * 1000, // 90 min: the governor runs ≤ every 30 min
 };
 
 // ============================================

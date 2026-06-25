@@ -58,6 +58,7 @@ ict-trading.db
 data/allocator-recommendations.json
 data/decay-status.json
 data/decay-alerts-log.json
+data/book-governance.json
 
 # 1m candle datasets (100-500MB each — regenerate via scripts/download-gold-1m.ts etc.)
 data/*_1m.json
@@ -73,3 +74,6 @@ logs/
 
 # Local agent state (Claude Code, Ralph loop) — never commit
 .claude/
+.superpowers/
+data/*.db.bak*
+simulation-report.html
