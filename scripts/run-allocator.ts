@@ -322,6 +322,48 @@ function liveCrypto(): SleeveResult {
 }
 
 // ============================================
+// Book-governance signal emitter (exported for the governor loop)
+// ============================================
+
+/**
+ * Compute the current book state from live sleeve data, decide the governance
+ * action, and atomically refresh `data/book-governance.json`.
+ *
+ * This is EXPORTED so `scripts/run-governor-loop.ts` can call it on a cadence
+ * without re-running the full allocator CLI. Importing this module does NOT
+ * trigger `main()` — that is guarded by `require.main === module`.
+ *
+ * Returns the action + reason for the caller to log.
+ */
+export function emitBookGovernanceSignal(): { action: string; reason: string } {
+  const cryptoResult = liveCrypto();
+  const sessionResult = liveSessionBook();
+  const f2fResult = liveF2F();
+
+  const bookState = computeBookGovernanceState(
+    [
+      { name: 'crypto', byDay: cryptoResult.byDay },
+      { name: 'sessionBookRetail', byDay: sessionResult.byDay },
+      { name: 'f2f', byDay: f2fResult.byDay },
+    ],
+    CLUSTER_WEIGHTS,
+    365,
+    BOOK_GOVERNANCE_CONFIG.min30,
+    BOOK_GOVERNANCE_CONFIG.min60,
+  );
+  const bookDecision = decideBookGovernance({ ...bookState, config: BOOK_GOVERNANCE_CONFIG });
+  const nowMs = Number(process.env.GOV_NOW_MS) || Date.now();
+  writeBookGovernanceSignal(path.resolve(__dirname, '..', 'data'), {
+    ...bookState,
+    action: bookDecision.action,
+    multiplier: bookDecision.multiplier,
+    reason: bookDecision.reason,
+    asOfMs: nowMs,
+  });
+  return { action: bookDecision.action, reason: bookDecision.reason };
+}
+
+// ============================================
 // Main
 // ============================================
 
@@ -361,6 +403,9 @@ function main(): void {
   console.log('\nRules: WATCH = 30d Sharpe < 0 (normal, observe). BREACH = 60d Sharpe < −1 (review before kill).');
 
   // ── Book-level governance ─────────────────────────────────────────────────
+  const { action, reason } = emitBookGovernanceSignal();
+  // Re-read the state purely for the console summary (emitBookGovernanceSignal
+  // already wrote the signal; we just need the Sharpe/DD numbers for display).
   const bookState = computeBookGovernanceState(
     [
       { name: 'crypto', byDay: cryptoResult.byDay },
@@ -372,16 +417,7 @@ function main(): void {
     BOOK_GOVERNANCE_CONFIG.min30,
     BOOK_GOVERNANCE_CONFIG.min60,
   );
-  const bookDecision = decideBookGovernance({ ...bookState, config: BOOK_GOVERNANCE_CONFIG });
-  const nowMs = Number(process.env.GOV_NOW_MS) || Date.now();
-  writeBookGovernanceSignal(path.resolve(__dirname, '..', 'data'), {
-    ...bookState,
-    action: bookDecision.action,
-    multiplier: bookDecision.multiplier,
-    reason: bookDecision.reason,
-    asOfMs: nowMs,
-  });
-  console.log(`\nBOOK GOVERNANCE: ${bookDecision.action.toUpperCase()} ×${bookDecision.multiplier} — ${bookDecision.reason}`);
+  console.log(`\nBOOK GOVERNANCE: ${action.toUpperCase()} — ${reason}`);
   console.log(`  book: 30d Sharpe ${bookState.bookSharpe30 ?? '—'}, 60d Sharpe ${bookState.bookSharpe60 ?? '—'}, DD ${(bookState.bookDrawdown * 100).toFixed(1)}%, days ${bookState.days}`);
 
   const outPath = path.resolve(__dirname, '..', 'experiments', 'runs', 'allocator-report.json');

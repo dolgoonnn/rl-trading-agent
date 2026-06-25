@@ -133,6 +133,33 @@ module.exports = {
       listen_timeout: 10000,
     },
     {
+      // Book-level governance signal refresh. Reads live sleeve data every 15
+      // minutes and rewrites data/book-governance.json (trade / derisk / halt).
+      // The crypto bot reads this file fail-open: a dead governor never freezes
+      // trading — the bot falls back to `trade` after a 90-min staleness window.
+      name: 'book-governor',
+      script: './node_modules/.bin/tsx',
+      args: 'scripts/run-governor-loop.ts',
+      cwd: __dirname,
+      exec_mode: 'fork',
+      interpreter: 'none',
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '256M',
+      restart_delay: 30000,
+      max_restarts: 1000,
+      min_uptime: '30s',
+      env: {
+        NODE_ENV: 'production',
+      },
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      error_file: 'logs/book-governor-error.log',
+      out_file: 'logs/book-governor-out.log',
+      merge_logs: true,
+      kill_timeout: 10000,
+      listen_timeout: 10000,
+    },
+    {
       // L2 order-flow collector (read-only public Bybit WS). Accumulates 1s
       // snapshots (mid, spreadBps, bidDepth5/askDepth5, imb5/25) + publicTrade +
       // allLiquidation to data/orderflow/ — the precondition for the blocked
