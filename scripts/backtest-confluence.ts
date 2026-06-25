@@ -62,6 +62,8 @@ import {
   type SimConfig,
   type SimPosition,
   type EntryTiming,
+  buildDumpedPosition,
+  type DumpedPosition,
 } from '../src/lib/sim';
 
 // ============================================
@@ -779,6 +781,7 @@ function createConfluenceRunner(
   futuresDataMap?: Map<string, { timestamp: number; fundingRate: number }[]>,
   chargeFunding = false,
   entryTiming: EntryTiming = 'signal_close',
+  dumpedPositions?: DumpedPosition[],
 ): {
   runner: WalkForwardStrategyRunner;
   allTrades: TradeResult[];
@@ -917,6 +920,12 @@ function createConfluenceRunner(
             entryTimestamp: candle.timestamp,
             strategy: signal.strategy,
           };
+
+          // --dump-positions: capture canonical entry (RAW signal price, post-regime SL/TP adjust)
+          // Only runs when the flag is set; zero overhead when dumpedPositions is undefined.
+          if (dumpedPositions !== undefined && meta?.symbol !== undefined) {
+            dumpedPositions.push(buildDumpedPosition(position, meta.symbol));
+          }
 
           // Simulate the trade from the next bar forward
           let trade: TradeResult | null;
@@ -1614,6 +1623,7 @@ async function main(): Promise<void> {
   const makerBpsArg = getArg('maker-bps'); // --maker-bps 2 (passive TP exit leg, per side)
   const takerBpsArg = getArg('taker-bps'); // --taker-bps 5.5 (entry + SL/timeout exit leg, per side)
   const entryTimingArg = getArg('entry-timing'); // --entry-timing signal_close|next_open
+  const dumpPositionsArg = getArg('dump-positions'); // --dump-positions <path> (canonical entries → JSON)
 
   // Gold-specific args
   const goldRangeMinArg = getArg('asian-range-min'); // --asian-range-min 0.15 (min Asian range %)
@@ -2002,9 +2012,13 @@ async function main(): Promise<void> {
     }
   }
 
+  // --dump-positions: allocate collection array only when flag is set (zero overhead otherwise)
+  const dumpedPositions: DumpedPosition[] | undefined =
+    dumpPositionsArg !== undefined ? [] : undefined;
+
   // Create the confluence runner
   const { runner, allTrades, signalCounts, tradeRegimes, circuitBreakerFirings, fundingStats } =
-    createConfluenceRunner(threshold, exitMode, scorerConfig, circuitBreaker, partialTP, regimeSLMultipliers, riskConfig, multiTP, futuresDataMap, chargeFunding, entryTiming);
+    createConfluenceRunner(threshold, exitMode, scorerConfig, circuitBreaker, partialTP, regimeSLMultipliers, riskConfig, multiTP, futuresDataMap, chargeFunding, entryTiming, dumpedPositions);
 
   // Run walk-forward validation
   const walkForwardResult = await runWalkForward(runner, configOverrides, { quiet: jsonOutputMode });
@@ -2120,6 +2134,17 @@ async function main(): Promise<void> {
     if (!jsonOutputMode) {
       log(`Detailed results saved to: experiments/iteration-2-confluence-results.json`);
     }
+  }
+
+  // --dump-positions: write all canonical positions to JSON (gated — no-op when flag absent)
+  if (dumpPositionsArg !== undefined && dumpedPositions !== undefined) {
+    const dumpPath = path.resolve(dumpPositionsArg);
+    const dumpDir = path.dirname(dumpPath);
+    if (!fs.existsSync(dumpDir)) {
+      fs.mkdirSync(dumpDir, { recursive: true });
+    }
+    fs.writeFileSync(dumpPath, JSON.stringify(dumpedPositions, null, 2));
+    log(`[dump] wrote ${dumpedPositions.length} positions to ${dumpPath}`);
   }
 
   process.exit(walkForwardResult.overallPassed ? 0 : 1);

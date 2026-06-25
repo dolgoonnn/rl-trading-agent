@@ -7,3 +7,4 @@ export * from './reconcile';
 export * from './resolve-config';
 export * from './liquidation';
 export * from './leverage-equity';
+export * from './position-dump';
