@@ -88,7 +88,7 @@ async function main(): Promise<void> {
       continue;
     }
 
-    const simResult = replayLiveRow(row, candles, fillModel);
+    const simResult = replayLiveRow(row, candles, fillModel, frictionPerSide);
     if (!simResult) {
       console.warn(`[warn] Could not replay trade ${row.id} (${row.symbol} @${row.entryTimestamp}) — candle not found`);
       skipped++;

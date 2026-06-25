@@ -134,7 +134,9 @@ const EXPECTED_NET = 0.5 * partialPnl + 0.5 * remainderPnl;   // 0.0085
 describe('reconcile-partial: replayLiveRow (Cycles 2+3)', () => {
   describe('Cycle 2 — partial-TP blend parity', () => {
     it('replayLiveRow returns blended netReturn matching first-principles derivation (within 1e-9)', () => {
-      const result = replayLiveRow(row, candles, fillModel);
+      // frictionPerSide=0: the bot applied no entry slippage, so un-slip is a no-op.
+      // row.entryPrice (=100) is already the raw signal price; math is unchanged.
+      const result = replayLiveRow(row, candles, fillModel, 0);
       expect(result).not.toBeNull();
       expect(result!.netReturn).toBeCloseTo(EXPECTED_NET, 9);
     });
@@ -155,7 +157,8 @@ describe('reconcile-partial: replayLiveRow (Cycles 2+3)', () => {
 
   describe('Cycle 3 — barsHeld parity', () => {
     it('simBarsHeld derived from timestamps equals the bar index of the final (remainder) exit', () => {
-      const result = replayLiveRow(row, candles, fillModel);
+      // frictionPerSide=0: un-slip is no-op; row.entryPrice=100 is the raw signal price.
+      const result = replayLiveRow(row, candles, fillModel, 0);
       expect(result).not.toBeNull();
 
       const barMs = 3_600_000;
