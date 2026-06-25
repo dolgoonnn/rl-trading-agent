@@ -1,9 +1,4 @@
 // src/lib/scalp/leverage/liquidation.ts
-import type { Candle } from '@/types/candle';
-import type { TradeTapeEntry, LeverageConfig, TradeOutcome } from './types';
-
-// Re-export for Task 3 resolver to consume from this module.
-export type { Candle, TradeTapeEntry, LeverageConfig, TradeOutcome };
 
 const EIGHT_HOURS_MS = 8 * 3_600_000;
 
