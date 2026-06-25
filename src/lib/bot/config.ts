@@ -321,7 +321,7 @@ export const BOOK_GOVERNANCE_CONFIG: BookGovernanceConfig = {
   sharpe: RETIREMENT_CONFIG.sharpe,
   horizonYears: RETIREMENT_CONFIG.horizonYears,
   bootstrapP5DD: RETIREMENT_CONFIG.bootstrapP5DD,
-  signalMaxAgeMs: 90 * 60 * 1000, // 90 min: the governor runs ≤ every 30 min
+  signalMaxAgeMs: 90 * 60 * 1000, // 90 min staleness window: the governor loop refreshes every 15 min (6x headroom)
 };
 
 // ============================================

@@ -28,6 +28,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { readBookGovernanceSignal, BOOK_GOVERNANCE_CONFIG } from '../src/lib/bot/book-governance';
 
 const STATE_PATH = path.resolve(__dirname, '..', 'data', 'metals-bot-state.json');
 const TICK_MS = 30_000;
@@ -176,6 +177,20 @@ async function tick(state: BotState): Promise<void> {
   const dow = d.getUTCDay();
   const ldnHour = londonHour(now);
 
+  // Book-level governance: fail-open (null ⇒ trade as normal).
+  // REDUCE-ONLY: bookHalted blocks new-leg OPENS only; exits/closes below always run.
+  // De-risk (×0.5 multiplier) is NOT wired here — session legs are fixed-notional,
+  // so the sizing multiplier cannot be applied cleanly. Deferred.
+  const bookSignal = readBookGovernanceSignal(
+    path.resolve(__dirname, '..', 'data'),
+    now,
+    BOOK_GOVERNANCE_CONFIG.signalMaxAgeMs,
+  );
+  const bookHalted = bookSignal?.action === 'halt';
+  if (bookHalted) {
+    log(`[BOOK-HALT] new session legs blocked — book governance halt: ${bookSignal!.reason}`);
+  }
+
   const quotes: Partial<Record<Instrument, { price: number; ts: number }>> = {};
   for (const metal of ['gold', 'silver', 'eurusd', 'us500'] as const) {
     const q = await fetchQuote(metal);
@@ -230,88 +245,90 @@ async function tick(state: BotState): Promise<void> {
     }
   }
 
-  // --- Entries ---
-  // Overnight (Sun–Thu): 18:05–19:30 ET (CME reopen anchor — execution-audit fix)
+  // --- Entries (skipped entirely on book-level hard-halt; exits above always run) ---
   const ny = nyHour(now);
   const nyMin = ny.h * 60 + ny.m;
-  if (dow >= 0 && dow <= 4 && nyMin >= 18 * 60 + 5 && nyMin <= 19 * 60 + 30) {
-    for (const metal of ['gold', 'silver'] as const) {
-      const q = quotes[metal];
-      if (q && !overnightOpen(metal)) {
-        openPosition(state, { leg: 'overnight', metal, side: 'long', entryPrice: q.price, entryTime: now });
+  if (!bookHalted) {
+    // Overnight (Sun–Thu): 18:05–19:30 ET (CME reopen anchor — execution-audit fix)
+    if (dow >= 0 && dow <= 4 && nyMin >= 18 * 60 + 5 && nyMin <= 19 * 60 + 30) {
+      for (const metal of ['gold', 'silver'] as const) {
+        const q = quotes[metal];
+        if (q && !overnightOpen(metal)) {
+          openPosition(state, { leg: 'overnight', metal, side: 'long', entryPrice: q.price, entryTime: now });
+        }
       }
     }
-  }
-  // Weekend leg (Friday 20:00–20:45 UTC)
-  if (dow === 5 && utcMin >= 20 * 60 && utcMin <= 20 * 60 + 45) {
-    for (const metal of ['gold', 'silver'] as const) {
-      const q = quotes[metal];
-      if (q && !overnightOpen(metal)) {
-        openPosition(state, { leg: 'weekend', metal, side: 'long', entryPrice: q.price, entryTime: now });
+    // Weekend leg (Friday 20:00–20:45 UTC)
+    if (dow === 5 && utcMin >= 20 * 60 && utcMin <= 20 * 60 + 45) {
+      for (const metal of ['gold', 'silver'] as const) {
+        const q = quotes[metal];
+        if (q && !overnightOpen(metal)) {
+          openPosition(state, { leg: 'weekend', metal, side: 'long', entryPrice: q.price, entryTime: now });
+        }
       }
     }
-  }
-  // Fix-short (gold): 14:00–14:30 London, weekdays
-  if (dow >= 1 && dow <= 5 && ldnHour === 14) {
-    const q = quotes.gold;
-    const open = state.positions.find((p) => p.leg === 'fix-short');
-    if (q && !open) {
-      openPosition(state, { leg: 'fix-short', metal: 'gold', side: 'short', entryPrice: q.price, entryTime: now });
+    // Fix-short (gold): 14:00–14:30 London, weekdays
+    if (dow >= 1 && dow <= 5 && ldnHour === 14) {
+      const q = quotes.gold;
+      const open = state.positions.find((p) => p.leg === 'fix-short');
+      if (q && !open) {
+        openPosition(state, { leg: 'fix-short', metal: 'gold', side: 'short', entryPrice: q.price, entryTime: now });
+      }
     }
-  }
-  // amfix-long leg removed: cut by execution audit (real-cost pricing)
-  // Silver own-fix short: 11:00–12:00 London, weekdays (book leg I)
-  if (dow >= 1 && dow <= 5 && ldnHour === 11) {
-    const q = quotes.silver;
-    const open = state.positions.find((p) => p.leg === 'agfix-short');
-    if (q && !open) {
-      openPosition(state, { leg: 'agfix-short', metal: 'silver', side: 'short', entryPrice: q.price, entryTime: now });
+    // amfix-long leg removed: cut by execution audit (real-cost pricing)
+    // Silver own-fix short: 11:00–12:00 London, weekdays (book leg I)
+    if (dow >= 1 && dow <= 5 && ldnHour === 11) {
+      const q = quotes.silver;
+      const open = state.positions.find((p) => p.leg === 'agfix-short');
+      if (q && !open) {
+        openPosition(state, { leg: 'agfix-short', metal: 'silver', side: 'short', entryPrice: q.price, entryTime: now });
+      }
     }
-  }
-  // EUR morning short 09:00→12:00 UTC, weekdays (book leg K, Breedon-Ranaldo)
-  if (dow >= 1 && dow <= 5 && d.getUTCHours() >= 9 && d.getUTCHours() < 11) {
-    const q = quotes.eurusd;
-    const open = state.positions.find((p) => p.leg === 'eur-morning-short');
-    if (q && !open) {
-      openPosition(state, { leg: 'eur-morning-short', metal: 'eurusd', side: 'short', entryPrice: q.price, entryTime: now });
+    // EUR morning short 09:00→12:00 UTC, weekdays (book leg K, Breedon-Ranaldo)
+    if (dow >= 1 && dow <= 5 && d.getUTCHours() >= 9 && d.getUTCHours() < 11) {
+      const q = quotes.eurusd;
+      const open = state.positions.find((p) => p.leg === 'eur-morning-short');
+      if (q && !open) {
+        openPosition(state, { leg: 'eur-morning-short', metal: 'eurusd', side: 'short', entryPrice: q.price, entryTime: now });
+      }
     }
-  }
-  // eur-h22-long leg removed: dead at real rollover costs (execution audit)
+    // eur-h22-long leg removed: dead at real rollover costs (execution audit)
 
-  // US500 overnight (book leg J): enter 16:00–16:45 ET Mon–Fri (cash close mark
-  // via ES=F), exit next cash open. Friday entry holds the weekend.
-  if (dow >= 1 && dow <= 5 && nyMin >= 16 * 60 && nyMin <= 16 * 60 + 45) {
-    const q = quotes.us500;
-    const open = state.positions.find((p) => p.leg === 'us500-overnight');
-    if (q && !open) {
-      openPosition(state, { leg: 'us500-overnight', metal: 'us500', side: 'long', entryPrice: q.price, entryTime: now });
-    }
-  }
-
-  // Gold NFP momentum (book leg F): first Friday of the month.
-  // DELAY-AWARE windows (research-nfp-bot-sim.ts): the Yahoo feed lags ~10min,
-  // so reading at the backtest's own timestamps destroys the signal (132-event
-  // replay: direction match 67%, edge +8.2%→+0.4%). Shifted windows — mark
-  // ticks 08:30–08:35 (feed shows ≤08:25, pre-release), signal ticks
-  // 09:12–09:22 (feed shows ≥~09:02, the true post-print move) — keep the
-  // edge intact with real late fills (replay: t=1.98, +13.7%, 58% WR).
-  if (dow === 5 && isFirstFriday(d)) {
-    const q = quotes.gold;
-    const today = d.toISOString().slice(0, 10);
-    if (q && nyMin >= 8 * 60 + 30 && nyMin <= 8 * 60 + 35 && state.nfpSignal?.date !== today) {
-      state.nfpSignal = { date: today, price0830: q.price };
-      log(`NFP signal mark @ ${q.price.toFixed(2)}`);
-    }
-    if (q && nyMin >= 9 * 60 + 12 && nyMin <= 9 * 60 + 22
-      && state.nfpSignal?.date === today
-      && !state.positions.find((p) => p.leg === 'nfp-mom')) {
-      const dir = q.price > state.nfpSignal.price0830 ? 'long' : q.price < state.nfpSignal.price0830 ? 'short' : null;
-      if (dir) {
-        openPosition(state, { leg: 'nfp-mom', metal: 'gold', side: dir, entryPrice: q.price, entryTime: now });
+    // US500 overnight (book leg J): enter 16:00–16:45 ET Mon–Fri (cash close mark
+    // via ES=F), exit next cash open. Friday entry holds the weekend.
+    if (dow >= 1 && dow <= 5 && nyMin >= 16 * 60 && nyMin <= 16 * 60 + 45) {
+      const q = quotes.us500;
+      const open = state.positions.find((p) => p.leg === 'us500-overnight');
+      if (q && !open) {
+        openPosition(state, { leg: 'us500-overnight', metal: 'us500', side: 'long', entryPrice: q.price, entryTime: now });
       }
-      state.nfpSignal = null;
     }
-  }
+
+    // Gold NFP momentum (book leg F): first Friday of the month.
+    // DELAY-AWARE windows (research-nfp-bot-sim.ts): the Yahoo feed lags ~10min,
+    // so reading at the backtest's own timestamps destroys the signal (132-event
+    // replay: direction match 67%, edge +8.2%→+0.4%). Shifted windows — mark
+    // ticks 08:30–08:35 (feed shows ≤08:25, pre-release), signal ticks
+    // 09:12–09:22 (feed shows ≥~09:02, the true post-print move) — keep the
+    // edge intact with real late fills (replay: t=1.98, +13.7%, 58% WR).
+    if (dow === 5 && isFirstFriday(d)) {
+      const q = quotes.gold;
+      const today = d.toISOString().slice(0, 10);
+      if (q && nyMin >= 8 * 60 + 30 && nyMin <= 8 * 60 + 35 && state.nfpSignal?.date !== today) {
+        state.nfpSignal = { date: today, price0830: q.price };
+        log(`NFP signal mark @ ${q.price.toFixed(2)}`);
+      }
+      if (q && nyMin >= 9 * 60 + 12 && nyMin <= 9 * 60 + 22
+        && state.nfpSignal?.date === today
+        && !state.positions.find((p) => p.leg === 'nfp-mom')) {
+        const dir = q.price > state.nfpSignal.price0830 ? 'long' : q.price < state.nfpSignal.price0830 ? 'short' : null;
+        if (dir) {
+          openPosition(state, { leg: 'nfp-mom', metal: 'gold', side: dir, entryPrice: q.price, entryTime: now });
+        }
+        state.nfpSignal = null;
+      }
+    }
+  } // end !bookHalted entries
 
   saveState(state);
   vlog(`tick done — positions=${state.positions.length} trades=${state.trades.length} totalPnL=${state.totalPnlPct.toFixed(2)}%`);
