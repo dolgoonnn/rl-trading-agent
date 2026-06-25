@@ -55,6 +55,14 @@ import {
   type MakerTakerConfig,
 } from '../src/lib/cost/trade-cost';
 import { countFundingSettlements } from '../src/lib/cost/funding-ledger';
+import {
+  simulatePosition,
+  DefaultFillModel,
+  FlatFrictionCostModel,
+  type SimConfig,
+  type SimPosition,
+  type EntryTiming,
+} from '../src/lib/sim';
 
 // ============================================
 // Constants
@@ -275,62 +283,6 @@ function calculatePnlPercent(
   return (adjustedEntry - adjustedExit) / adjustedEntry;
 }
 
-/**
- * Simulate a position through subsequent candles until SL, TP, or max bars.
- * Returns the trade result with friction applied.
- *
- * SIMPLE MODE: No strategy exit logic, just SL/TP/max bars.
- */
-function simulatePositionSimple(
-  position: SimulatedPosition,
-  candles: Candle[],
-  startIndex: number,
-): TradeResult | null {
-  const adjustedEntry = applyEntryFriction(
-    position.entryPrice,
-    position.direction,
-  );
-
-  for (let i = startIndex; i < candles.length; i++) {
-    const candle = candles[i];
-    if (!candle) continue;
-
-    const barsHeld = i - position.entryIndex;
-    const exitResult = checkSLTPMaxBars(position, candle, barsHeld);
-    if (exitResult) {
-      const adjustedExit = applyExitFriction(exitResult, position.direction);
-      return {
-        entryTimestamp: position.entryTimestamp,
-        exitTimestamp: candle.timestamp,
-        direction: position.direction,
-        entryPrice: adjustedEntry,
-        exitPrice: adjustedExit,
-        pnlPercent: calculatePnlPercent(adjustedEntry, adjustedExit, position.direction),
-        strategy: position.strategy,
-      };
-    }
-  }
-
-  return closeAtEnd(position, candles, adjustedEntry);
-}
-
-/** Check if SL, TP, or max bars hit. Returns exit price or null. */
-function checkSLTPMaxBars(
-  position: SimulatedPosition,
-  candle: Candle,
-  barsHeld: number,
-): number | null {
-  if (position.direction === 'long') {
-    if (candle.low <= position.stopLoss) return position.stopLoss;
-    if (candle.high >= position.takeProfit) return position.takeProfit;
-  } else {
-    if (candle.high >= position.stopLoss) return position.stopLoss;
-    if (candle.low <= position.takeProfit) return position.takeProfit;
-  }
-  if (barsHeld >= MAX_POSITION_BARS) return candle.close;
-  return null;
-}
-
 /** Close position at last available candle */
 function closeAtEnd(
   position: SimulatedPosition,
@@ -465,158 +417,14 @@ function simulatePositionBreakeven(
 }
 
 /**
- * PARTIAL TP MODE: Close a fraction at triggerR, move SL to breakeven, let rest run to TP.
- * PnL = weighted average of partial exit + final exit.
+ * Build a DefaultFillModel backed by the current FRICTION_PER_SIDE / MAKER_TAKER globals.
+ * allowHeuristic: false → pessimistic SL-first, matching legacy behaviour (no sub-bar data).
  */
-function simulatePositionPartialTP(
-  position: SimulatedPosition,
-  candles: Candle[],
-  startIndex: number,
-  partialConfig: PartialTPConfig,
-): TradeResult | null {
-  const adjustedEntry = applyEntryFriction(position.entryPrice, position.direction);
-  let currentSL = position.stopLoss;
-
-  const riskDistance = position.direction === 'long'
-    ? position.entryPrice - position.stopLoss
-    : position.stopLoss - position.entryPrice;
-  let partialTaken = false;
-  let partialPnl = 0;
-
-  for (let i = startIndex; i < candles.length; i++) {
-    const candle = candles[i];
-    if (!candle) continue;
-
-    const barsHeld = i - position.entryIndex;
-
-    // Check SL and TP
-    if (position.direction === 'long') {
-      if (candle.low <= currentSL) {
-        const adjustedExit = applyExitFriction(currentSL, position.direction);
-        const exitPnl = calculatePnlPercent(adjustedEntry, adjustedExit, position.direction);
-        const finalPnl = partialTaken
-          ? partialConfig.fraction * partialPnl + (1 - partialConfig.fraction) * exitPnl
-          : exitPnl;
-        return {
-          entryTimestamp: position.entryTimestamp,
-          exitTimestamp: candle.timestamp,
-          direction: position.direction,
-          entryPrice: adjustedEntry,
-          exitPrice: adjustedExit,
-          pnlPercent: finalPnl,
-          strategy: position.strategy,
-        };
-      }
-      if (candle.high >= position.takeProfit) {
-        const adjustedExit = applyExitFriction(position.takeProfit, position.direction, 'maker');
-        const exitPnl = calculatePnlPercent(adjustedEntry, adjustedExit, position.direction);
-        const finalPnl = partialTaken
-          ? partialConfig.fraction * partialPnl + (1 - partialConfig.fraction) * exitPnl
-          : exitPnl;
-        return {
-          entryTimestamp: position.entryTimestamp,
-          exitTimestamp: candle.timestamp,
-          direction: position.direction,
-          entryPrice: adjustedEntry,
-          exitPrice: adjustedExit,
-          pnlPercent: finalPnl,
-          strategy: position.strategy,
-        };
-      }
-    } else {
-      if (candle.high >= currentSL) {
-        const adjustedExit = applyExitFriction(currentSL, position.direction);
-        const exitPnl = calculatePnlPercent(adjustedEntry, adjustedExit, position.direction);
-        const finalPnl = partialTaken
-          ? partialConfig.fraction * partialPnl + (1 - partialConfig.fraction) * exitPnl
-          : exitPnl;
-        return {
-          entryTimestamp: position.entryTimestamp,
-          exitTimestamp: candle.timestamp,
-          direction: position.direction,
-          entryPrice: adjustedEntry,
-          exitPrice: adjustedExit,
-          pnlPercent: finalPnl,
-          strategy: position.strategy,
-        };
-      }
-      if (candle.low <= position.takeProfit) {
-        const adjustedExit = applyExitFriction(position.takeProfit, position.direction, 'maker');
-        const exitPnl = calculatePnlPercent(adjustedEntry, adjustedExit, position.direction);
-        const finalPnl = partialTaken
-          ? partialConfig.fraction * partialPnl + (1 - partialConfig.fraction) * exitPnl
-          : exitPnl;
-        return {
-          entryTimestamp: position.entryTimestamp,
-          exitTimestamp: candle.timestamp,
-          direction: position.direction,
-          entryPrice: adjustedEntry,
-          exitPrice: adjustedExit,
-          pnlPercent: finalPnl,
-          strategy: position.strategy,
-        };
-      }
-    }
-
-    // Partial TP: close fraction at triggerR, move SL to breakeven
-    if (!partialTaken && riskDistance > 0) {
-      const unrealizedR = position.direction === 'long'
-        ? (candle.close - position.entryPrice) / riskDistance
-        : (position.entryPrice - candle.close) / riskDistance;
-
-      if (unrealizedR >= partialConfig.triggerR) {
-        partialTaken = true;
-        const partialExit = applyExitFriction(candle.close, position.direction);
-        partialPnl = calculatePnlPercent(adjustedEntry, partialExit, position.direction);
-        // Move SL to breakeven + buffer (skip if beBuffer < 0)
-        // Use friction-adjusted entry so BE stop covers actual fill price
-        if (partialConfig.beBuffer >= 0) {
-          const buffer = riskDistance * partialConfig.beBuffer;
-          if (position.direction === 'long') {
-            currentSL = Math.max(currentSL, adjustedEntry + buffer);
-          } else {
-            currentSL = Math.min(currentSL, adjustedEntry - buffer);
-          }
-        }
-      }
-    }
-
-    // Max bars
-    if (barsHeld >= MAX_POSITION_BARS) {
-      const adjustedExit = applyExitFriction(candle.close, position.direction);
-      const exitPnl = calculatePnlPercent(adjustedEntry, adjustedExit, position.direction);
-      const finalPnl = partialTaken
-        ? partialConfig.fraction * partialPnl + (1 - partialConfig.fraction) * exitPnl
-        : exitPnl;
-      return {
-        entryTimestamp: position.entryTimestamp,
-        exitTimestamp: candle.timestamp,
-        direction: position.direction,
-        entryPrice: adjustedEntry,
-        exitPrice: adjustedExit,
-        pnlPercent: finalPnl,
-        strategy: position.strategy,
-      };
-    }
-  }
-
-  // Close at end with partial consideration
-  const lastCandle = candles[candles.length - 1];
-  if (!lastCandle) return null;
-  const adjustedExit = applyExitFriction(lastCandle.close, position.direction);
-  const exitPnl = calculatePnlPercent(adjustedEntry, adjustedExit, position.direction);
-  const finalPnl = partialTaken
-    ? partialConfig.fraction * partialPnl + (1 - partialConfig.fraction) * exitPnl
-    : exitPnl;
-  return {
-    entryTimestamp: position.entryTimestamp,
-    exitTimestamp: lastCandle.timestamp,
-    direction: position.direction,
-    entryPrice: adjustedEntry,
-    exitPrice: adjustedExit,
-    pnlPercent: finalPnl,
-    strategy: position.strategy,
-  };
+function buildFillModel(): DefaultFillModel {
+  return new DefaultFillModel(
+    new FlatFrictionCostModel(FRICTION_PER_SIDE, MAKER_TAKER),
+    { allowHeuristic: false },
+  );
 }
 
 /**
@@ -970,6 +778,7 @@ function createConfluenceRunner(
   multiTP?: MultiTPConfig,
   futuresDataMap?: Map<string, { timestamp: number; fundingRate: number }[]>,
   chargeFunding = false,
+  entryTiming: EntryTiming = 'signal_close',
 ): {
   runner: WalkForwardStrategyRunner;
   allTrades: TradeResult[];
@@ -1122,10 +931,33 @@ function createConfluenceRunner(
             default:
               if (multiTP) {
                 trade = simulatePositionMultiTP(position, allCandles, i + 1, multiTP);
-              } else if (partialTP) {
-                trade = simulatePositionPartialTP(position, allCandles, i + 1, partialTP);
               } else {
-                trade = simulatePositionSimple(position, allCandles, i + 1);
+                // Delegate simple and partial_tp to the shared sim engine (parity-tested).
+                const simPos: SimPosition = {
+                  direction: position.direction,
+                  entryPrice: position.entryPrice,
+                  entryTimestamp: position.entryTimestamp,
+                  entryIndex: position.entryIndex,
+                  stopLoss: position.stopLoss,
+                  takeProfit: position.takeProfit,
+                  strategy: position.strategy,
+                };
+                const simExitMode = partialTP ? 'partial_tp' : 'simple';
+                const simConfig: SimConfig = {
+                  entryTiming,
+                  maxBars: MAX_POSITION_BARS,
+                  barMs: 3_600_000,
+                  exitMode: simExitMode,
+                  partialTP: partialTP
+                    ? { fraction: partialTP.fraction, triggerR: partialTP.triggerR, beBuffer: partialTP.beBuffer }
+                    : undefined,
+                };
+                trade = simulatePosition(simPos, allCandles, i + 1, {
+                  fillModel: buildFillModel(),
+                  config: simConfig,
+                  // rateAt is NOT passed — funding stays handled post-hoc by the
+                  // existing chargeFunding block below; pnlPercent stays gross.
+                });
               }
               break;
           }
@@ -1781,6 +1613,7 @@ async function main(): Promise<void> {
   const chargeFunding = hasFlag('charge-funding'); // --charge-funding to debit realized funding as a real cost (Task 8 PROBE)
   const makerBpsArg = getArg('maker-bps'); // --maker-bps 2 (passive TP exit leg, per side)
   const takerBpsArg = getArg('taker-bps'); // --taker-bps 5.5 (entry + SL/timeout exit leg, per side)
+  const entryTimingArg = getArg('entry-timing'); // --entry-timing signal_close|next_open
 
   // Gold-specific args
   const goldRangeMinArg = getArg('asian-range-min'); // --asian-range-min 0.15 (min Asian range %)
@@ -1807,6 +1640,16 @@ async function main(): Promise<void> {
     exitMode = exitModeArg as ExitMode;
   } else if (useSimple) {
     exitMode = 'simple';
+  }
+
+  // Resolve entry timing (--entry-timing signal_close|next_open; default: signal_close)
+  let entryTiming: EntryTiming = 'signal_close';
+  if (entryTimingArg) {
+    if (!['signal_close', 'next_open'].includes(entryTimingArg)) {
+      console.error('Error: --entry-timing must be one of: signal_close, next_open');
+      process.exit(1);
+    }
+    entryTiming = entryTimingArg as EntryTiming;
   }
 
   // Parse partial TP config
@@ -2161,7 +2004,7 @@ async function main(): Promise<void> {
 
   // Create the confluence runner
   const { runner, allTrades, signalCounts, tradeRegimes, circuitBreakerFirings, fundingStats } =
-    createConfluenceRunner(threshold, exitMode, scorerConfig, circuitBreaker, partialTP, regimeSLMultipliers, riskConfig, multiTP, futuresDataMap, chargeFunding);
+    createConfluenceRunner(threshold, exitMode, scorerConfig, circuitBreaker, partialTP, regimeSLMultipliers, riskConfig, multiTP, futuresDataMap, chargeFunding, entryTiming);
 
   // Run walk-forward validation
   const walkForwardResult = await runWalkForward(runner, configOverrides, { quiet: jsonOutputMode });

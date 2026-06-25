@@ -22,6 +22,12 @@ import type { StrategyConfig, OrderbookSnapshot } from '@/types/bot';
 import { SYMBOL_ALLOCATION, SAFETY_GATE_CONFIG, TRADEABILITY_CONFIG } from './config';
 import { computePositionSize, checkTradeability, checkPreTradeGuards } from './guards';
 import type { RejectReason } from '@/types/bot';
+import { DefaultFillModel, FlatFrictionCostModel } from '@/lib/sim';
+
+// Module-level singleton: zero friction so resolveExit cost path is unused;
+// allowHeuristic:false forces pessimistic floor (SL wins on straddle) — matches
+// the live behavior captured by the characterization tests.
+const _exitFillModel = new DefaultFillModel(new FlatFrictionCostModel(0), { allowHeuristic: false });
 
 // ============================================
 // Position Manager
@@ -444,20 +450,20 @@ export class OrderManager {
     const direction = position.direction;
     const currentSL = position.currentSL;
 
-    // 1. Check SL hit
-    if (direction === 'long' && candle.low <= currentSL) {
-      return this.closePosition(position, currentSL, candle.timestamp, barsHeld, 'stop_loss');
-    }
-    if (direction === 'short' && candle.high >= currentSL) {
-      return this.closePosition(position, currentSL, candle.timestamp, barsHeld, 'stop_loss');
-    }
-
-    // 2. Check TP hit
-    if (direction === 'long' && candle.high >= position.takeProfit) {
-      return this.closePosition(position, position.takeProfit, candle.timestamp, barsHeld, 'take_profit');
-    }
-    if (direction === 'short' && candle.low <= position.takeProfit) {
-      return this.closePosition(position, position.takeProfit, candle.timestamp, barsHeld, 'take_profit');
+    // 1 + 2. SL and TP — delegated to shared DefaultFillModel (pessimistic floor:
+    // SL wins on straddle). maxBars is suppressed (POSITIVE_INFINITY) here so the
+    // partial-TP block (step 3) still runs before the time-exit (step 4), preserving
+    // the exact SL/TP → partial → maxBars order. The returned exitPrice is the
+    // SL or TP level — same value the old manual code passed to closePosition.
+    // applyExitSlippage is applied inside closePosition as before.
+    const slTpFill = _exitFillModel.resolveExit({
+      levels: { direction, stopLoss: currentSL, takeProfit: position.takeProfit },
+      bar: candle,
+      barsHeld,
+      maxBars: Number.POSITIVE_INFINITY,
+    });
+    if (slTpFill && (slTpFill.exitReason === 'stop_loss' || slTpFill.exitReason === 'take_profit')) {
+      return this.closePosition(position, slTpFill.exitPrice, candle.timestamp, barsHeld, slTpFill.exitReason);
     }
 
     // 3. Partial TP check (if configured and not yet taken)
