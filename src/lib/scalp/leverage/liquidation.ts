@@ -1,4 +1,6 @@
 // src/lib/scalp/leverage/liquidation.ts
+import type { Candle } from '@/types/candle';
+import type { TradeTapeEntry, LeverageConfig, TradeOutcome } from './types';
 
 const EIGHT_HOURS_MS = 8 * 3_600_000;
 
@@ -46,4 +48,34 @@ export function fundingCostFraction(
   let count = 0;
   for (let t = first; t <= exitTs; t += EIGHT_HOURS_MS) count++;
   return count * fundingRate8h;
+}
+
+/**
+ * Resolve one trade under leverage by walking its 1m path.
+ * Leverage's ONLY effect is liquidation: if the adverse extreme reaches the
+ * liquidation trigger within (entryTs, exitTs], the trade is liquidated
+ * (lose full margin). Otherwise the 1x outcome is amplified, net of funding.
+ */
+export function resolveTradeUnderLeverage(
+  trade: TradeTapeEntry,
+  candles1m: Candle[],
+  cfg: LeverageConfig,
+): TradeOutcome {
+  const trigger = effectiveLiqTrigger(
+    trade.entryPrice, trade.direction, cfg.leverage, cfg.mmr, cfg.slippageBps,
+  );
+
+  for (const bar of candles1m) {
+    if (bar.timestamp <= trade.entryTimestamp) continue;
+    if (bar.timestamp > trade.exitTimestamp) break;
+    const hit = trade.direction === 'long' ? bar.low <= trigger : bar.high >= trigger;
+    if (hit) {
+      return { liquidated: true, equityMultiplier: 1 - cfg.marginFraction };
+    }
+  }
+
+  const funding = fundingCostFraction(trade.entryTimestamp, trade.exitTimestamp, cfg.fundingRate8h);
+  const netReturn = trade.pnlPercent1x - funding;
+  const multiplier = 1 + cfg.marginFraction * cfg.leverage * netReturn;
+  return { liquidated: false, equityMultiplier: multiplier };
 }
