@@ -77,3 +77,4 @@ logs/
 .superpowers/
 data/*.db.bak*
 simulation-report.html
+experiments/runs/allocator-report.json
