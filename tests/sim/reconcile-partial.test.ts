@@ -56,7 +56,8 @@ function makeRow(overrides: Partial<BotTradeRow> & Pick<BotTradeRow, 'entryTimes
     symbol: 'BTCUSDT',
     direction: overrides.direction,
     entryPrice: overrides.entryPrice,
-    exitPrice: overrides.exitPrice ?? overrides.takeProfit,
+    // replayTrade does not consume exitPrice; default to entryPrice so the dummy is neutral, not misleading.
+    exitPrice: overrides.exitPrice ?? overrides.entryPrice,
     entryTimestamp: overrides.entryTimestamp,
     exitTimestamp: overrides.exitTimestamp,
     stopLoss: overrides.stopLoss,
