@@ -30,6 +30,7 @@ import { RestClientV5 } from 'bybit-api';
 import type { Candle } from '../src/types/candle';
 import { AlertManager } from '../src/lib/bot/alerts';
 import { isKilled, type KillDb } from '../src/lib/bot/kill-switch';
+import { readBookGovernanceSignal, BOOK_GOVERNANCE_CONFIG } from '../src/lib/bot/book-governance';
 import * as dbSchema from '../src/lib/data/schema';
 import {
   generateSignals,
@@ -410,39 +411,53 @@ function processTick(
     }
   }
 
-  // Check entry — gated by the shared kill switch + the sleeve's drawdown breaker.
-  // REDUCE-ONLY: a halt/DD breach only blocks OPENING here; any open position was
-  // already managed/closed above. We never force-liquidate.
+  // Check entry — gated by the shared kill switch + the sleeve's drawdown breaker
+  // + the book-level governance hard-halt.
+  // REDUCE-ONLY: any halt only blocks OPENING here; any open position was already
+  // managed/closed above. We never force-liquidate.
   if (state.position === null && signal.isLongEntry && !opts.dryRun) {
-    // Shared global stop: data/KILL sentinel, KILL_SWITCH env, or bot_kill_switch row.
-    const killFlag = db ? isKilled(db as KillDb, { nowMs: Date.now() }) : { halted: false };
-    // Pure gate: halted OR drawdown >= GOLD_MAX_DRAWDOWN blocks new entries.
-    const gate = goldEntryAllowed({
-      halted: killFlag.halted,
-      equity: state.equity,
-      peakEquity: state.peakEquity ?? state.equity,
-    });
+    // Book-level governance: fail-open (null ⇒ trade as normal).
+    const book = readBookGovernanceSignal(
+      path.resolve(__dirname, '..', 'data'),
+      Date.now(),
+      BOOK_GOVERNANCE_CONFIG.signalMaxAgeMs,
+    );
 
-    if (!gate.allowed) {
-      // Log once per blocked tick; do NOT crash, do NOT close the (absent) position.
-      console.log(`  [SAFETY] new gold entry skipped — ${gate.reason}${killFlag.reason ? ` (${killFlag.reason})` : ''}`);
+    if (book?.action === 'halt') {
+      // Book hard-halt: block new entry, log reason. Never blocks exits.
+      console.log(`  [BOOK-HALT] new gold entry blocked — book governance halt: ${book.reason}`);
       action = 'entry_blocked';
     } else {
-      const weight = computePositionWeight(signal);
+      // Shared global stop: data/KILL sentinel, KILL_SWITCH env, or bot_kill_switch row.
+      const killFlag = db ? isKilled(db as KillDb, { nowMs: Date.now() }) : { halted: false };
+      // Pure gate: halted OR drawdown >= GOLD_MAX_DRAWDOWN blocks new entries.
+      const gate = goldEntryAllowed({
+        halted: killFlag.halted,
+        equity: state.equity,
+        peakEquity: state.peakEquity ?? state.equity,
+      });
 
-      if (weight > 0.01) {
-        state.position = {
-          entryPrice: signal.close,
-          entryTimestamp: signal.timestamp,
-          weight,
-          hardStop: signal.close - fp.hardStopAtrMultiple * signal.atr,
-          trailingStop: signal.close - fp.trailingStopAtrMultiple * signal.atr,
-          peakPrice: signal.close,
-          daysHeld: 0,
-          pBullAtEntry: signal.pBull,
-          atrAtEntry: signal.atr,
-        };
-        action = 'entry_long';
+      if (!gate.allowed) {
+        // Log once per blocked tick; do NOT crash, do NOT close the (absent) position.
+        console.log(`  [SAFETY] new gold entry skipped — ${gate.reason}${killFlag.reason ? ` (${killFlag.reason})` : ''}`);
+        action = 'entry_blocked';
+      } else {
+        const weight = computePositionWeight(signal);
+
+        if (weight > 0.01) {
+          state.position = {
+            entryPrice: signal.close,
+            entryTimestamp: signal.timestamp,
+            weight,
+            hardStop: signal.close - fp.hardStopAtrMultiple * signal.atr,
+            trailingStop: signal.close - fp.trailingStopAtrMultiple * signal.atr,
+            peakPrice: signal.close,
+            daysHeld: 0,
+            pBullAtEntry: signal.pBull,
+            atrAtEntry: signal.atr,
+          };
+          action = 'entry_long';
+        }
       }
     }
   } else if (state.position === null && signal.isLongEntry && opts.dryRun) {
