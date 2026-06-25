@@ -1,6 +1,6 @@
 import type { Candle } from '@/types/candle';
 
-export type SimExitReason = 'stop_loss' | 'take_profit' | 'max_bars' | 'strategy';
+export type SimExitReason = 'stop_loss' | 'take_profit' | 'max_bars' | 'strategy' | 'liquidation';
 export type FidelityTier = 'l2_depth' | 'subbar_1m' | 'ohlc_heuristic' | 'pessimistic';
 export type EntryTiming = 'signal_close' | 'next_open';
 
@@ -21,6 +21,10 @@ export interface SimConfig {
   exitMode: 'simple' | 'partial_tp' | 'breakeven' | 'trailing';
   partialTP?: { fraction: number; triggerR: number; beBuffer: number };
   trailing?: { activationR: number; distanceR: number };
+  /** Isolated-margin leverage. When present, enables liquidation modeling. */
+  leverage?: number;
+  /** Maintenance margin ratio (fraction). Defaults to DEFAULT_MMR = 0.005. */
+  mmr?: number;
 }
 
 export interface SimTradeResult {
@@ -36,6 +40,8 @@ export interface SimTradeResult {
   grossReturn: number;      // == pnlPercent (cost already in adjusted prices)
   fundingReturn: number;
   netReturn: number;        // grossReturn + fundingReturn
+  /** True when the position was closed by a liquidation event (leverage-induced). */
+  liquidated: boolean;
 }
 
 export interface SubBarProvider {

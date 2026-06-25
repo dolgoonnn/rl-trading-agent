@@ -5,7 +5,7 @@ import type { SimTradeResult } from '@/lib/sim/types';
 function sim(net: number, reason: SimTradeResult['exitReason']): SimTradeResult {
   return { entryTimestamp: 0, exitTimestamp: 1, direction: 'long', entryPrice: 100, exitPrice: 101,
            pnlPercent: net, strategy: 'ob', exitReason: reason, tier: 'pessimistic',
-           grossReturn: net, fundingReturn: 0, netReturn: net };
+           grossReturn: net, fundingReturn: 0, netReturn: net, liquidated: false };
 }
 
 describe('reconcile', () => {
