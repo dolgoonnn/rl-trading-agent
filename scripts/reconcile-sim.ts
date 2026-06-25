@@ -16,11 +16,11 @@
 import fs from 'fs';
 import path from 'path';
 import { db } from '../src/lib/data/db';
-import { loadLiveTrades, replayTrade, diffTrades, reconcileReport } from '../src/lib/sim/reconcile';
+import { loadLiveTrades, replayLiveRow, diffTrades, reconcileReport } from '../src/lib/sim/reconcile';
 import type { TradeDiff } from '../src/lib/sim/reconcile';
 import { DefaultFillModel } from '../src/lib/sim/fill-model';
 import { FlatFrictionCostModel } from '../src/lib/sim/cost-model';
-import type { SimConfig } from '../src/lib/sim/types';
+import { resolveSimConfig } from '../src/lib/sim/resolve-config';
 import type { Candle } from '../src/types/candle';
 
 // ─── CLI args ───────────────────────────────────────────────────────────────
@@ -57,15 +57,6 @@ function loadCandles(symbol: string): Candle[] | null {
   return candles;
 }
 
-// ─── Default sim config (mirrors production Run 20 exit settings) ────────────
-
-const SIM_CONFIG: SimConfig = {
-  entryTiming: 'signal_close',
-  maxBars: 160,
-  barMs: 3_600_000,
-  exitMode: 'simple',
-};
-
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
@@ -97,15 +88,16 @@ async function main(): Promise<void> {
       continue;
     }
 
-    const simResult = replayTrade(row, candles, fillModel, SIM_CONFIG);
+    const simResult = replayLiveRow(row, candles, fillModel, frictionPerSide);
     if (!simResult) {
       console.warn(`[warn] Could not replay trade ${row.id} (${row.symbol} @${row.entryTimestamp}) — candle not found`);
       skipped++;
       continue;
     }
 
-    // barsHeld: compute from sim entry/exit timestamps (each bar = 1h)
-    const simBarsHeld = Math.round((simResult.exitTimestamp - simResult.entryTimestamp) / SIM_CONFIG.barMs);
+    // barsHeld: compute from sim entry/exit timestamps using the per-row resolved barMs
+    const rowConfig = resolveSimConfig(row.strategy);
+    const simBarsHeld = Math.round((simResult.exitTimestamp - simResult.entryTimestamp) / rowConfig.barMs);
 
     const live = {
       netReturn: row.netReturn,

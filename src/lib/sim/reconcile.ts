@@ -81,6 +81,7 @@ import type { SimPosition, SimConfig } from './types';
 import type { FillModel } from './fill-model';
 import { simulatePosition } from './simulator';
 import type { Candle } from '@/types/candle';
+import { resolveSimConfig } from './resolve-config';
 
 // Drizzle DB type scoped to the project schema
 type DrizzleDB = BetterSQLite3Database<typeof schema>;
@@ -125,4 +126,43 @@ export function replayTrade(
   // entryIndex = i). Entering at a bar's close means that already-closed bar
   // cannot fill the position — checking it would manufacture false sim/live drift.
   return simulatePosition(position, candles, startIndex + 1, { fillModel, config });
+}
+
+/**
+ * Replay a live bot trade using the exact SimConfig the strategy ran with.
+ *
+ * This is the seam that fixes the pre-fix bug where every row was replayed
+ * through a hardcoded `simple` config regardless of strategy. Now each row's
+ * strategy is resolved to its deployed config (e.g. order_block → partial_tp),
+ * so the blend math in simulatePosition matches what the live bot did.
+ *
+ * Entry-friction un-slip (Cycle 4 fix):
+ *   bot_trades.entry_price stores the ALREADY-SLIPPED fill that order-manager.ts
+ *   wrote (e.g. long: price*(1+frictionPerSide), short: price*(1-frictionPerSide)).
+ *   Without this correction, simulatePosition would re-apply entry friction on top
+ *   of that stored fill, double-counting it (+7 bps systematic error per trade).
+ *   We reconstruct the raw signal price so the sim's fill model re-derives the
+ *   exact same adjusted fill that the bot recorded.
+ *
+ *   COUPLING: reconcile must know the bot's entry-slippage rate to invert it.
+ *   This is exact when --friction matches the bot's deployed frictionPerSide (0.0007).
+ *   If paper mode uses a different rate, pass the matching value.
+ *
+ * Pure (no DB, no Date.now, no fetch) — delegates to replayTrade.
+ */
+export function replayLiveRow(
+  row: BotTradeRow,
+  candles: Candle[],
+  fillModel: FillModel,
+  frictionPerSide: number,
+): SimTradeResult | null {
+  // Invert the entry-slippage the bot applied when it stored entry_price, so the
+  // sim's fill model re-applies it exactly once (not twice).
+  const rawEntry =
+    row.direction === 'long'
+      ? row.entryPrice / (1 + frictionPerSide)
+      : row.entryPrice / (1 - frictionPerSide);
+
+  const correctedRow: BotTradeRow = { ...row, entryPrice: rawEntry };
+  return replayTrade(correctedRow, candles, fillModel, resolveSimConfig(row.strategy));
 }
