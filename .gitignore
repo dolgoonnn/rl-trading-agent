@@ -72,6 +72,9 @@ data/metals-bot-state.json
 data/gold-bot-state.json
 logs/
 
+# Regenerated Pine port artifact (written by a local Stop hook; not branch source)
+pine/run20-confluence-ob.pine
+
 # Local agent state (Claude Code, Ralph loop) — never commit
 .claude/
 .superpowers/
