@@ -13,8 +13,8 @@
 |---|---|---|---|---|---|---|
 | 1 | Cross-sectional short-term **reversal** (long losers/short winners) | relative-value | high | strong (CO-OC reversal "robust") | HIGH (turnover) | ❌ **KILLED** (iter 1) |
 | 2 | **Funding-carry delta-neutral** (collect funding, market-neutral) | mechanism harvest | n/a (carry) | strong: 10–20% APY, 0.8% maxDD 2025 | LOW | ✅ **SURVIVES** (iter 2) — parked as combine-candidate |
-| 3 | **Stat-arb cointegration pairs** (spread mean-reversion, multi-day hold) | relative-value | med | Fil/Kristoufek 30%/yr; intraday HF variants | MED (longer hold = lower turnover) | ⏳ NEXT |
-| 4 | **Lead-lag cross-predictability** (BTC→alt; intraday *negative* lead-lag) | relative-value | high | LASSO profits "net of realistic costs" | HIGH (intraday turnover) | queued |
+| 3 | **Stat-arb cointegration pairs** (spread mean-reversion, multi-day hold) | relative-value | med | Fil/Kristoufek 30%/yr; intraday HF variants | MED (longer hold = lower turnover) | ❌ **KILLED** (iter 3, by walk-forward) |
+| 4 | **Lead-lag cross-predictability** (BTC→alt; intraday *negative* lead-lag) | relative-value | high | LASSO profits "net of realistic costs" | HIGH (intraday turnover) | ⏳ NEXT |
 | 5 | Cross-sectional **momentum** (2–4wk) / longer-horizon reversal, size/illiquidity factors | factor | low (weekly=swing) | large & significant, not on std factors | LOW | queued (swing, not intraday) |
 
 Sources: cross-sectional crypto factors ([Dobrynskaya SSRN 3913263](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3913263); factor-momentum 3,900 coins); stat-arb ([Springer 978-3-031-68974-1_16](https://link.springer.com/chapter/10.1007/978-3-031-68974-1_16); Fil & Kristoufek); funding carry ([market-neutral funds +14.4% 2025](https://www.tv-hub.org/guide/market-neutral-strategy-crypto), [arbitragescanner guide](https://arbitragescanner.io/blog/crypto-funding-rate-arbitrage-guide)); lead-lag ([intraday cross-predictability, ScienceDirect S1062940822000833](https://www.sciencedirect.com/science/article/abs/pii/S1062940822000833); [seesaw effect S0927539823000956](https://www.sciencedirect.com/science/article/abs/pii/S0927539823000956)); short-term reversal robustness (QuantPedia CO-OC).
@@ -61,6 +61,20 @@ Sources: cross-sectional crypto factors ([Dobrynskaya SSRN 3913263](https://pape
 
 ---
 
-## Next (iteration 3): Stat-arb cointegration pairs
+## Iteration 3 — Stat-arb cointegration pairs — ❌ KILLED (by walk-forward)
 
-**Why:** relative-value family, but **multi-day hold** dodges the turnover wall that killed reversal (iter 1) — the cost ÷ signal ratio is the whole game. Lit prior strong (Fil & Kristoufek ~30%/yr gross). Pulse plan: screen the 20-coin panel for cointegrated pairs (Engle-Granger / rolling OLS hedge ratio + ADF on residual), trade the z-scored spread (enter |z|>2, exit |z|<0.5), hold days not hours → report gross vs net Sharpe at realistic 4-leg cost, and **% of pairs whose cointegration survives out-of-sample** (the real failure mode is spurious in-sample cointegration). Combine survivors into the book.
+**Script:** `scripts/statarb-pairs-pulse.ts` · 20-coin 1h panel, 12,875 common bars. Engle-Granger (OLS log-log hedge β + Dickey-Fuller t on residual), z-scored spread, enter |z|>2 / exit |z|<0.5, β-hedged, net of (1+β)×5bps per change. Three lenses: single 50/50 split, equal-weight basket, rolling walk-forward.
+
+**The trap and the catch:**
+- **Single 50/50 split looked like a strong survivor:** all-pairs basket net Sharpe **1.52**, 27%/yr, 9.2% maxDD; *cost-robust* (Sharpe 1.52→1.48→1.41 at 5/10/20 bps — the multi-day hold dodges the turnover wall that killed reversal); corr −0.26 to BTC. The cointegration FILTER never helped (cointegrated basket 1.26 < all-pairs 1.52 — breadth/diversification beats DF-selection; the ADF test is theater).
+- **Walk-forward KILLED it:** rolling IS=3000→OOS=1500, β re-estimated per window ⇒ **1/6 windows positive, mean Sharpe −0.86** (−1.31, +0.95, −1.56, −0.64, −0.25, −2.32). Long IS=6000 is *worse* (1/6, mean −1.53 — not an estimation-length problem). Reactive short OOS=750 is a coin-flip (6/11, mean −0.57). The 50/50's OOS half simply happened to be a mean-reverting regime.
+
+**Verdict:** the mean-reversion is **regime-dependent, not a persistent edge** — it does not survive realistic rolling deployment. Classic single-split trap; the project's own WF gate (>60% windows positive + positive mean) is exactly what exposed it. **Lesson re-confirmed: never trust a single-split / full-sample backtest — walk-forward decides.** I was one commit from recording this as a winner.
+
+**Why funding carry (iter 2) is NOT subject to this:** carry is a *mechanism* (funding contractually paid every 8h, 90% positive over 3yr, zero fitted params in always-on) — no estimation-window fragility. Stat-arb's edge was a *fitted* statistical relationship → regime-fragile. Different robustness class.
+
+---
+
+## Next (iteration 4): Lead-lag cross-predictability
+
+**Why:** does BTC's (or the panel's) past return predict an alt's NEXT return beyond its own autocorrelation? Lit prior is intraday cross-predictability + a documented *negative* lead-lag ("seesaw"). **Honest design must front-load walk-forward** (iter-3 lesson): fit any lead-lag coefficient on rolling IS, trade next OOS, demand >60% windows positive AND positive mean — no single-split headline. Cost discipline: this is higher-turnover (intraday signal) so the cost÷signal ratio is the kill switch, same as reversal. If it needs sub-hourly reaction to work, it's an execution edge not a candle edge → dead for us.
