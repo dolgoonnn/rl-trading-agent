@@ -233,6 +233,28 @@ Tested 5 candidates in the relative-value/cross-sectional/mechanism space the pr
 
 ---
 
+# FULL VALIDATION of xs-momentum (project's real bar) — ❌ DOES NOT CLEAR IT
+
+**Script:** `scripts/validate-momentum.ts` — reuses the deployed-strategy suite (`pbo.ts`, `deflated-sharpe.ts`, `monte-carlo.ts`) on the 2wk LS book (138 weekly obs on a shared 12wk-start grid, annualized Sharpe 1.60).
+
+| test | result | verdict |
+|---|---|---|
+| **PBO (CSCV)**, 7 configs × 10 windows | **63.5%** | ❌ **FAIL** (bar <25% strong / <50% pass) |
+| **DSR per-obs (statistically correct)** | +0.050 @7 trials → +0.001 @25 → **−0.04 @100** | ⚠️ passes only at low trial counts; FAILS at honest search breadth |
+| DSR annualized (project convention) | +1.20 → +0.98 | ✅ passes — but this convention feeds annualized SR into a per-obs formula → inflated; discount |
+| **Monte Carlo** (2000 iters) | reshuffle z=0.98; bootstrap Sharpe p5=0.63, PnL p5=+0.6%; skip-20%/30% 100% profitable | ✅ **PASS** |
+| **Survivorship** | not tested by PBO/DSR/MC | ⚠️ open, larger risk |
+
+**Verdict: xs-momentum does NOT clear the project's deployment bar.**
+- **PBO 63.5% (FAIL)** is the decisive strike: the in-sample-best lookback under-performs OOS more than half the time — the lookback ranking is *unstable* (consistent with 4wk/8wk breaking in the recent regime). Picking 2wk specifically is partly luck. *Nuance:* lookbacks are a correlated continuum, so a high PBO means "don't hand-pick a lookback" more than "zero edge" — a lookback ENSEMBLE (1–4wk) would dodge the selection, but as a single hand-picked config it fails.
+- **DSR is marginal:** within the momentum family (~7–16 trials) it scrapes positive; counting the full loop's search breadth (≥50 configs across all 10 iterations) it goes negative. Honest read: **not robustly significant** after multiple-testing correction.
+- **MC passes** (the chosen series isn't outlier-/luck-driven *within sample*) — but MC conditions on the already-selected config, so it's the weakest of the three and can't rescue a PBO fail.
+- **Survivorship** (the biggest risk) remains untested and can only hurt.
+
+**Conclusion:** the "Sharpe 1.5 winner" was a *screening* result. Under the project's real overfitting controls it is a **weak, not-robustly-significant edge** — NOT deployable as a single hand-picked config. The combine gain (+0.61 vt book Sharpe) rests on this sleeve and must be treated as unproven. **Do not deploy as-is.** Salvage paths, in order: (1) test a lookback-ENSEMBLE (1–4wk avg) to remove the selection overfit, then re-run DSR/MC; (2) obtain a point-in-time universe to measure the survivorship haircut; only then reconsider. If the ensemble also fails DSR at honest trial counts → shelve momentum.
+
+---
+
 # FINAL SYNTHESIS — loop complete (10 iterations, hard stop reached)
 
 | # | candidate | family | verdict |
