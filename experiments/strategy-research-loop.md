@@ -15,7 +15,7 @@
 | 2 | **Funding-carry delta-neutral** (collect funding, market-neutral) | mechanism harvest | n/a (carry) | strong: 10–20% APY, 0.8% maxDD 2025 | LOW | ✅ **SURVIVES** (iter 2) — parked as combine-candidate |
 | 3 | **Stat-arb cointegration pairs** (spread mean-reversion, multi-day hold) | relative-value | med | Fil/Kristoufek 30%/yr; intraday HF variants | MED (longer hold = lower turnover) | ❌ **KILLED** (iter 3, by walk-forward) |
 | 4 | **Lead-lag cross-predictability** (BTC→alt; intraday *negative* lead-lag) | relative-value | high | LASSO profits "net of realistic costs" | HIGH (intraday turnover) | ❌ **KILLED** (iter 4, cost wall + decay) |
-| 5 | Cross-sectional **momentum** (2–4wk) / longer-horizon reversal, size/illiquidity factors | factor | low (weekly=swing) | large & significant, not on std factors | LOW | ⏳ NEXT (low-turnover ⇒ should dodge the cost wall) |
+| 5 | Cross-sectional **momentum** (2–4wk) / longer-horizon reversal, size/illiquidity factors | factor | low (weekly=swing) | large & significant, not on std factors | LOW | ✅ **SURVIVES — strongest** (iter 5); combine-candidate |
 
 Sources: cross-sectional crypto factors ([Dobrynskaya SSRN 3913263](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3913263); factor-momentum 3,900 coins); stat-arb ([Springer 978-3-031-68974-1_16](https://link.springer.com/chapter/10.1007/978-3-031-68974-1_16); Fil & Kristoufek); funding carry ([market-neutral funds +14.4% 2025](https://www.tv-hub.org/guide/market-neutral-strategy-crypto), [arbitragescanner guide](https://arbitragescanner.io/blog/crypto-funding-rate-arbitrage-guide)); lead-lag ([intraday cross-predictability, ScienceDirect S1062940822000833](https://www.sciencedirect.com/science/article/abs/pii/S1062940822000833); [seesaw effect S0927539823000956](https://www.sciencedirect.com/science/article/abs/pii/S0927539823000956)); short-term reversal robustness (QuantPedia CO-OC).
 
@@ -103,6 +103,46 @@ GROSS Sharpe by window: 3.73, 5.16, 3.41, 0.30, 0.11, 0.74 (decaying). NET: −1
 
 ---
 
-## Next (iteration 5): Cross-sectional momentum (low-turnover factor)
+## Iteration 5 — Cross-sectional momentum — ✅ SURVIVES (strongest result of the loop)
 
-**Why it's the strongest remaining candidate:** it is the one family that *structurally dodges the kill switches above* — **weekly rebalance** (swing, not intraday) ⇒ low turnover ⇒ no cost wall (killed 1,4); and it's a **risk-premium factor** (rank by trailing 2–4wk return, hold winners), not a fitted pairwise relationship ⇒ less regime-fragile than stat-arb (3). Lit prior strong (Dobrynskaya: large & significant crypto momentum, not spanned by standard factors). **Honest design:** rolling WF, weekly rebalance, long top-tercile / short bottom-tercile (and long-only variant — shorting alts is hard), net of realistic cost, demand >60% windows positive + positive mean, and corr to the directional book (combine-candidate check).
+**Script:** `scripts/xs-momentum-pulse.ts` · 20-coin 1h panel, weekly (HOLD=168) rebalance. Rank by trailing LOOKBACK return; long top tercile / short bottom tercile (and long-only). Cost charged on ACTUAL name turnover/rebalance.
+
+**Long-short (market-neutral):**
+| lookback | grossSharpe | netSharpe | netAnn | maxDD | split-half (1st/2nd) |
+|---|---|---|---|---|---|
+| 1wk | 0.37 | 0.25 | 8.5% | 24.3% | −0.42 / 0.74 |
+| **2wk** | 1.55 | **1.49** | **58.0%** | 15.8% | **1.48 / 1.50** |
+| 4wk | 1.15 | 1.10 | 40.3% | 24.6% | 1.39 / 0.87 |
+| 8wk | 1.52 | 1.48 | 57.9% | 17.4% | 1.96 / 0.89 |
+
+**Long-only beats market** (selection, not just beta): momo−market excess Sharpe +0.76/+0.84/+1.40 at 2/4/8wk.
+
+**Deep-dive on 2wk long-short (the winner):**
+- **Rolling 20-week Sharpe: 52/55 windows positive (95%)** — median 2.47, min −1.71, max 3.58. *This is the rolling-WF robustness stat-arb FAILED (1/6) and momentum PASSES decisively.*
+- **corr to BTC weekly return = 0.069** — genuinely market-neutral ⇒ real diversifier.
+- **cost-robust**: at 20bps/name net Sharpe still 1.31 / 50.8%/yr / split-half 1.28/1.33 (low weekly turnover dodges the cost wall).
+- not a lucky lookback: 2/4/8wk all net >1; only 1wk fails (too short → reversal noise).
+
+**Verdict: real, robust, market-neutral, combinable momentum factor.** It structurally dodges BOTH kill switches — low turnover (survives cost, unlike 1,4) and a fixed ranking rule with no fitted params (not regime-fragile, unlike 3). Momentum is also the single most robust premium in cross-market asset pricing, so the EFFECT is not a fluke.
+
+**The one material caveat — survivorship bias:** the 20-coin universe is coins alive *today* with full history; a point-in-time universe (including delisted/dead coins) would lower the magnitude (winners that kept winning are over-represented; coins that went to zero are excluded). The *existence* of the premium (52/55 rolling, 0.07 BTC corr) is not a survivorship artifact, but the **~50–58%/yr level is almost certainly inflated** — treat as upper bound pending a survivorship-free universe. Short-leg also assumes alt shortability (borrow cost/availability); long-only is more deployable but carries 43–53% maxDD (long beta into bears).
+
+---
+
+## Standing scorecard (after 5 iterations — all candidates tested)
+
+| # | candidate | family | verdict | one-line why |
+|---|---|---|---|---|
+| 1 | reversal | relative-value | ❌ KILLED | gross @1-bar only; cost 23× signal |
+| 2 | funding carry | mechanism | ✅ PARKED | real ~5%/yr unlevered, ρ≈0; Sharpe artifact; needs basis data to deploy |
+| 3 | stat-arb pairs | relative-value | ❌ KILLED | 50/50 looked great, WF 1/6 — regime-fragile fitted relationship |
+| 4 | lead-lag | relative-value | ❌ KILLED | real gross (6/6) but cost wall @1h + decay → execution edge |
+| 5 | **xs-momentum** | **factor** | ✅ **SURVIVES (strongest)** | net Sharpe 1.3–1.5, 52/55 rolling, ρ=0.07 BTC, cost-robust |
+
+**Refined thesis:** NOT "all signals are dead." The precise law: **high-turnover signals die to cost (1,4); fitted statistical relationships die to regime shift (3); a LOW-turnover risk-premium FACTOR survives (5), as does a structural MECHANISM (2).** The two survivors are both market-neutral and ~uncorrelated to the directional book → genuine "combine" candidates. Momentum (5) is the prize: real return, clean robustness, deployable shape.
+
+---
+
+## Next (iteration 6): COMBINE — directional Run-20 book + xs-momentum LS
+
+**Why:** the mandate's payoff. Two ~uncorrelated market-neutral-ish sleeves (Run-20 directional crypto, xs-momentum LS at ρ=0.07) → combining should lift portfolio Sharpe materially (cf. [[strategy-combination]] where handcraft+DM beat every single sleeve). Plan: align Run-20 per-period returns with the momentum weekly series, compute the EW and vol-targeted combined Sharpe / maxDD vs each sleeve alone, confirm the diversification benefit is real (and not a survivorship mirage by haircutting momentum). Park funding carry until basis data exists.
