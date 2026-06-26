@@ -69,4 +69,33 @@ IS marginally positive (the screening illusion); **OOS negative**. Gross edge *d
 **Every refinement made it worse.** The most diffuse version (baseline) was least-bad — the textbook signature of fitting NOISE, not refining an edge.
 
 ## VERDICT — DEAD (no false hope)
-The single best gold-intraday candidate is **marginally positive in-sample, negative out-of-sample, and degrades under every principled refinement.** There is **no gold scalp/intraday winner** — now proven on a real 5-year OOS holdout, not assumed. Gold's intraday is a random walk; its only edge is session/swing (overnight + fix-short, the METALS BOOK). Closing gold intraday for good.
+The single best gold-intraday candidate is **marginally positive in-sample, negative out-of-sample, and degrades under every principled refinement.** There is **no gold scalp/intraday winner** — now proven on a real 5-year OOS holdout, not assumed.
+
+---
+
+# BREADTH PASS — ~22 distinct gold/silver intraday hypotheses (all OOS-tested) — ALL DEAD
+
+After the first deep-dive, ran the loop with real breadth. Every family below was tested with honest cost + the 2015–19 OOS holdout. **None survives (OOS netBp>0 AND OOS Sharpe>0.5).**
+
+**Directional battery** (`scripts/gold-intraday-battery.ts`, 1 trade/day, 4bp RT, IS/OOS):
+| signal | IS netBp | OOS netBp | OOS Sharpe |
+|---|---|---|---|
+| Asian breakout continuation | +0.97 | −1.33 | −0.33 |
+| Asian breakout fade | −8.97 | −6.67 | −1.65 |
+| overnight→day momentum | −0.50 | −4.00 | −0.93 |
+| overnight→day reversal | −7.50 | −4.00 | −0.93 |
+| prior-day momentum | −5.86 | −5.95 | −1.38 |
+| prior-day reversal | −2.14 | −2.05 | −0.48 |
+| London→NY momentum | −1.43 | −2.38 | −0.69 |
+| time-of-day (strong hrs) | +0.58 | −3.53 | −0.92 |
+
+(time-of-day +IS/−OOS confirms the hour-drift was in-sample mining.)
+
+**Relative-value** — gold–silver ratio mean-reversion (`scripts/gold-silver-ratio.ts`): IS gross Sharpe −0.28 (ratio does NOT revert intraday — it persists), net −1.12; OOS net −1.67. No gross edge.
+
+**VWAP reversion** (`scripts/gold-vwap-reversion.ts`, 4 thresholds): all IS & OOS negative (−0.66 to −3.39 OOS Sharpe). Consistent with autocorr≈0.
+
+**Silver (XAGUSD) scalp scorecard** (3bps/side): all 5 net-negative, worse than gold (mean_reversion −139%, session_range −32%, atr_breakout −61%, bb_squeeze −36%, silver_bullet −7%). Wider spread → cost dominates more.
+
+## MASTER VERDICT (exhaustive)
+Tested ~22 distinct intraday/scalp hypotheses across gold + silver: statistical scalp (×2 assets), session breakout (cont/fade), overnight & prior-day momentum/reversal, London→NY, time-of-day, gold–silver relative value, VWAP reversion — **plus** the previously-closed ICT-directional intraday gold (40+ nulls). **ZERO survive OOS net of cost.** The mechanism is consistent and now bulletproof: gold intraday is a near-random-walk (lag-1 autocorr −0.009); the rare flickers sit below the ~4bp cost frontier; and gold candles carry no order-flow to reach a microstructure edge. **Gold/silver scalp & intraday is exhaustively CLOSED.** The only metals edge is session/swing (overnight + fix-short = METALS BOOK, ~17%/yr). No false hope — the search was wide and the answer is no.
