@@ -4,8 +4,8 @@ import {
   liquidationPrice,
   effectiveLiqTrigger,
   fundingCostFraction,
+  resolveTradeUnderLeverage,
 } from '@/lib/scalp/leverage/liquidation';
-import { resolveTradeUnderLeverage } from '@/lib/scalp/leverage/liquidation';
 import type { Candle } from '@/types/candle';
 import type { TradeTapeEntry, LeverageConfig } from '@/lib/scalp/leverage/types';
 
@@ -92,6 +92,7 @@ describe('resolveTradeUnderLeverage', () => {
     const candles = [c(0, 100, 100, 100, 100), c(M, 100, 101, 85, 95), c(2 * M, 95, 96, 94, 95), c(3 * M, 95, 95, 94, 95)];
     const out = resolveTradeUnderLeverage(longTrade, candles, baseCfg);
     expect(out.liquidated).toBe(true);
+    expect(out.equityMultiplier).toBeCloseTo(0, 9);
   });
 
   it('low leverage: P_liq far away -> survives even on a losing 1x trade', () => {
@@ -114,5 +115,17 @@ describe('resolveTradeUnderLeverage', () => {
     const out = resolveTradeUnderLeverage(t, candles, cfg);
     // 1 + 1*10*(0.30 - 0.01) = 3.9
     expect(out.equityMultiplier).toBeCloseTo(3.9, 9);
+  });
+
+  it('short: liquidation when a 1m high pierces P_liq before exit -> lose full margin', () => {
+    // L=10 short: P_liq = 109.5. Bar high 110 >= 109.5 -> liquidated even though 1x was a winner.
+    const shortTrade: TradeTapeEntry = {
+      symbol: 'X', direction: 'short', entryPrice: 100, stopLoss: 112, takeProfit: 70,
+      entryTimestamp: 0, exitTimestamp: 3 * M, pnlPercent1x: 0.30,
+    };
+    const candles = [c(0, 100, 100, 100, 100), c(M, 100, 110, 99, 105), c(2 * M, 105, 106, 68, 70), c(3 * M, 70, 71, 69, 70)];
+    const out = resolveTradeUnderLeverage(shortTrade, candles, baseCfg);
+    expect(out.liquidated).toBe(true);
+    expect(out.equityMultiplier).toBeCloseTo(0, 9);
   });
 });
