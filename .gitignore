@@ -81,3 +81,7 @@ pine/run20-confluence-ob.pine
 data/*.db.bak*
 simulation-report.html
 experiments/runs/allocator-report.json
+# Research-loop momentum combine artifacts (regenerable via scripts/add-momentum-sleeve.ts)
+experiments/runs/strategy-daily-returns-plus-momentum.json
+experiments/runs/combined-daily-E.json
+experiments/runs/combined-daily-F.json

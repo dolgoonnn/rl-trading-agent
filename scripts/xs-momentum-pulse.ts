@@ -19,10 +19,14 @@
 import { readFileSync } from 'node:fs';
 
 interface Candle { timestamp: number; close: number }
+// MATICUSDT dropped: its 1h data ends 2024-09-10 (MATIC→POL rebrand) and was the
+// SINGLE coin truncating the all-coins common timeline to Sep-2024. Dropping it
+// (a rebrand/data-availability artifact, not a zero) extends the panel to Feb-2026
+// so momentum is tested on the FULL ~3yr window incl. the recent regime.
 const COINS = [
   'AAVEUSDT', 'ADAUSDT', 'APTUSDT', 'ARBUSDT', 'ATOMUSDT', 'AVAXUSDT', 'BNBUSDT',
   'BTCUSDT', 'DOGEUSDT', 'DOTUSDT', 'ETHUSDT', 'FILUSDT', 'ICPUSDT', 'LINKUSDT',
-  'LTCUSDT', 'MATICUSDT', 'NEARUSDT', 'SOLUSDT', 'UNIUSDT', 'XRPUSDT',
+  'LTCUSDT', 'NEARUSDT', 'SOLUSDT', 'UNIUSDT', 'XRPUSDT',
 ];
 const FRICTION = Number(process.env.FRICTION ?? 0.0005); // 5 bps per name-side traded
 const HOLD = 168;        // 1 week (hours)

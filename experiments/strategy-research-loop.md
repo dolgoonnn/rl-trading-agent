@@ -143,6 +143,39 @@ GROSS Sharpe by window: 3.73, 5.16, 3.41, 0.30, 0.11, 0.74 (decaying). NET: −1
 
 ---
 
-## Next (iteration 6): COMBINE — directional Run-20 book + xs-momentum LS
+## Iteration 6 — COMBINE: book + xs-momentum — ✅ REAL DIVERSIFICATION GAIN
 
-**Why:** the mandate's payoff. Two ~uncorrelated market-neutral-ish sleeves (Run-20 directional crypto, xs-momentum LS at ρ=0.07) → combining should lift portfolio Sharpe materially (cf. [[strategy-combination]] where handcraft+DM beat every single sleeve). Plan: align Run-20 per-period returns with the momentum weekly series, compute the EW and vol-targeted combined Sharpe / maxDD vs each sleeve alone, confirm the diversification benefit is real (and not a survivorship mirage by haircutting momentum). Park funding carry until basis data exists.
+**Scripts:** `scripts/add-momentum-sleeve.ts` (emits the validated 2wk LS momentum as daily log returns + a survivorship-haircut variant) → reuses the tested `scripts/combine-strategies.ts` (handcraft/ERC/DM/vol-target) via a new `RETURNS_FILE` env + gated Universes E/F.
+
+**First, a data correction that mattered:** all iters 1–5 ran on a 20-coin panel whose common timeline was truncated to **Sep-2024** by MATICUSDT (MATIC→POL rebrand, data ends 2024-09-10 — the single limiting coin). Dropping MATIC (rebrand/data artifact, not a zero) extends the panel to **Feb-2026 (full ~3yr window)**. Re-validated momentum on the full window:
+- **2wk LS holds: net Sharpe 1.51** (was 1.49 on the short window), 64.5%/yr, maxDD 29.6% (more realistic), split-half 1.74/1.30, **rolling 112/129 (87%) positive**, ρ=0.08.
+- **4wk/8wk BROKE in the recent regime** (2nd-half Sharpe −0.29/−0.26) — the edge is concentrated at the **1–2wk horizon**; 2wk is robust on both windows. Mild horizon-sensitivity noted.
+
+**Combine result — EW book, same window (2023-05-29→2026-01-08), same 3 base sleeves ± momentum:**
+| book (EW) | annRet | raw Sharpe | vol-targeted Sharpe |
+|---|---|---|---|
+| A: crypto+sessionBook+f2f | 31.9% | 2.93 | 2.79 |
+| **E: + xsMomentum** | 33.6% | **3.23** | **3.40** |
+| F: + xsMomentum (Sharpe halved to 0.79) | 30.8% | 2.96 | **3.14** |
+
+momentum's correlation to every sleeve ≤ |0.08| (crypto −0.02, sessionBook −0.08, f2f +0.02) → DM 1.72→1.97. Adding it lifts EW Sharpe **2.93→3.23 (+0.30 raw, +0.61 vol-targeted)** at ~flat drawdown. EW beats handcraft/ERC (P<50%) — consistent with the project's robust-EW finding.
+
+**Survivorship-robustness (the key honest check):** even with momentum's Sharpe **halved to 0.79** (conservative survivorship floor), the **vol-targeted book still improves 2.79→3.14 (+0.35)** (raw ~flat +0.03). Because ρ≈0 is *structural* (market-neutral), the diversification benefit survives the haircut — only its magnitude scales with momentum's true Sharpe. Realistic outcome sits between E and F: **the book improves, most clearly vol-targeted (the deployable config).**
+
+**Verdict:** xs-momentum LS is a genuine, combinable, ~uncorrelated sleeve that improves the existing book even under a conservative survivorship haircut. The loop's "combine if needed" mandate is satisfied with a real result.
+
+---
+
+## Loop summary (6 iterations)
+
+Tested 5 candidates in the relative-value/cross-sectional/mechanism space the project had never touched, then combined the winner:
+- **KILLED (3):** reversal (cost wall), stat-arb pairs (regime-fragile, WF 1/6), lead-lag (cost wall @1h + decay). All *signals*; all die to turnover×cost or estimation-window fragility.
+- **PARKED (1):** funding carry — real mechanism (~5%/yr, ρ=0.04) but Sharpe is an artifact; needs basis/tail data to deploy.
+- **SURVIVED + COMBINED (1):** xs-momentum 2wk LS — net Sharpe ~1.5, 87% rolling windows, ρ≈0.08; adds +0.30–0.61 to book Sharpe, robust to a survivorship haircut (vol-targeted).
+
+**Final refined thesis:** the project's "edge = execution/mechanism, not signals" is *mostly* right but **incomplete** — a **low-turnover risk-premium FACTOR (cross-sectional momentum)** also survives, and uniquely it *combines* with the directional book for a real diversification gain. The kill switches are universal (turnover×cost; estimation-window/regime fragility); the survivor traits are: no per-trade fitting, low turnover, market-neutral, structurally uncorrelated.
+
+## Possible next iterations (open backlog)
+- **Deploy path for xs-momentum:** point-in-time (survivorship-free) universe to nail the true magnitude; shortability/borrow-cost model for the LS leg (long-only is more deployable but 64% maxDD); wire as a paper sleeve.
+- **Funding carry:** source spot+perp basis data → model the tail → revisit deploy.
+- **New families not yet tested:** time-series (not cross-sectional) momentum/trend on the panel; vol-risk-premium (sell rich realized-vs-implied); on-chain/flow factors. Same discipline: pulse → WF → cost → combine.

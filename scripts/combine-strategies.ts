@@ -93,7 +93,11 @@ interface AlignedData {
 }
 
 function loadAligned(names: string[], minDate?: string): AlignedData {
-  const file = path.resolve(__dirname, '..', 'experiments', 'runs', 'strategy-daily-returns.json');
+  // RETURNS_FILE env lets a caller point at an augmented returns file (e.g. with a
+  // candidate sleeve added) without touching the canonical book.
+  const file = process.env.RETURNS_FILE
+    ? path.resolve(process.env.RETURNS_FILE)
+    : path.resolve(__dirname, '..', 'experiments', 'runs', 'strategy-daily-returns.json');
   const data = JSON.parse(fs.readFileSync(file, 'utf-8')) as { series: Record<string, Record<string, number>> };
   const series = names.map((n) => {
     const s = data.series[n];
@@ -537,6 +541,19 @@ function main(): void {
     out.push(runUniverse('D', 'UNIVERSE D — review-preview upgraded book', ['crypto', 'sessionBookUpgraded', 'f2f']));
   } catch {
     console.log('\n(Universe D skipped — sessionBookUpgraded not present)');
+  }
+  // Universe E: add the xs-momentum sleeve (research-loop iter 6). Gated on the
+  // sleeve being present (provide via RETURNS_FILE=…-plus-momentum.json).
+  try {
+    out.push(runUniverse('E', 'UNIVERSE E — book + xs-momentum', ['crypto', 'sessionBook', 'f2f', 'xsMomentum']));
+  } catch {
+    console.log('\n(Universe E skipped — xsMomentum not present; run add-momentum-sleeve.ts + set RETURNS_FILE)');
+  }
+  // Universe F: book + survivorship-haircut momentum (halved Sharpe) — robustness floor.
+  try {
+    out.push(runUniverse('F', 'UNIVERSE F — book + xs-momentum (survivorship haircut)', ['crypto', 'sessionBook', 'f2f', 'xsMomentumHC']));
+  } catch {
+    console.log('\n(Universe F skipped — xsMomentumHC not present)');
   }
 
   const outPath = path.resolve(__dirname, '..', 'experiments', 'runs', 'strategy-combination-results.json');
