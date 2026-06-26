@@ -19,6 +19,11 @@
       "sharpe": 0.48,
       "maxDDPct": 12.8
     },
+    "fixShortRefined1430": {
+      "totalPct": 30.1,
+      "sharpe": 0.63,
+      "maxDDPct": 13.6
+    },
     "metals5050": {
       "totalPct": 134.9,
       "sharpe": 1,
@@ -28,6 +33,11 @@
       "totalPct": 164.1,
       "sharpe": 1.13,
       "maxDDPct": 21
+    },
+    "fullStackRefined1430": {
+      "totalPct": 165.1,
+      "sharpe": 1.18,
+      "maxDDPct": 22.2
     }
   },
   "corrGoldSilver": 0.7557,

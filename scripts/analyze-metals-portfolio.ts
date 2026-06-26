@@ -59,11 +59,14 @@ function londonOffsetHours(ts: number): number {
   const y = new Date(ts).getUTCFullYear();
   return ts >= nthSundayUTC(y, 2, -1) + 3_600_000 && ts < nthSundayUTC(y, 9, -1) + 3_600_000 ? 1 : 0;
 }
-function fixShortDaily(files: string[], frictionPerSide: number): Map<string, number> {
+// entryBound = London-local minute of entry (840 = 14:00 original; 870 = 14:30 refined).
+// The 14:30 refinement (gold-fix-refinement-validate.ts) drops the zero-mean/high-variance
+// 14:00→14:30 segment: same mean drift, ~22% less variance, Sharpe 0.48→0.63. Cover at 15:00.
+function fixShortDaily(files: string[], frictionPerSide: number, entryBound = 840): Map<string, number> {
   const out = new Map<string, number>();
   for (const f of files) {
     const candles: Candle[] = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'data', f), 'utf-8'));
-    const byDay = new Map<string, { at14?: number; at15?: number }>();
+    const byDay = new Map<string, { entry?: number; at15?: number }>();
     for (const c of candles) {
       const local = c.timestamp + londonOffsetHours(c.timestamp) * 3_600_000;
       const d = new Date(local);
@@ -71,12 +74,12 @@ function fixShortDaily(files: string[], frictionPerSide: number): Map<string, nu
       const day = d.toISOString().slice(0, 10);
       let rec = byDay.get(day);
       if (!rec) { rec = {}; byDay.set(day, rec); }
-      if (lm <= 840) rec.at14 = c.close;
+      if (lm <= entryBound) rec.entry = c.close;
       if (lm <= 900) rec.at15 = c.close;
     }
     for (const [day, rec] of byDay) {
-      if (rec.at14 !== undefined && rec.at15 !== undefined && rec.at14 > 0) {
-        out.set(day, -Math.log(rec.at15 / rec.at14) - 2 * frictionPerSide);
+      if (rec.entry !== undefined && rec.at15 !== undefined && rec.entry > 0) {
+        out.set(day, -Math.log(rec.at15 / rec.entry) - 2 * frictionPerSide);
       }
     }
   }
@@ -87,18 +90,21 @@ async function main(): Promise<void> {
   console.log('Building legs (futures-tier friction)...');
   const gold = dailySeries(['XAUUSD_1m_holdout.json', 'XAUUSD_1m.json'], 0.00003);
   const silver = dailySeries(['XAGUSD_1m_holdout.json', 'XAGUSD_1m.json'], 0.0001);
-  const fixS = fixShortDaily(['XAUUSD_1m_holdout.json', 'XAUUSD_1m.json'], 0.00003);
+  const fixS = fixShortDaily(['XAUUSD_1m_holdout.json', 'XAUUSD_1m.json'], 0.00003);            // 14:00 original
+  const fixSRef = fixShortDaily(['XAUUSD_1m_holdout.json', 'XAUUSD_1m.json'], 0.00003, 870);     // 14:30 refined (deployed)
 
   const allDates = [...new Set([...gold.keys(), ...silver.keys(), ...fixS.keys()])].sort();
-  const g: number[] = [], s: number[] = [], f: number[] = [], metals: number[] = [], stack: number[] = [];
+  const g: number[] = [], s: number[] = [], f: number[] = [], fRef: number[] = [], metals: number[] = [], stack: number[] = [], stackRef: number[] = [];
   const perYear = new Map<string, { g: number; s: number; stack: number }>();
   for (const d of allDates) {
     const rg = gold.get(d) ?? 0;
     const rs = silver.get(d) ?? 0;
     const rf = fixS.get(d) ?? 0;
-    g.push(rg); s.push(rs); f.push(rf);
+    const rfRef = fixSRef.get(d) ?? 0;
+    g.push(rg); s.push(rs); f.push(rf); fRef.push(rfRef);
     metals.push(0.5 * rg + 0.5 * rs);
     stack.push(0.5 * rg + 0.5 * rs + rf);
+    stackRef.push(0.5 * rg + 0.5 * rs + rfRef);
     const y = d.slice(0, 4);
     const rec = perYear.get(y) ?? { g: 0, s: 0, stack: 0 };
     rec.g += rg; rec.s += rs; rec.stack += 0.5 * rg + 0.5 * rs + rf;
@@ -112,9 +118,11 @@ async function main(): Promise<void> {
   console.log(`\n=== Metals overnight portfolio (${allDates[0]} → ${allDates[allDates.length - 1]}) ===`);
   rep('gold 22-07+wknd @0.3bp', g);
   rep('silver same @1bp', s);
-  rep('fix-short @0.3bp', f);
+  rep('fix-short 14:00 @0.3bp', f);
+  rep('fix-short 14:30 @0.3bp', fRef);
   rep('50/50 metals', metals);
-  rep('full stack (+fix)', stack);
+  rep('full stack (+fix 14:00)', stack);
+  rep('full stack (+fix 14:30)', stackRef);
   console.log(`  corr(gold,silver)=${fmt(corr(g, s), 3)} corr(metals,fix)=${fmt(corr(metals, f), 3)}`);
   console.log('\n  Per-year (gold / silver / full stack):');
   for (const [y, r] of [...perYear.entries()].sort()) {
@@ -170,8 +178,10 @@ async function main(): Promise<void> {
         gold: { totalPct: fmt(g.reduce((a, x) => a + x, 0) * 100, 1), sharpe: fmt(sharpe(g)), maxDDPct: fmt(maxDD(g) * 100, 1) },
         silver: { totalPct: fmt(s.reduce((a, x) => a + x, 0) * 100, 1), sharpe: fmt(sharpe(s)), maxDDPct: fmt(maxDD(s) * 100, 1) },
         fixShort: { totalPct: fmt(f.reduce((a, x) => a + x, 0) * 100, 1), sharpe: fmt(sharpe(f)), maxDDPct: fmt(maxDD(f) * 100, 1) },
+        fixShortRefined1430: { totalPct: fmt(fRef.reduce((a, x) => a + x, 0) * 100, 1), sharpe: fmt(sharpe(fRef)), maxDDPct: fmt(maxDD(fRef) * 100, 1) },
         metals5050: { totalPct: fmt(metals.reduce((a, x) => a + x, 0) * 100, 1), sharpe: fmt(sharpe(metals)), maxDDPct: fmt(maxDD(metals) * 100, 1) },
         fullStack: { totalPct: fmt(stack.reduce((a, x) => a + x, 0) * 100, 1), sharpe: fmt(sharpe(stack)), maxDDPct: fmt(maxDD(stack) * 100, 1) },
+        fullStackRefined1430: { totalPct: fmt(stackRef.reduce((a, x) => a + x, 0) * 100, 1), sharpe: fmt(sharpe(stackRef)), maxDDPct: fmt(maxDD(stackRef) * 100, 1) },
       },
       corrGoldSilver: fmt(corr(g, s), 4),
       perYear: Object.fromEntries([...perYear.entries()].sort().map(([y, r]) => [y, { gold: fmt(r.g * 100, 1), silver: fmt(r.s * 100, 1), stack: fmt(r.stack * 100, 1) }])),

@@ -5,7 +5,7 @@
  * Deployable legs (experiments/execution-audit.md, venue-realistic costs):
  *   - Au+Ag overnight long: enter 18:05–19:30 ET (CME reopen anchor), exit 07:01+ UTC.
  *   - Friday weekend leg: enter 20:00 UTC Friday, exit Monday morning.
- *   - Gold fix-short: short 14:00 London, cover 15:00 London (DST-aware).
+ *   - Gold fix-short: short 14:30 London (refined window), cover 15:00 London (DST-aware).
  *   - Silver own-fix short: 11:00→12:00 London.
  *   - EUR morning short: 09:00→12:00 UTC (Breedon-Ranaldo).
  *   - US500 overnight: 16:00 ET close → 09:31 ET open (leg J).
@@ -267,8 +267,10 @@ async function tick(state: BotState): Promise<void> {
         }
       }
     }
-    // Fix-short (gold): 14:00–14:30 London, weekdays
-    if (dow >= 1 && dow <= 5 && ldnHour === 14) {
+    // Fix-short (gold): enter 14:30 London (refined window — gold-fix-refinement-validate.ts:
+    // the 14:00→14:30 segment is zero-mean/high-variance, so the tighter 14:30→15:00 short
+    // harvests the same drift with 22% less variance, Sharpe 0.48→0.63), cover 15:00. Weekdays.
+    if (dow >= 1 && dow <= 5 && ldnHour === 14 && d.getUTCMinutes() >= 30) {
       const q = quotes.gold;
       const open = state.positions.find((p) => p.leg === 'fix-short');
       if (q && !open) {
