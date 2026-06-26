@@ -22,6 +22,7 @@ export function simulateLeverage(
     if (outcome.liquidated) liquidations++;
     const m = Math.max(outcome.equityMultiplier, 0); // isolated margin: cannot go below 0
     multipliers.push(m);
+    // floor avoids log(0) = -Infinity on a full-margin liquidation (multiplier 0); 1e-12 is negligible vs any real multiplier
     logMultipliers.push(Math.log(Math.max(m, 1e-12)));
     equity *= m;
     equityCurve.push(equity);
@@ -35,7 +36,7 @@ export function simulateLeverage(
   return {
     leverage: cfg.leverage,
     marginFraction: cfg.marginFraction,
-    tradeCount: tape.length,
+    tradeCount: multipliers.length,
     liquidations,
     totalReturn: equity - 1,
     meanLogGrowthPerTrade: meanLog,

@@ -25,6 +25,11 @@ describe('simulateLeverage', () => {
     // equity: 1 * 1.10 * 0.95 = 1.045
     expect(r.totalReturn).toBeCloseTo(0.045, 9);
     expect(r.tradeCount).toBe(2);
+    // Per-trade equity curve verification
+    expect(r.equityCurve).toHaveLength(3);
+    expect(r.equityCurve[0]).toBeCloseTo(1, 9);
+    expect(r.equityCurve[1]).toBeCloseTo(1.10, 9);   // 1 * (1 + 1*1*0.10)
+    expect(r.equityCurve[2]).toBeCloseTo(1.045, 9);  // 1.10 * (1 + 1*1*(-0.05))
   });
 
   it('throws on missing candle data for a symbol', () => {
