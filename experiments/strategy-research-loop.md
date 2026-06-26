@@ -202,8 +202,21 @@ Tested 5 candidates in the relative-value/cross-sectional/mechanism space the pr
 
 **Verdict:** no premium (net Sharpe ~0–0.18, unstable split-halves with negative first halves). The equity low-vol anomaly **does not transfer to crypto** — consistent with crypto's lottery/speculative character: high-vol alts aren't penalized, they often have the biggest runs (MAX/lottery preference dominates the low-vol effect). Clean kill of a genuinely new factor family.
 
+## Iteration 9 — Order-flow imbalance (takerBuyVolume) — ❌ no candle edge, ✅ thesis-confirming
+
+**Script:** `scripts/flow-imbalance-pulse.ts` · 19-coin panel, imbalance=(2·takerBuy−vol)/vol (1h-aggregated order-flow proxy), cross-sectional long-short, both directions, holds 24h/168h.
+
+| dir | look/hold | grossSharpe | netSharpe | splitH |
+|---|---|---|---|---|
+| momentum | 24/24 | −0.63 | −1.24 | −1.32/−1.18 |
+| reversal | 24/24 | **+0.63** | **+0.01** | 0.02/0.01 |
+| momentum | 336/168 | 0.60 | 0.54 | 0.32/0.73 |
+| reversal | 168/168 | 0.48 | 0.39 | 1.05/−0.37 |
+
+**Verdict:** at fast (24h) frequency there's a real GROSS flow-reversal signal (Sharpe +0.63) **entirely eaten by turnover cost (net +0.01)** — the textbook signature of a microstructure edge that needs sub-hour/L2 execution, not candles. The only net-positive config (slow weekly flow-momentum, net 0.54) is a noisy proxy for price momentum (redundant). **No tradeable candle edge, BUT a clean empirical confirmation of the project thesis using order-flow data directly:** the edge is real and lives *below the candle/cost frontier*. Reinforces [[edge-source-vs-signal-hunting]] — order-flow IS where signal is, but harvesting it needs L2/maker execution we don't have.
+
 ## Hard stop (set 2026-06-26 after user chose "keep searching")
-**Loop ends after iteration 10, OR earlier the moment the next candidate is data-blocked / only redundant families remain.** Iterations remaining: 9, 10. After that → stop searching, pivot to deploying xs-momentum (the one validated, combinable winner).
+**Loop ends after iteration 10.** One iteration remaining: 10 (Amihud illiquidity — the most orthogonal new factor left). After that → stop searching, pivot to deploying xs-momentum (the one validated, combinable winner).
 
 ## Possible next iterations (open backlog)
 - **Deploy path for xs-momentum:** point-in-time (survivorship-free) universe to nail the true magnitude; shortability/borrow-cost model for the LS leg (long-only is more deployable but 64% maxDD); wire as a paper sleeve.
