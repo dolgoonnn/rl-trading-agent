@@ -49,5 +49,34 @@ stronger than the deployed 14:00–15:00 — a candidate tweak for the deployed 
 This is the honest "how people do it": the edge is mechanism + execution (the fix, on futures),
 exactly as the project thesis and the web research said — never a spot-candle pattern.
 
-## Next system candidates (loop continues): COMEX/NY-open vol window, turn-of-month gold
-flow, OPEX pinning, futures-roll. All mechanism/flow, judged OOS, cost-honest.
+## Improve step — month-end concentration REJECTED by holdout (`scripts/gold-fix-monthend.ts`)
+
+Mechanism prediction: benchmark/index rebalancing flow is largest at month-end ⇒ the fix
+down-drift should concentrate in the last K business days, giving a cost-robust subset
+(bigger move, ~5× fewer trades). Tested 14→15 London short split by business-days-to-month-end.
+| | month-end (last K bd) | rest-of-month |
+|---|---|---|
+| IS 20-26 K=5 | **4.02bp, Sharpe 1.85, t=2.30** | 0.04bp ≈ 0 |
+| OOS 15-19 K=5 | 0.45bp, Sharpe 0.27 | **1.17bp, Sharpe 0.65** |
+| OOS 15-19 K=3 | 2.05bp, Sharpe 1.40, **t=1.18 (insig)** | 0.84bp |
+
+In-sample the edge is *entirely* month-end (rest ≈ 0) — a perfect mechanism story. OOS it
+**vanishes**: month-end is NOT specially strong (rest-of-month is stronger at K=5), the K=3
+point estimate is insignificant (t=1.18) and flips sign vs K=5 = noise. At 1bp/side all gone.
+**No cost-robust retail subset.** The fix edge is real but *diffuse* across the month, not
+concentrable — same IS-strong/OOS-gone signature as time-of-day. Refinement closed.
+
+## Cross-check — replicates prior independent work
+`experiments/calendar-research.md` (2026-06-10, independent) found the identical conclusion:
+gold London PM-fix down-drift −1.59bp/d into 15:00, t=−2.62, regime-stable, "below retail
+friction — futures-tier overlay only." Two independent passes ⇒ the fix mechanism is solid;
+both reach "institutional/futures-tier only." Turn-of-month gold there = regime-unstable (dead).
+
+## SYSTEMS-LOOP TERMINAL VERDICT (gold intraday)
+The only gold intraday SYSTEM is the **fix mechanism** (pre-fix short + post-fix bounce, AM &
+PM): real, OOS-robust, mechanistically coherent, independently replicated — but **institutional/
+futures-only** (~0.6bp RT). No retail-deployable form exists (cost sensitivity + month-end both
+confirm). Candle patterns (~22 hyps), calendar (ToM/DOW/momentum), and events (FOMC/NFP) are all
+dead. Deployable gold edge stays the overnight/fix METALS BOOK; the loop's one actionable
+refinement is the tighter **14:30–15:00 pre-PM-fix window** (OOS 1.06 vs deployed 0.57) as a
+forward-test candidate for the existing fix-short leg.
