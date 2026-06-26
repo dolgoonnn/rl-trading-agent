@@ -22,7 +22,9 @@
  */
 
 import fs from 'fs';
+import { writeFileSync } from 'node:fs';
 import path from 'path';
+import type { TradeTapeEntry } from '../src/lib/scalp/leverage/types';
 import type { Candle } from '@/types';
 import { aggregate } from '../src/lib/scalp/data/aggregator';
 import { ICT5mStrategy } from '../src/lib/scalp/strategies/ict-5m';
@@ -152,12 +154,14 @@ function createScalpRunner(
   suppressRegimes: string[],
   tf: number,
   partialTP?: PartialTPConfig,
+  tape?: TradeTapeEntry[],
+  emitTapePath?: string | null,
 ): { runner: WalkForwardStrategyRunner; allTrades: TradeResult[] } {
   const allTrades: TradeResult[] = [];
 
   const runner: WalkForwardStrategyRunner = {
     name: `scalp-${strategy.name}`,
-    async run(trainCandles5m: Candle[], valCandles5m: Candle[], _meta?: { symbol?: string }): Promise<TradeResult[]> {
+    async run(trainCandles5m: Candle[], valCandles5m: Candle[], meta?: { symbol?: string }): Promise<TradeResult[]> {
       const all5m = [...trainCandles5m, ...valCandles5m];
       const all1h = aggregate(all5m, 60); // 60 minutes = 1H
 
@@ -247,6 +251,21 @@ function createScalpRunner(
           if (trade) {
             windowTrades.push(trade);
             allTrades.push(trade);
+
+            // Emit trade tape entry if requested
+            if (emitTapePath && tape) {
+              const symbol = meta?.symbol ?? '';
+              tape.push({
+                symbol,
+                direction: position.direction,
+                entryPrice: position.entryPrice,
+                stopLoss: position.stopLoss,
+                takeProfit: position.takeProfit,
+                entryTimestamp: position.entryTimestamp,
+                exitTimestamp: trade.exitTimestamp,
+                pnlPercent1x: trade.pnlPercent,
+              });
+            }
 
             // Find exit bar index
             let exitIdx = i + 1;
@@ -348,6 +367,11 @@ async function main(): Promise<void> {
   const targetRArg = getArg('target-r');
   const sessionArg = getArg('session');
   const jsonOutputMode = hasFlag('json');
+
+  // Emit trade tape
+  const args = process.argv.slice(2);
+  const emitTapeArg = args.indexOf('--emit-trade-tape');
+  const emitTapePath: string | null = emitTapeArg !== -1 ? (args[emitTapeArg + 1] ?? null) : null;
 
   // Execution timeframe in minutes (default 5 — original harness behavior)
   const tf = tfArg ? parseInt(tfArg, 10) : 5;
@@ -501,9 +525,11 @@ async function main(): Promise<void> {
   }
 
   // Create strategy and runner
+  const tape: TradeTapeEntry[] = [];
   const strategy = createStrategy(strategyName, ict5mConfig, atrConfig, sweepChochConfig);
   const { runner, allTrades } = createScalpRunner(
     strategy, threshold, exitMode, maxBars, cooldownBars, friction, suppressRegimes, tf, partialTP,
+    tape, emitTapePath,
   );
 
   // Run walk-forward validation on execution-TF candles
@@ -523,6 +549,12 @@ async function main(): Promise<void> {
       try { fs.unlinkSync(path.resolve(tempDataDir, `${sym}_${tf}m.json`)); } catch { /* ignore */ }
     }
     try { fs.rmdirSync(tempDataDir); } catch { /* ignore */ }
+  }
+
+  // Write trade tape if requested
+  if (emitTapePath) {
+    writeFileSync(emitTapePath, JSON.stringify(tape, null, 2));
+    console.log(`\n📼 Wrote ${tape.length} trades to ${emitTapePath}`);
   }
 
   // Compute summary metrics
