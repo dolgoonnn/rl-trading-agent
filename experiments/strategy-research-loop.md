@@ -218,7 +218,44 @@ Tested 5 candidates in the relative-value/cross-sectional/mechanism space the pr
 ## Hard stop (set 2026-06-26 after user chose "keep searching")
 **Loop ends after iteration 10.** One iteration remaining: 10 (Amihud illiquidity — the most orthogonal new factor left). After that → stop searching, pivot to deploying xs-momentum (the one validated, combinable winner).
 
-## Possible next iterations (open backlog)
-- **Deploy path for xs-momentum:** point-in-time (survivorship-free) universe to nail the true magnitude; shortability/borrow-cost model for the LS leg (long-only is more deployable but 64% maxDD); wire as a paper sleeve.
-- **Funding carry:** source spot+perp basis data → model the tail → revisit deploy.
-- **New families not yet tested:** time-series (not cross-sectional) momentum/trend on the panel; vol-risk-premium (sell rich realized-vs-implied); on-chain/flow factors. Same discipline: pulse → WF → cost → combine.
+## Iteration 10 — Amihud illiquidity — ❌ inverted / marginal (FINAL iteration)
+
+**Script:** `scripts/amihud-pulse.ts` · weekly, long-illiquid/short-liquid tercile by Amihud (|ret|/dollar-vol).
+
+| dir | win | netSharpe | splitH | corr→BTC |
+|---|---|---|---|---|
+| long-illiquid (classic) | 14d | −0.91 | −0.58/−1.16 | −0.07 |
+| long-illiquid (classic) | 30d | −0.75 | −0.19/−1.16 | −0.05 |
+| long-liquid (inverse) | 14d | 0.90 | 0.56/1.16 | 0.07 |
+| long-liquid (inverse) | 30d | 0.74 | 0.18/1.16 | 0.05 |
+
+**Verdict:** the classic illiquidity premium is **INVERTED in crypto** — liquid coins outperform illiquid. The inverse leg (long-liquid/short-illiquid, net 0.90) is below the >1 bar and is really a **"long-majors/short-small-alts" size/quality tilt** that rode the 2023–26 BTC-dominance regime (2nd-half-driven). Regime-dependent, sub-threshold → not promoted.
+
+---
+
+# FINAL SYNTHESIS — loop complete (10 iterations, hard stop reached)
+
+| # | candidate | family | verdict |
+|---|---|---|---|
+| 1 | xs reversal | relative-value | ❌ cost wall (net −43) |
+| 2 | funding carry | mechanism | ⏸️ PARKED (real ~5%/yr, needs basis data) |
+| 3 | stat-arb pairs | relative-value | ❌ regime-fragile (WF 1/6) |
+| 4 | lead-lag | relative-value | ❌ cost wall @1h + decay |
+| 5 | **xs-momentum** | **factor** | ✅ **WINNER** (net Sharpe 1.51, 87% rolling, ρ=0.08) |
+| 6 | COMBINE | portfolio | ✅ book Sharpe 2.93→3.23 (+0.61 vt), survivorship-robust |
+| 7 | ts-momentum | factor | ⚠️ real but redundant (same family, weaker) |
+| 8 | BAB / low-vol | factor | ❌ doesn't transfer to crypto |
+| 9 | order-flow imbalance | microstructure | ❌ no candle edge / ✅ thesis-confirming (gross dies to cost) |
+| 10 | Amihud illiquidity | factor | ❌ inverted, sub-threshold size tilt |
+
+**One winner in ten: cross-sectional momentum.** It is the only candidate that is simultaneously (a) net-profitable after realistic cost, (b) robust across rolling walk-forward windows, (c) market-neutral / uncorrelated to the existing book, and (d) free of fitted per-trade parameters. It improves the deployed book by a real, survivorship-robust margin.
+
+**The law the loop established (precise version of the project thesis):**
+- **Signals die.** Every fast/fitted signal (reversal, lead-lag, stat-arb, order-flow) dies to turnover×cost or estimation-window/regime fragility. Order-flow (iter 9) directly confirms the microstructure edge is real but lives *below the candle/cost frontier* — needs L2/maker execution we don't have.
+- **Most factors don't transfer.** Low-vol/BAB (iter 8) and illiquidity (iter 10) — robust in equities — are null or inverted in crypto's lottery-preference market.
+- **What survives:** a single **low-turnover, market-neutral risk-premium FACTOR (cross-sectional momentum)** and a **structural MECHANISM (funding carry, pending data)**. Both are *harvest*, not *prediction*.
+
+## Loop ENDED here (hard stop, 10 iterations). Recommended next = DEPLOY, not search:
+1. **xs-momentum → paper sleeve.** Point-in-time (survivorship-free) universe to nail true magnitude; shortability/borrow-cost model for the LS leg (long-only is simpler but ~64% maxDD); wire as a 4th EW sleeve in the book (the combine already shows +0.30–0.61 Sharpe).
+2. **funding carry** — only if spot+perp basis data is sourced (to model the tail).
+3. Do **not** resume open-ended candle-signal search — the space is now mapped; the answer is execution (L2) or deployment of the one winner.
