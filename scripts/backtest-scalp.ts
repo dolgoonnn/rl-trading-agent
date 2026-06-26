@@ -22,7 +22,6 @@
  */
 
 import fs from 'fs';
-import { writeFileSync } from 'node:fs';
 import path from 'path';
 import type { TradeTapeEntry } from '../src/lib/scalp/leverage/types';
 import type { Candle } from '@/types';
@@ -553,7 +552,7 @@ async function main(): Promise<void> {
 
   // Write trade tape if requested
   if (emitTapePath) {
-    writeFileSync(emitTapePath, JSON.stringify(tape, null, 2));
+    fs.writeFileSync(emitTapePath, JSON.stringify(tape, null, 2));
     console.log(`\n📼 Wrote ${tape.length} trades to ${emitTapePath}`);
   }
 
