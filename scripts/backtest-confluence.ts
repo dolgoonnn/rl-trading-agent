@@ -65,6 +65,10 @@ import {
   buildDumpedPosition,
   type DumpedPosition,
 } from '../src/lib/sim';
+import {
+  buildTradeFeatureRow,
+  type TradeFeatureRow,
+} from '../src/lib/meta/dataset';
 
 // ============================================
 // Constants
@@ -782,6 +786,7 @@ function createConfluenceRunner(
   chargeFunding = false,
   entryTiming: EntryTiming = 'signal_close',
   dumpedPositions?: DumpedPosition[],
+  dumpedFeatures?: TradeFeatureRow[],
 ): {
   runner: WalkForwardStrategyRunner;
   allTrades: TradeResult[];
@@ -1040,7 +1045,25 @@ function createConfluenceRunner(
 
             // Tag trade with regime at entry point
             const tradeRegime = detectRegime(allCandles, i);
-            tradeRegimes.set(adjustedTrade.entryTimestamp, regimeLabel(tradeRegime));
+            const tradeRegimeLbl = regimeLabel(tradeRegime);
+            tradeRegimes.set(adjustedTrade.entryTimestamp, tradeRegimeLbl);
+
+            // --dump-features: capture {features, label} row for meta-labeler training.
+            // Only runs when the flag is set; zero overhead when dumpedFeatures is undefined.
+            if (dumpedFeatures !== undefined && meta?.symbol !== undefined) {
+              dumpedFeatures.push(
+                buildTradeFeatureRow({
+                  symbol: meta.symbol,
+                  entryTimestamp: adjustedTrade.entryTimestamp,
+                  exitTimestamp: adjustedTrade.exitTimestamp,
+                  direction: adjustedTrade.direction,
+                  factorBreakdown: result.selectedSignal.factorBreakdown,
+                  confluenceScore: result.selectedSignal.totalScore,
+                  regimeLabel: tradeRegimeLbl,
+                  netReturn: trade.pnlPercent,
+                }),
+              );
+            }
 
             // Circuit breaker: track consecutive losses
             if (circuitBreaker) {
@@ -1624,6 +1647,7 @@ async function main(): Promise<void> {
   const takerBpsArg = getArg('taker-bps'); // --taker-bps 5.5 (entry + SL/timeout exit leg, per side)
   const entryTimingArg = getArg('entry-timing'); // --entry-timing signal_close|next_open
   const dumpPositionsArg = getArg('dump-positions'); // --dump-positions <path> (canonical entries → JSON)
+  const dumpFeaturesArg = getArg('dump-features'); // --dump-features <path> (meta-labeler training rows → JSON)
 
   // Gold-specific args
   const goldRangeMinArg = getArg('asian-range-min'); // --asian-range-min 0.15 (min Asian range %)
@@ -2016,9 +2040,13 @@ async function main(): Promise<void> {
   const dumpedPositions: DumpedPosition[] | undefined =
     dumpPositionsArg !== undefined ? [] : undefined;
 
+  // --dump-features: allocate collection array only when flag is set (zero overhead otherwise)
+  const dumpedFeatures: TradeFeatureRow[] | undefined =
+    dumpFeaturesArg !== undefined ? [] : undefined;
+
   // Create the confluence runner
   const { runner, allTrades, signalCounts, tradeRegimes, circuitBreakerFirings, fundingStats } =
-    createConfluenceRunner(threshold, exitMode, scorerConfig, circuitBreaker, partialTP, regimeSLMultipliers, riskConfig, multiTP, futuresDataMap, chargeFunding, entryTiming, dumpedPositions);
+    createConfluenceRunner(threshold, exitMode, scorerConfig, circuitBreaker, partialTP, regimeSLMultipliers, riskConfig, multiTP, futuresDataMap, chargeFunding, entryTiming, dumpedPositions, dumpedFeatures);
 
   // Run walk-forward validation
   const walkForwardResult = await runWalkForward(runner, configOverrides, { quiet: jsonOutputMode });
@@ -2145,6 +2173,17 @@ async function main(): Promise<void> {
     }
     fs.writeFileSync(dumpPath, JSON.stringify(dumpedPositions, null, 2));
     log(`[dump] wrote ${dumpedPositions.length} positions to ${dumpPath}`);
+  }
+
+  // --dump-features: write meta-labeler training rows to JSON (gated — no-op when flag absent)
+  if (dumpFeaturesArg !== undefined && dumpedFeatures !== undefined) {
+    const featPath = path.resolve(dumpFeaturesArg);
+    const featDir = path.dirname(featPath);
+    if (!fs.existsSync(featDir)) {
+      fs.mkdirSync(featDir, { recursive: true });
+    }
+    fs.writeFileSync(featPath, JSON.stringify(dumpedFeatures, null, 2));
+    log(`[features] wrote ${dumpedFeatures.length} rows to ${featPath}`);
   }
 
   process.exit(walkForwardResult.overallPassed ? 0 : 1);
