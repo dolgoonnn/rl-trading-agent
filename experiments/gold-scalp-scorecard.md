@@ -97,5 +97,7 @@ After the first deep-dive, ran the loop with real breadth. Every family below wa
 
 **Silver (XAGUSD) scalp scorecard** (3bps/side): all 5 net-negative, worse than gold (mean_reversion −139%, session_range −32%, atr_breakout −61%, bb_squeeze −36%, silver_bullet −7%). Wider spread → cost dominates more.
 
+**Cross-asset — gold–SPX intraday lead-lag** (`scripts/gold-spx-leadlag.ts`, US500_1m 2015–26): cross-corr(gold[t], SPX[t−1]) = **0.0000** both IS and OOS. SPX does not lead gold intraday at all — no gross signal even (gold is the rare case with no lead-lag edge to begin with, unlike crypto). Dead.
+
 ## MASTER VERDICT (exhaustive)
 Tested ~22 distinct intraday/scalp hypotheses across gold + silver: statistical scalp (×2 assets), session breakout (cont/fade), overnight & prior-day momentum/reversal, London→NY, time-of-day, gold–silver relative value, VWAP reversion — **plus** the previously-closed ICT-directional intraday gold (40+ nulls). **ZERO survive OOS net of cost.** The mechanism is consistent and now bulletproof: gold intraday is a near-random-walk (lag-1 autocorr −0.009); the rare flickers sit below the ~4bp cost frontier; and gold candles carry no order-flow to reach a microstructure edge. **Gold/silver scalp & intraday is exhaustively CLOSED.** The only metals edge is session/swing (overnight + fix-short = METALS BOOK, ~17%/yr). No false hope — the search was wide and the answer is no.
