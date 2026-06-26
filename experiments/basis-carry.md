@@ -93,6 +93,29 @@ Textbook confirmation of the loop thesis: real gross edge, binding constraint = 
 (turnover + alt-spot borrow), thin deployable residual. Do not deploy the L/S; the only
 borrow-free carry is the modest long-only high-funding tilt.
 
+## CROSS-EXCHANGE funding arb (Bybit vs Binance) — DEAD for retail (HFT-competed)
+`scripts/{download-binance-data,xexch-carry-analysis}.ts`. Both legs perps (no spot borrow →
+dodges the XS wall); capture the funding SPREAD between venues (short higher-funding venue / long
+lower), MtM on the tiny inter-venue perp basis. Downloaded Binance fapi perp+funding for all 19
+coins (8h settlements, 2023-26).
+- **Raw edge = mean |Bybit−Binance funding spread| = 0.74bp/8h** — already arbitraged to sub-bp.
+- HOLD=1, 2bp/fill: −5.9%/yr Sharpe −11 (turnover obliterates it — flip cost ≫ 0.74bp).
+- HOLD=9 turnover-controlled: full +0.3%/yr, IS +1.0% Sharpe 2.55, **OOS −0.6% Sharpe −1.33**.
+A real HFT micro-edge below the retail cost/latency frontier (needs co-location + ~0 fees). Dead
+for a REST-polling retail bot. Same execution wall.
+
+## FUNDING/BASIS FAMILY — COMPREHENSIVELY MAPPED (final)
+| variant | verdict |
+|---|---|
+| absolute carry (long spot/short perp) | real, ~1.6-3%/yr OOS unlevered, decaying, counterparty-risk |
+| XS carry L/S (funding differential) | real OOS-stable GROSS (+6.6%) but borrow-blocked → not deployable |
+| XS carry long-only | ~3%/yr OOS, modest, decays (keeps level beta) |
+| cross-exchange arb | 0.74bp spread, HFT-competed, OOS-negative net — dead retail |
+| funding as directional/regime signal | NULL (per-coin + aggregate) |
+**Only deployable residual: the modest unlevered long-only carry (~3%/yr), counterparty-risk-dominated.
+Every higher-return variant is execution-blocked (turnover / alt-spot borrow / HFT latency).** Textbook
+confirmation of the loop thesis across the entire funding/basis space.
+
 ## VERDICT — un-parked: real, modest, counterparty-risk-dominated diversifier
 The funding carry is a GENUINE market-neutral edge (~3.5%/yr unlevered recently, ρ≈0/slightly
 negative to crypto) — NOT the Sharpe-16 free lunch the pulse suggested. Deployable only as a
