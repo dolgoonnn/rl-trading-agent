@@ -57,7 +57,7 @@ scripts/backtest-scalp.ts  --emit-trade-tape tape.json   (only change to existin
 tape.json  (TradeTapeEntry[])
         │
         ▼
-scripts/leverage-sweep.ts
+scripts/scalp-leverage-sweep.ts
         │  loads tape + candle files
         ▼
 src/lib/scalp/leverage/
@@ -76,7 +76,7 @@ report (JSON + terminal ASCII):  per-symbol + combined, L*, L_ruin
 | `src/lib/scalp/leverage/types.ts` | `TradeTapeEntry`, `LeverageConfig`, `LeverageResult` |
 | `src/lib/scalp/leverage/liquidation.ts` | Pure functions: `liquidationPrice()`, `resolveBarOutcome()`, `accrueFunding()` |
 | `src/lib/scalp/leverage/simulator.ts` | `LeverageSimulator` — consumes tape + candles, returns equity curve + stats per leverage |
-| `scripts/leverage-sweep.ts` | CLI runner: load tape + candles, sweep grid, MC ruin, print/save report |
+| `scripts/scalp-leverage-sweep.ts` | CLI runner: load tape + candles, sweep grid, MC ruin, print/save report |
 | `scripts/backtest-scalp.ts` | **+1 flag** `--emit-trade-tape <path>` to dump the 1x trade tape (only modification to existing code) |
 | `src/lib/scalp/leverage/*.test.ts` | Unit tests (see §9) |
 
@@ -86,7 +86,7 @@ report (JSON + terminal ASCII):  per-symbol + combined, L*, L_ruin
    `npx tsx scripts/backtest-scalp.ts --strategy ict_5m --symbols BTCUSDT,ETHUSDT,SOLUSDT,XAUUSD --emit-trade-tape tape.json`
    Emits per-trade `TradeTapeEntry` and prints the 1x baseline metrics (expectancy, WR, Sharpe). If expectancy ≤ 0, stop.
 2. **Leverage sweep.**
-   `npx tsx scripts/leverage-sweep.ts --tape tape.json --leverage-grid 1,2,5,10,25,50,100,125 --mmr 0.005 --margin-fraction <f> --slippage-bps 3 --funding-rate 0.0001 --ruin-threshold 0.10`
+   `npx tsx scripts/scalp-leverage-sweep.ts --tape tape.json --leverage-grid 1,2,5,10,25,50,100,125 --mmr 0.005 --margin-fraction <f> --slippage-bps 3 --funding-rate 0.0001 --ruin-threshold 0.10`
    Loads candle files, re-walks each trade's 1m path per leverage level, runs MC ruin, writes report.
 
 ## 6. Data Model

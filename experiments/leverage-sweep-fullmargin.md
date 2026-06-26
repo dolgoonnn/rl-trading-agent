@@ -91,12 +91,12 @@ npx tsx scripts/backtest-scalp.ts --strategy ict_5m \
   --emit-trade-tape experiments/tape-ict5m.json
 
 # 2) Full margin
-npx tsx scripts/leverage-sweep.ts --tape experiments/tape-ict5m.json \
+npx tsx scripts/scalp-leverage-sweep.ts --tape experiments/tape-ict5m.json \
   --leverage-grid 1,2,5,10,25,50,100,125 --margin-fraction 1 \
   --out experiments/leverage-sweep-f1.json
 
 # 3) Kelly-revealing
-npx tsx scripts/leverage-sweep.ts --tape experiments/tape-ict5m.json \
+npx tsx scripts/scalp-leverage-sweep.ts --tape experiments/tape-ict5m.json \
   --leverage-grid 1,2,5,10,25,50,100,125 --margin-fraction 0.1 \
   --out experiments/leverage-sweep-f0.1.json
 ```

@@ -29,7 +29,7 @@
 | `src/lib/scalp/leverage/liquidation.ts` | Pure: `liquidationPrice`, `effectiveLiqTrigger`, `fundingCostFraction`, `resolveTradeUnderLeverage` |
 | `src/lib/scalp/leverage/simulator.ts` | `simulateLeverage` (equity curve + stats), `ruinProbability` (MC) |
 | `scripts/backtest-scalp.ts` | **Modify**: add `--emit-trade-tape <path>` flag |
-| `scripts/leverage-sweep.ts` | **Create**: CLI runner — load tape + 1m candles, sweep grid, MC ruin, report |
+| `scripts/scalp-leverage-sweep.ts` | **Create**: CLI runner — load tape + 1m candles, sweep grid, MC ruin, report |
 | `tests/scalp/leverage/liquidation.test.ts` | Unit tests for liquidation/funding/resolve |
 | `tests/scalp/leverage/simulator.test.ts` | Unit tests for sim, ruin, synthetic Kelly check |
 
@@ -678,7 +678,7 @@ gmp "emit trade tape from scalp backtest for leverage sim" feat backend
 ## Task 6: Leverage sweep CLI runner
 
 **Files:**
-- Create: `scripts/leverage-sweep.ts`
+- Create: `scripts/scalp-leverage-sweep.ts`
 
 **Context:** Loads the tape and the per-symbol 1m candle files referenced by the tape, runs `simulateLeverage` across a leverage grid, prints a table + ASCII curve, and writes a JSON report. Candle files are `data/<symbol>_1m.json` (an array of `Candle`).
 
@@ -689,7 +689,7 @@ gmp "emit trade tape from scalp backtest for leverage sim" feat backend
 - [ ] **Step 1: Implement the runner**
 
 ```ts
-// scripts/leverage-sweep.ts
+// scripts/scalp-leverage-sweep.ts
 import { readFileSync, writeFileSync } from 'node:fs';
 import type { Candle } from '../src/types/candle';
 import type { TradeTapeEntry, LeverageConfig, LeverageResult } from '../src/lib/scalp/leverage/types';
@@ -766,7 +766,7 @@ Expected: PASS.
 
 - [ ] **Step 3: Smoke-run on the BTC smoke tape**
 
-Run: `npx tsx scripts/leverage-sweep.ts --tape /tmp/tape-smoke.json --leverage-grid 1,10,50,100 --out /tmp/sweep-smoke.json`
+Run: `npx tsx scripts/scalp-leverage-sweep.ts --tape /tmp/tape-smoke.json --leverage-grid 1,10,50,100 --out /tmp/sweep-smoke.json`
 Expected: a printed table with 4 rows, an `L*`/`L_ruin` line, an ASCII curve, and `Wrote report to /tmp/sweep-smoke.json`. At L=100 expect many liquidations and high ruin%.
 
 - [ ] **Step 4: Commit**
@@ -792,12 +792,12 @@ Expected: baseline metrics for each symbol printed; tape written. **Record the 1
 
 - [ ] **Step 2: Run the leverage sweep (full margin, f=1)**
 
-Run: `npx tsx scripts/leverage-sweep.ts --tape experiments/tape-ict5m.json --leverage-grid 1,2,5,10,25,50,100,125 --margin-fraction 1 --out experiments/leverage-sweep-f1.json`
+Run: `npx tsx scripts/scalp-leverage-sweep.ts --tape experiments/tape-ict5m.json --leverage-grid 1,2,5,10,25,50,100,125 --margin-fraction 1 --out experiments/leverage-sweep-f1.json`
 Expected: table + curve. At `marginFraction=1`, a single liquidation zeroes equity — expect ruin% to climb to ~100% well before 100x.
 
 - [ ] **Step 3: Run the Kelly-revealing sweep (f<1)**
 
-Run: `npx tsx scripts/leverage-sweep.ts --tape experiments/tape-ict5m.json --leverage-grid 1,2,5,10,25,50,100,125 --margin-fraction 0.1 --out experiments/leverage-sweep-f0.1.json`
+Run: `npx tsx scripts/scalp-leverage-sweep.ts --tape experiments/tape-ict5m.json --leverage-grid 1,2,5,10,25,50,100,125 --margin-fraction 0.1 --out experiments/leverage-sweep-f0.1.json`
 Expected: with smaller per-trade margin the growth curve shows a hump (L*) before collapsing — the Kelly picture.
 
 - [ ] **Step 4: Reconcile L=1 against the baseline**

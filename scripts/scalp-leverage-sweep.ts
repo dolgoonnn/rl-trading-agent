@@ -1,4 +1,4 @@
-// scripts/leverage-sweep.ts
+// scripts/scalp-leverage-sweep.ts
 import { readFileSync, writeFileSync } from 'node:fs';
 import type { Candle } from '../src/types/candle';
 import type { TradeTapeEntry, LeverageConfig, LeverageResult } from '../src/lib/scalp/leverage/types';
