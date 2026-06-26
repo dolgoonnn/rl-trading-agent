@@ -37,3 +37,36 @@ Gold intraday dies **two** ways, both fatal:
 **Consistent with the project-wide law:** the short-horizon edge is execution/microstructure (here: gold's session-range structure is *real* but below the retail-spread frontier), not a tradeable candle signal. Gold candles carry no order-flow (spot metals = no centralized taker volume), so even the microstructure proxy that crypto allows is unavailable for gold.
 
 **The only gold edge that survives is SESSION/SWING horizon** (overnight hold + fix-short = the METALS BOOK, ~17%/yr deployable) — NOT intraday. Do not pursue gold scalp/intraday further; the answer is the cost/execution frontier.
+
+---
+
+# DEEP ANALYSIS — gold intraday loop ("find one, no false hope") — 2026-06-26
+
+Ran the full research→implement→improve→notes loop on gold scalp/intraday, depth-first, with the untouched **2015–2019 holdout** as the OOS test.
+
+## Research — `scripts/gold-intraday-diagnostic.ts` (XAUUSD 1m→hourly, 2020–26)
+- **Gold intraday is ~a random walk:** lag-1 hourly autocorrelation = **−0.009** (≈0) → no systematic intraday trend OR reversion. (Explains why mean_reversion had no gross edge.)
+- **Hour-of-day drift:** real but tiny (~1bp/hr; hr-23 Sharpe 5.45, hr-1 3.77) — far below the ~4bp cost frontier; 24-hours-tested invites mining. Not tradeable.
+- **Asian-range (00–07 UTC) breakout:** the strongest structure — post-break continuation **+4.79bp/break, Sharpe 0.055/day (~0.87 ann gross)**. Direction 50/50 (edge is magnitude, not hit-rate). The ONE candidate worth deep analysis.
+
+## Implement + OOS — `scripts/gold-session-breakout.ts` (clean, ≤1 trade/day, 4bp RT cost)
+| set | n | grossBp | netBp | gross Sharpe | net Sharpe | netTotal% |
+|---|---|---|---|---|---|---|
+| IS 2020–26 | 1614 | 4.97 | **+0.97** | 0.93 | 0.18 | +10.3% |
+| **OOS 2015–19** | 1266 | 2.67 | **−1.33** | 0.66 | **−0.33** | **−17.7%** |
+
+IS marginally positive (the screening illusion); **OOS negative**. Gross edge *decayed* 4.97→2.67bp OOS (below cost).
+
+## Improve — 4 a-priori principled variants (judged on OOS, holdout touched minimally)
+| variant | OOS netBp | OOS net Sharpe |
+|---|---|---|
+| baseline hold-to-close | −1.33 | −0.33 |
+| target 1R | −2.32 | −0.71 |
+| London-only window | −3.06 | −1.78 |
+| stop 0.5R | −3.33 | −1.20 |
+| target+stop bracket | −2.96 | −1.11 |
+
+**Every refinement made it worse.** The most diffuse version (baseline) was least-bad — the textbook signature of fitting NOISE, not refining an edge.
+
+## VERDICT — DEAD (no false hope)
+The single best gold-intraday candidate is **marginally positive in-sample, negative out-of-sample, and degrades under every principled refinement.** There is **no gold scalp/intraday winner** — now proven on a real 5-year OOS holdout, not assumed. Gold's intraday is a random walk; its only edge is session/swing (overnight + fix-short, the METALS BOOK). Closing gold intraday for good.
