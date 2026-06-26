@@ -46,6 +46,46 @@ Inconsistent across symbols, decays/flips OOS; OOS decile spreads (5-11bp BTC) b
 cost. **Confirms the prior "funding = zero predictive power" null with proper basis data.** The
 basis is real as a CARRY mechanism but useless as a directional timing signal. Don't re-test.
 
+## CROSS-SECTIONAL funding carry (19-coin panel) — real gross edge, execution-blocked
+`scripts/{download-xs-carry-data,xs-carry-analysis}.ts`. Downloaded funding + spot/perp basis
+for 19 coins (BTC…ICP, 2023-26, ~29.8k bars each; funding dispersion BNB −0.0019%/8h → ARB
++0.0093%/8h). Each 8h: rank by trailing(EMA) funding, long-carry top-5 / short-carry bottom-5,
+dollar-neutral, honest basis MtM.
+
+**Gross edge is REAL and OOS-STABLE** (the differential persists where the level decays):
+| rebalance | gross OOS | net@6bp OOS | net@12bp OOS |
+|---|---|---|---|
+| 8h (HOLD=1) | 8.7% Sh 6.78 | **−21.9%** | −52% |
+| daily (HOLD=3) | — | −5.0% | — |
+| 3-day (HOLD=9) | — | +4.0% Sh 2.72 | — |
+| weekly (HOLD=21) | — | **+6.6% Sh 4.45** | +5.3% Sh 3.40 |
+| 2-week (HOLD=42) | — | +7.2% Sh 4.89 | — |
+
+Turnover wall: at 8h rebalance the funding ranking churns → gross +8.7% becomes net −22% (cost
+~24%/yr). Slowing to weekly tames it → net +6.6% OOS, cost-robust, IS≈OOS (stable, NOT decaying
+like the absolute level). The best gross signal of the whole session.
+
+**BUT killed by alt-spot borrow** (the L/S short leg = short SPOT + long perp; alt spot must be
+borrowed). Modeling borrow on the short legs:
+| alt-spot borrow | OOS net (HOLD=21, 6bp) |
+|---|---|
+| 0% | +6.6% |
+| 10% | **−3.4%** |
+| 20% | −13.4% |
+| 30% | −23.4% |
+Real alt-spot borrow is 15-50%/yr → the market-neutral L/S is NOT deployable. Execution wall.
+
+**Borrow-free deployable form = LONG-ONLY top-5 selection** (long spot/short perp only, no
+borrow): OOS **3.1%/yr Sharpe 2.77** vs absolute-EW OOS 1.6% — selection adds ~1.5pp but keeps
+the decaying common funding-level beta (corr 0.78 to absolute carry; IS 13.4%→OOS 3.1% = decays).
+
+### XS carry verdict
+Real, OOS-stable GROSS edge (funding differential) — but the clean market-neutral form is
+borrow-blocked and the borrow-free residual (long-only ~3%/yr OOS, decaying) is marginal.
+Textbook confirmation of the loop thesis: real gross edge, binding constraint = execution
+(turnover + alt-spot borrow), thin deployable residual. Do not deploy the L/S; the only
+borrow-free carry is the modest long-only high-funding tilt.
+
 ## VERDICT — un-parked: real, modest, counterparty-risk-dominated diversifier
 The funding carry is a GENUINE market-neutral edge (~3.5%/yr unlevered recently, ρ≈0/slightly
 negative to crypto) — NOT the Sharpe-16 free lunch the pulse suggested. Deployable only as a
