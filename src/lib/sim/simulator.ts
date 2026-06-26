@@ -1,7 +1,11 @@
 import type { Candle } from '@/types/candle';
 import { fundingReturn as calcFundingReturn } from '@/lib/cost/funding-ledger';
+import { liquidationPrice } from './liquidation';
 import type { FillModel } from './fill-model';
 import type { BarFillRequest, FidelityTier, SimConfig, SimExitReason, SimPosition, SimTradeResult, SubBarProvider } from './types';
+
+/** Default maintenance margin ratio for isolated-margin USDT-perp (Bybit). */
+const DEFAULT_MMR = 0.005;
 
 function pnlPercent(adjEntry: number, adjExit: number, dir: 'long' | 'short'): number {
   return dir === 'long' ? (adjExit - adjEntry) / adjEntry : (adjEntry - adjExit) / adjEntry;
@@ -18,6 +22,7 @@ function finishBlended(
   partialTaken: boolean,
   partialFraction: number,
   partialPnl: number,
+  liquidated = false,
 ): SimTradeResult {
   const remainderPnl = pnlPercent(adjustedEntry, adjustedExit, position.direction);
   const gross = partialTaken
@@ -39,6 +44,7 @@ function finishBlended(
     grossReturn: gross,
     fundingReturn: funding,
     netReturn: gross + funding,
+    liquidated,
   };
 }
 
@@ -72,6 +78,13 @@ export function simulatePosition(
       ? position.entryPrice - position.stopLoss
       : position.stopLoss - position.entryPrice;
 
+  // Liquidation price — computed once before the bar loop when leverage is set.
+  // Uses the RAW signal entryPrice (consistent with rawRisk / triggerR).
+  const liqPrice: number | undefined =
+    config.leverage !== undefined
+      ? liquidationPrice(position.entryPrice, position.direction, config.leverage, config.mmr ?? DEFAULT_MMR)
+      : undefined;
+
   for (let i = startIndex; i < candles.length; i++) {
     const bar = candles[i];
     if (!bar) continue;
@@ -90,8 +103,26 @@ export function simulatePosition(
     // SL/TP FIRST (legacy order: before partial and maxBars). maxBars is suppressed
     // (Infinity) here so the time-exit fires AFTER the partial move below — exactly
     // as legacy simulatePositionPartialTP / checkSLTPMaxBars sequence.
+    //
+    // When liqPrice is set, it competes as the adverse stop: the level closer to
+    // entry wins (liqPrice for high-leverage, mutableSL for low-leverage).
+    let liqBinding = false;
+    let effectiveStop: number;
+    if (liqPrice !== undefined) {
+      if (position.direction === 'long') {
+        // long: adverse = low; higher stop is closer to entry → liq wins when above SL
+        effectiveStop = Math.max(mutableSL, liqPrice);
+        liqBinding = liqPrice >= mutableSL;
+      } else {
+        // short: adverse = high; lower stop is closer to entry → liq wins when below SL
+        effectiveStop = Math.min(mutableSL, liqPrice);
+        liqBinding = liqPrice <= mutableSL;
+      }
+    } else {
+      effectiveStop = mutableSL;
+    }
     const slReq: BarFillRequest = {
-      levels: { direction: position.direction, stopLoss: mutableSL, takeProfit: position.takeProfit },
+      levels: { direction: position.direction, stopLoss: effectiveStop, takeProfit: position.takeProfit },
       bar,
       barsHeld,
       maxBars: Number.POSITIVE_INFINITY,
@@ -99,9 +130,12 @@ export function simulatePosition(
     };
     const sltp = fillModel.resolveExit(slReq);
     if (sltp) {
+      // If the fill was a stop_loss and liqPrice was the binding level, this is a liquidation.
+      const isLiquidation = sltp.exitReason === 'stop_loss' && liqBinding;
+      const resolvedReason: SimExitReason = isLiquidation ? 'liquidation' : sltp.exitReason;
       const exitSide = sltp.exitReason === 'take_profit' ? 'maker' : 'taker';
       const adjustedExit = fillModel.applyCost(sltp.exitPrice, 'exit', position.direction, { exitSide });
-      return finishBlended(position, adjustedEntry, adjustedExit, sltp.exitReason, sltp.fillTimestamp, sltp.tier, rateAt, partialTaken, partialFraction, partialPnl);
+      return finishBlended(position, adjustedEntry, adjustedExit, resolvedReason, sltp.fillTimestamp, sltp.tier, rateAt, partialTaken, partialFraction, partialPnl, isLiquidation);
     }
 
     // partial TP: take a fraction at triggerR and move SL to BE+buffer (once)
