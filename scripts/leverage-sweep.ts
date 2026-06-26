@@ -15,6 +15,11 @@ function arg(name: string, def: string): string {
 
 const tapePath = arg('--tape', 'tape.json');
 const grid = arg('--leverage-grid', '1,2,5,10,25,50,100,125').split(',').map(Number).sort((a, b) => a - b);
+if (grid.length === 0 || grid.some((n) => !Number.isFinite(n) || n <= 0)) {
+  console.error('FATAL: --leverage-grid must be a comma-separated list of positive finite numbers');
+  process.exit(1);
+}
+
 const marginFraction = Number(arg('--margin-fraction', '1'));
 const mmr = Number(arg('--mmr', '0.005'));
 const slippageBps = Number(arg('--slippage-bps', '3'));
@@ -22,6 +27,32 @@ const fundingRate8h = Number(arg('--funding-rate', '0.0001'));
 const ruinThreshold = Number(arg('--ruin-threshold', '0.10'));
 const mcIterations = Number(arg('--mc-iterations', '1000'));
 const outPath = arg('--out', 'experiments/leverage-sweep.json');
+
+// Validate scalar numeric args
+if (!Number.isFinite(marginFraction) || marginFraction <= 0 || marginFraction > 1) {
+  console.error('FATAL: --margin-fraction must be a finite number in (0, 1]');
+  process.exit(1);
+}
+if (!Number.isFinite(mmr) || mmr < 0) {
+  console.error('FATAL: --mmr must be a finite number >= 0');
+  process.exit(1);
+}
+if (!Number.isFinite(slippageBps) || slippageBps < 0) {
+  console.error('FATAL: --slippage-bps must be a finite number >= 0');
+  process.exit(1);
+}
+if (!Number.isFinite(fundingRate8h) || fundingRate8h < 0) {
+  console.error('FATAL: --funding-rate must be a finite number >= 0');
+  process.exit(1);
+}
+if (!Number.isFinite(ruinThreshold) || ruinThreshold < 0) {
+  console.error('FATAL: --ruin-threshold must be a finite number >= 0');
+  process.exit(1);
+}
+if (!Number.isInteger(mcIterations) || mcIterations <= 0) {
+  console.error('FATAL: --mc-iterations must be a positive integer');
+  process.exit(1);
+}
 
 const tape: TradeTapeEntry[] = JSON.parse(readFileSync(tapePath, 'utf8')) as TradeTapeEntry[];
 if (tape.length === 0) { console.error('Empty tape — nothing to simulate.'); process.exit(1); }

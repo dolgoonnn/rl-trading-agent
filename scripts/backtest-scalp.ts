@@ -251,7 +251,7 @@ function createScalpRunner(
             windowTrades.push(trade);
             allTrades.push(trade);
 
-            // Emit trade tape entry if requested
+            // Emit trade tape entry if requested (tape assumes single-exit; partial_tp is guarded at startup)
             if (emitTapePath && tape) {
               const symbol = meta?.symbol ?? '';
               tape.push({
@@ -441,6 +441,14 @@ async function main(): Promise<void> {
       };
       exitMode = 'partial_tp';
     }
+  }
+
+  // Guard: tape emission is only valid for single-exit trades. Under partial_tp,
+  // pnlPercent is a blended two-exit value and the leverage sim's linear amplification
+  // produces silently-wrong results.
+  if (emitTapePath && exitMode === 'partial_tp') {
+    console.error('ERROR: --emit-trade-tape requires single-exit mode. Partial-TP tapes are not leverage-valid (the leverage sim amplifies one blended pnlPercent). Re-run without --partial-tp / with --exit-mode simple.');
+    process.exit(1);
   }
 
   // Verify data exists for all symbols
