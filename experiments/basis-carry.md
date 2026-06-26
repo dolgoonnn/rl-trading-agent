@@ -34,6 +34,18 @@ delta-neutral P&L (`basis-carry-analysis.ts`): r = funding_credit − Δbasis (l
 Unmodeled costs (all adverse): hedge-rebalance drag (~0.5-1%/yr to hold delta-neutral as price
 moves), spot-capital opportunity cost, borrow. Net forward expectation ≈ 2.5-3%/yr unlevered.
 
+## Step-4 hunt: basis as a DIRECTIONAL signal — NULL (`scripts/basis-signal-pulse.ts`)
+Thesis: extreme basis (crowded leveraged longs) → squeeze → negative forward perp return
+(contrarian). Pulse: rolling-168h z-score of basis vs forward 8h/24h perp return, IS/OOS.
+| | corr z→fwd IS | corr z→fwd OOS | read |
+|---|---|---|---|
+| BTC | −0.04/−0.05 | −0.018/−0.015 | weak contrarian, decays to ~0 |
+| ETH | −0.008/−0.015 | **+0.008/+0.020** | flips sign OOS — dead |
+| SOL | −0.010/+0.004 | −0.005/−0.002 | noise |
+Inconsistent across symbols, decays/flips OOS; OOS decile spreads (5-11bp BTC) barely cover
+cost. **Confirms the prior "funding = zero predictive power" null with proper basis data.** The
+basis is real as a CARRY mechanism but useless as a directional timing signal. Don't re-test.
+
 ## VERDICT — un-parked: real, modest, counterparty-risk-dominated diversifier
 The funding carry is a GENUINE market-neutral edge (~3.5%/yr unlevered recently, ρ≈0/slightly
 negative to crypto) — NOT the Sharpe-16 free lunch the pulse suggested. Deployable only as a
