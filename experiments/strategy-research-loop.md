@@ -175,6 +175,20 @@ Tested 5 candidates in the relative-value/cross-sectional/mechanism space the pr
 
 **Final refined thesis:** the project's "edge = execution/mechanism, not signals" is *mostly* right but **incomplete** — a **low-turnover risk-premium FACTOR (cross-sectional momentum)** also survives, and uniquely it *combines* with the directional book for a real diversification gain. The kill switches are universal (turnover×cost; estimation-window/regime fragility); the survivor traits are: no per-trade fitting, low turnover, market-neutral, structurally uncorrelated.
 
+## Iteration 7 — Time-series (absolute) momentum / trend — ⚠️ real but redundant
+
+**Script:** `scripts/ts-momentum-pulse.ts` · 19-coin 1h panel, weekly rebalance, inverse-vol sized, long/short each coin on its own trailing trend (Moskowitz-Ooi-Pedersen).
+
+| lkbk | netSharpe | netAnn | maxDD | avgNetExp | splitH | corr→BTC |
+|---|---|---|---|---|---|---|
+| 1wk | 0.49 | 23% | 52% | −0.05 | 0.14/0.76 | 0.04 |
+| 2wk | 0.70 | 32% | 51% | −0.10 | 0.44/0.91 | 0.01 |
+| **4wk** | **1.11** | 49.6% | 33.8% | −0.11 | 1.52/0.77 | 0.01 |
+| 8wk | 0.79 | 36% | 37% | −0.10 | 0.39/1.11 | −0.20 |
+| 12wk | 0.68 | 34% | 44% | −0.07 | 0.28/1.00 | −0.06 |
+
+**Verdict:** a real edge AND a surprise — it's **market-neutral, not long beta** (inverse-vol weighting across 19 coins → avg net exposure ≈ −0.1, corr→BTC ≈ 0.01). Best at 4wk (net Sharpe 1.11, both split-halves positive). **But weaker and more lookback-sensitive than xs-momentum** (only 4wk clears 1.0 vs xs-momentum robust across 1–2wk; xs 1.51 > ts 1.11) and it's the **same factor family** ⇒ almost certainly captures the same premium. Not promoted as an independent sleeve — **xs-momentum dominates as the momentum representative.** (Could revisit a momentum *composite* of xs+ts if ever chasing marginal robustness, but YAGNI now.)
+
 ## Possible next iterations (open backlog)
 - **Deploy path for xs-momentum:** point-in-time (survivorship-free) universe to nail the true magnitude; shortability/borrow-cost model for the LS leg (long-only is more deployable but 64% maxDD); wire as a paper sleeve.
 - **Funding carry:** source spot+perp basis data → model the tail → revisit deploy.
