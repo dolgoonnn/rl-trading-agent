@@ -189,6 +189,22 @@ Tested 5 candidates in the relative-value/cross-sectional/mechanism space the pr
 
 **Verdict:** a real edge AND a surprise — it's **market-neutral, not long beta** (inverse-vol weighting across 19 coins → avg net exposure ≈ −0.1, corr→BTC ≈ 0.01). Best at 4wk (net Sharpe 1.11, both split-halves positive). **But weaker and more lookback-sensitive than xs-momentum** (only 4wk clears 1.0 vs xs-momentum robust across 1–2wk; xs 1.51 > ts 1.11) and it's the **same factor family** ⇒ almost certainly captures the same premium. Not promoted as an independent sleeve — **xs-momentum dominates as the momentum representative.** (Could revisit a momentum *composite* of xs+ts if ever chasing marginal robustness, but YAGNI now.)
 
+## Iteration 8 — Low-volatility / betting-against-beta (BAB) — ❌ KILLED (doesn't transfer to crypto)
+
+**Script:** `scripts/bab-pulse.ts` · 19-coin panel, weekly, long low-vol tercile / short high-vol tercile, dollar-neutral.
+
+| volWin | netSharpe | netAnn | splitH | corr→BTC |
+|---|---|---|---|---|
+| 7d | −0.10 | −3.6% | −0.49/0.32 | −0.37 |
+| 14d | 0.11 | 4.2% | 0.06/0.17 | −0.27 |
+| 30d | 0.18 | 8.5% | −0.34/0.55 | −0.11 |
+| 60d | −0.23 | −12.2% | −0.82/0.29 | −0.35 |
+
+**Verdict:** no premium (net Sharpe ~0–0.18, unstable split-halves with negative first halves). The equity low-vol anomaly **does not transfer to crypto** — consistent with crypto's lottery/speculative character: high-vol alts aren't penalized, they often have the biggest runs (MAX/lottery preference dominates the low-vol effect). Clean kill of a genuinely new factor family.
+
+## Hard stop (set 2026-06-26 after user chose "keep searching")
+**Loop ends after iteration 10, OR earlier the moment the next candidate is data-blocked / only redundant families remain.** Iterations remaining: 9, 10. After that → stop searching, pivot to deploying xs-momentum (the one validated, combinable winner).
+
 ## Possible next iterations (open backlog)
 - **Deploy path for xs-momentum:** point-in-time (survivorship-free) universe to nail the true magnitude; shortability/borrow-cost model for the LS leg (long-only is more deployable but 64% maxDD); wire as a paper sleeve.
 - **Funding carry:** source spot+perp basis data → model the tail → revisit deploy.
