@@ -14,8 +14,8 @@
 | 1 | Cross-sectional short-term **reversal** (long losers/short winners) | relative-value | high | strong (CO-OC reversal "robust") | HIGH (turnover) | ❌ **KILLED** (iter 1) |
 | 2 | **Funding-carry delta-neutral** (collect funding, market-neutral) | mechanism harvest | n/a (carry) | strong: 10–20% APY, 0.8% maxDD 2025 | LOW | ✅ **SURVIVES** (iter 2) — parked as combine-candidate |
 | 3 | **Stat-arb cointegration pairs** (spread mean-reversion, multi-day hold) | relative-value | med | Fil/Kristoufek 30%/yr; intraday HF variants | MED (longer hold = lower turnover) | ❌ **KILLED** (iter 3, by walk-forward) |
-| 4 | **Lead-lag cross-predictability** (BTC→alt; intraday *negative* lead-lag) | relative-value | high | LASSO profits "net of realistic costs" | HIGH (intraday turnover) | ⏳ NEXT |
-| 5 | Cross-sectional **momentum** (2–4wk) / longer-horizon reversal, size/illiquidity factors | factor | low (weekly=swing) | large & significant, not on std factors | LOW | queued (swing, not intraday) |
+| 4 | **Lead-lag cross-predictability** (BTC→alt; intraday *negative* lead-lag) | relative-value | high | LASSO profits "net of realistic costs" | HIGH (intraday turnover) | ❌ **KILLED** (iter 4, cost wall + decay) |
+| 5 | Cross-sectional **momentum** (2–4wk) / longer-horizon reversal, size/illiquidity factors | factor | low (weekly=swing) | large & significant, not on std factors | LOW | ⏳ NEXT (low-turnover ⇒ should dodge the cost wall) |
 
 Sources: cross-sectional crypto factors ([Dobrynskaya SSRN 3913263](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3913263); factor-momentum 3,900 coins); stat-arb ([Springer 978-3-031-68974-1_16](https://link.springer.com/chapter/10.1007/978-3-031-68974-1_16); Fil & Kristoufek); funding carry ([market-neutral funds +14.4% 2025](https://www.tv-hub.org/guide/market-neutral-strategy-crypto), [arbitragescanner guide](https://arbitragescanner.io/blog/crypto-funding-rate-arbitrage-guide)); lead-lag ([intraday cross-predictability, ScienceDirect S1062940822000833](https://www.sciencedirect.com/science/article/abs/pii/S1062940822000833); [seesaw effect S0927539823000956](https://www.sciencedirect.com/science/article/abs/pii/S0927539823000956)); short-term reversal robustness (QuantPedia CO-OC).
 
@@ -75,6 +75,34 @@ Sources: cross-sectional crypto factors ([Dobrynskaya SSRN 3913263](https://pape
 
 ---
 
-## Next (iteration 4): Lead-lag cross-predictability
+## Iteration 4 — Lead-lag cross-predictability — ❌ KILLED (cost wall + decay)
 
-**Why:** does BTC's (or the panel's) past return predict an alt's NEXT return beyond its own autocorrelation? Lit prior is intraday cross-predictability + a documented *negative* lead-lag ("seesaw"). **Honest design must front-load walk-forward** (iter-3 lesson): fit any lead-lag coefficient on rolling IS, trade next OOS, demand >60% windows positive AND positive mean — no single-split headline. Cost discipline: this is higher-turnover (intraday signal) so the cost÷signal ratio is the kill switch, same as reversal. If it needs sub-hourly reaction to work, it's an execution edge not a candle edge → dead for us.
+**Script:** `scripts/leadlag-pulse.ts` · leader=BTC, 19 alts, 12,874 1h return bars. pos_A[t] = sign(IS corr(r_A[t], r_BTC[t-1]))·clip(r_BTC[t-1]/σ_IS, ±3); equal-weight basket; rolling WF IS=3000/OOS=1500; cost 5bps·|Δpos|/bar. Reports GROSS (signal exists?) and NET (survives turnover?).
+
+| | windows positive | mean Sharpe |
+|---|---|---|
+| GROSS | **6/6** | **2.24** |
+| NET | **0/6** | **−6.84** |
+
+GROSS Sharpe by window: 3.73, 5.16, 3.41, 0.30, 0.11, 0.74 (decaying). NET: −1.47 … −25.07 (worsening).
+
+**Verdict:** the lead-lag signal is **real** (6/6 gross windows positive — BTC's last bar predicts alts' next bar, the spillover/seesaw exists) but it lives at **1h turnover** and is **entirely eaten by cost** (position flips nearly every bar). Plus it's **decaying** (gross Sharpe 3.7→0.1 across the sample — classic lead-lag erosion as the market gets more efficient). Same signature as reversal (iter 1): a real GROSS signal that is an **execution/microstructure edge, not a candle edge** — capturable only with maker rebates / L2 / sub-second reaction, which we don't have.
+
+---
+
+## Standing scorecard (after 4 iterations)
+
+| # | candidate | family | verdict | why |
+|---|---|---|---|---|
+| 1 | reversal | relative-value | ❌ KILLED | gross @1-bar only; cost 23× signal |
+| 2 | funding carry | mechanism | ✅ PARKED | real ~5%/yr unlevered, ρ≈0; Sharpe artifact; needs basis/tail data to deploy |
+| 3 | stat-arb pairs | relative-value | ❌ KILLED | 50/50 looked great but WF 1/6 — regime-fragile fitted relationship |
+| 4 | lead-lag | relative-value | ❌ KILLED | real gross (6/6) but cost wall @1h + decay → execution edge |
+
+**Pattern (now empirically re-confirmed in the cross-sectional space the project never tested):** every SIGNAL dies — to cost (1,4), regime-fragility (3), or both. The only survivor is a MECHANISM (2, funding). This *is* the project's standing thesis (edge = execution/microstructure or mechanism, not OHLC signals) — and it now holds beyond single-asset OHLC. **The common kill switch is turnover×cost or estimation-window fragility; the common survivor trait is "no fitted signal, just harvest a structural payment."**
+
+---
+
+## Next (iteration 5): Cross-sectional momentum (low-turnover factor)
+
+**Why it's the strongest remaining candidate:** it is the one family that *structurally dodges the kill switches above* — **weekly rebalance** (swing, not intraday) ⇒ low turnover ⇒ no cost wall (killed 1,4); and it's a **risk-premium factor** (rank by trailing 2–4wk return, hold winners), not a fitted pairwise relationship ⇒ less regime-fragile than stat-arb (3). Lit prior strong (Dobrynskaya: large & significant crypto momentum, not spanned by standard factors). **Honest design:** rolling WF, weekly rebalance, long top-tercile / short bottom-tercile (and long-only variant — shorting alts is hard), net of realistic cost, demand >60% windows positive + positive mean, and corr to the directional book (combine-candidate check).
