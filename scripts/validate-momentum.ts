@@ -135,6 +135,23 @@ console.log(`   skip 20%: profitable ${(sk20.profitableFraction * 100).toFixed(1
 console.log(`   skip 30%: profitable ${(sk30.profitableFraction * 100).toFixed(1)}%`);
 console.log(`   bootstrap Sharpe median ${bs.sharpe.median.toFixed(2)}, PnL median ${bs.finalPnl.median.toFixed(1)}%\n`);
 
+// ── 4. SALVAGE TEST: lookback ENSEMBLE (no selection → dodges the PBO failure) ─
+const ensLbs = [1, 2, 3, 4];
+const ensSeries = chosen.map((_, i) => mean(ensLbs.map((lb) => seriesByLb.get(lb)![i]!)));
+const ensPerObs = mean(ensSeries) / std(ensSeries);
+const ensSk = skew(ensSeries), ensKu = kurt(ensSeries);
+console.log('── 4. SALVAGE: lookback ensemble (avg 1–4wk, no selection) ──────');
+console.log(`   annualized Sharpe ${annSharpe(ensSeries).toFixed(2)}, netAnn ${(mean(ensSeries) * WK_PER_YR * 100).toFixed(1)}%, per-obs SR ${ensPerObs.toFixed(4)}`);
+console.log('   trials | DSR(per-obs, CORRECT)');
+console.log('   -------|----------------------');
+for (const trials of [1, 5, 10, 25, 50]) {
+  const d = calculateDeflatedSharpe(ensPerObs, ensSeries.length, trials, { skewness: ensSk, kurtosis: ensKu });
+  console.log(`   ${String(trials).padStart(6)} | ${d.deflatedSharpe.toFixed(4).padStart(8)} ${d.deflatedSharpe > 0 ? 'PASS ✅' : 'FAIL ❌'}`);
+}
+const ensMC = bootstrapTrades(ensSeries.map((r) => ({ pnlPercent: r })), ITERS, undefined, ANN);
+console.log(`   MC bootstrap Sharpe p5 = ${ensMC.sharpe.p5.toFixed(2)} ${ensMC.sharpe.p5 > 0 ? 'PASS ✅' : 'FAIL ❌'}, PnL p5 = ${ensMC.finalPnl.p5.toFixed(1)}%`);
+console.log('   (ensemble removes LOOKBACK selection, but NOT family-selection across the ~10 loop families, NOR survivorship)\n');
+
 console.log('═══════════════════════════════════════════════════════════════════');
 console.log('  ⚠️ SURVIVORSHIP NOT TESTED. PBO/DSR/MC test overfitting/luck/robustness');
 console.log('  on the SURVIVING 19-coin universe only. The (larger) survivorship');

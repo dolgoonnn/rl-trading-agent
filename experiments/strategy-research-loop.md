@@ -251,7 +251,9 @@ Tested 5 candidates in the relative-value/cross-sectional/mechanism space the pr
 - **MC passes** (the chosen series isn't outlier-/luck-driven *within sample*) — but MC conditions on the already-selected config, so it's the weakest of the three and can't rescue a PBO fail.
 - **Survivorship** (the biggest risk) remains untested and can only hurt.
 
-**Conclusion:** the "Sharpe 1.5 winner" was a *screening* result. Under the project's real overfitting controls it is a **weak, not-robustly-significant edge** — NOT deployable as a single hand-picked config. The combine gain (+0.61 vt book Sharpe) rests on this sleeve and must be treated as unproven. **Do not deploy as-is.** Salvage paths, in order: (1) test a lookback-ENSEMBLE (1–4wk avg) to remove the selection overfit, then re-run DSR/MC; (2) obtain a point-in-time universe to measure the survivorship haircut; only then reconsider. If the ensemble also fails DSR at honest trial counts → shelve momentum.
+**Salvage test — lookback ENSEMBLE (avg 1–4wk, no selection → dodges PBO):** annualized Sharpe **1.31** (vs 1.60 hand-picked — the drop is the de-cherry-picking). DSR per-obs +0.18 @1 trial → **−0.004 @10 → −0.06 @50** (FAIL at honest breadth); MC bootstrap Sharpe p5 0.32 (pass). So even removing lookback selection, **DSR still fails once the full search (~10 families, 50+ configs) is counted.**
+
+**Conclusion: xs-momentum is a weak, NOT-robustly-significant edge — it does NOT clear the project's deployment bar, single-config or ensemble.** The "Sharpe 1.5 winner" was a *screening* result that survives MC (not luck-/outlier-driven in-sample) but fails PBO (single config) and fails DSR after honest multiple-testing correction (both config and ensemble). The combine gain (+0.61 vt book Sharpe) rests on this sleeve and is therefore **unproven**. Survivorship (untested) can only worsen it. **Do NOT deploy.** It joins the "interesting but unvalidated" pile — closer to the other candidates than the earlier "winner" framing implied. Only revisit with: a point-in-time (survivorship-free) universe AND a pre-registered single design (to legitimately lower the trial count). Honest net of the whole loop: **0 deployable edges found** — but the project's validation machinery worked exactly as intended (caught a screening false-positive before any capital).
 
 ---
 
@@ -270,7 +272,9 @@ Tested 5 candidates in the relative-value/cross-sectional/mechanism space the pr
 | 9 | order-flow imbalance | microstructure | ❌ no candle edge / ✅ thesis-confirming (gross dies to cost) |
 | 10 | Amihud illiquidity | factor | ❌ inverted, sub-threshold size tilt |
 
-**One winner in ten: cross-sectional momentum.** It is the only candidate that is simultaneously (a) net-profitable after realistic cost, (b) robust across rolling walk-forward windows, (c) market-neutral / uncorrelated to the existing book, and (d) free of fitted per-trade parameters. It improves the deployed book by a real, survivorship-robust margin.
+**⚠️ UPDATE — full validation downgraded the "winner": see the validation section above. xs-momentum FAILS PBO (63.5%) and DSR (at honest trial counts); it does NOT clear the deployment bar. Net deployable edges from the loop = 0.** The text below describes the *screening* outcome (why momentum looked best of the ten); the validation section is the binding verdict.
+
+**Best-in-screening was cross-sectional momentum.** It was the only candidate simultaneously (a) net-profitable after cost, (b) robust across rolling walk-forward windows, (c) market-neutral/uncorrelated to the book, (d) free of fitted per-trade params — which is why it passed the *pulse* gate. But under the project's real overfitting controls (PBO/DSR) it is a weak, not-robustly-significant edge, not deployable.
 
 **The law the loop established (precise version of the project thesis):**
 - **Signals die.** Every fast/fitted signal (reversal, lead-lag, stat-arb, order-flow) dies to turnover×cost or estimation-window/regime fragility. Order-flow (iter 9) directly confirms the microstructure edge is real but lives *below the candle/cost frontier* — needs L2/maker execution we don't have.
