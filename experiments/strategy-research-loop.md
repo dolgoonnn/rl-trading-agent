@@ -12,8 +12,8 @@
 | # | Candidate | Family | Intraday fit | Prior (lit) | Survives-cost risk | Status |
 |---|---|---|---|---|---|---|
 | 1 | Cross-sectional short-term **reversal** (long losers/short winners) | relative-value | high | strong (CO-OC reversal "robust") | HIGH (turnover) | ❌ **KILLED** (iter 1) |
-| 2 | **Funding-carry delta-neutral** (collect funding, market-neutral) | mechanism harvest | n/a (carry) | strong: 10–20% APY, 0.8% maxDD 2025 | LOW | ⏳ NEXT |
-| 3 | **Stat-arb cointegration pairs** (spread mean-reversion, multi-day hold) | relative-value | med | Fil/Kristoufek 30%/yr; intraday HF variants | MED (longer hold = lower turnover) | queued |
+| 2 | **Funding-carry delta-neutral** (collect funding, market-neutral) | mechanism harvest | n/a (carry) | strong: 10–20% APY, 0.8% maxDD 2025 | LOW | ✅ **SURVIVES** (iter 2) — parked as combine-candidate |
+| 3 | **Stat-arb cointegration pairs** (spread mean-reversion, multi-day hold) | relative-value | med | Fil/Kristoufek 30%/yr; intraday HF variants | MED (longer hold = lower turnover) | ⏳ NEXT |
 | 4 | **Lead-lag cross-predictability** (BTC→alt; intraday *negative* lead-lag) | relative-value | high | LASSO profits "net of realistic costs" | HIGH (intraday turnover) | queued |
 | 5 | Cross-sectional **momentum** (2–4wk) / longer-horizon reversal, size/illiquidity factors | factor | low (weekly=swing) | large & significant, not on std factors | LOW | queued (swing, not intraday) |
 
@@ -36,10 +36,31 @@ Sources: cross-sectional crypto factors ([Dobrynskaya SSRN 3913263](https://pape
 
 ---
 
-## Next (iteration 2): Funding-carry delta-neutral
+## Iteration 2 — Funding-carry delta-neutral — ✅ SURVIVES (parked as combine-candidate)
 
-**Why promoted to #1:** it's a *strategy*, not a chart edge — a structural **carry** (collect perp funding while spot-hedged), market-neutral, documented persistent (10–20% APY, ~0.8% maxDD in 2025), and it **combines** with the directional swing book as an uncorrelated sleeve (exactly the "combine if needed" mandate). The project already has a `funding-arb-engine` (bot) and `data/*_futures_1h.json` funding history — testable now.
+**Script:** `scripts/funding-carry-pulse.ts` · settlement-grid (8h) funding from `data/{BTC,ETH,SOL}USDT_futures_1h.json`, n=3,219 settlements/coin (~3yr). Long-spot / short-perp delta-neutral; carry P&L ≈ Σ funding − 2bps/settle rehedge. Tests always-on, funding-timed, combined-ew, + corr to BTC spot.
 
-**Pulse plan:** load `data/{BTC,ETH,SOL}USDT_futures_1h.json` funding series → simulate delta-neutral carry (long spot / short perp, or vice-versa by funding sign) → net of taker/maker fees + rebalance → report APY, maxDD, % months positive, and **correlation to the Run-20 book** (the real value is ρ≈0 diversification). Honest cost modeling (the carry is small per-period; fees can eat it — same discipline as everything else).
+| book | n | annGross | annNet | Sharpe* | maxDD | %pos | totalNet |
+|---|---|---|---|---|---|---|---|
+| BTC always-on | 3219 | 8.2% | **6.0%** | 21.1* | 0.3% | 90 | 19% |
+| ETH always-on | 3219 | 8.5% | **6.3%** | 21.0* | 0.2% | 90 | 20% |
+| SOL always-on | 3219 | 6.3% | **4.1%** | 7.5* | 2.2% | 74 | 13% |
+| BTC funding-timed | 3218 | 8.1% | 5.9% | 21.1* | 0.2% | 84 | 19% |
+| SOL funding-timed | 3218 | 7.6% | 5.4% | 12.2* | 0.6% | 65 | 17% |
+| **COMBINED ew** | 3219 | 7.7% | **5.5%** | 16.3* | 0.6% | 86 | 17% |
 
-Then iter 3+: stat-arb pairs (multi-day hold to dodge the turnover wall), lead-lag pulse. Combine survivors into the book.
+**Combined-carry vs BTC-spot return corr = 0.040** ⇒ genuinely market-neutral.
+
+**Verdict:** the carry is **real and robust** — 90% of 3,219 settlements positive across all three coins; gross 8.2%/yr BTC matches the known ~0.01%/8h funding rate (conservative, not mined). It is genuinely **market-neutral** (ρ=0.04). funding-timing only helps the noisy coin (SOL 4.1→5.4%); BTC/ETH funding is ~always positive so timing is moot.
+
+***The Sharpe 16–21 is an ARTIFACT — do NOT treat as deployable.** The funding stream is mechanically smooth, so the ratio explodes, but the true risk of delta-neutral carry lives in **basis blow-ups, spot-hedge cost/availability, and negative-funding regimes** — none of which a pure funding-rate series contains. Honest deployable read: **~5%/yr unlevered, near-zero spot correlation** — the textbook diversifier, opposite profile to the directional book.
+
+**Why parked (not built out now):** a deployable carry book needs spot+perp **basis** data to model the tail (the part that actually hurts); I can't manufacture a real combination-Sharpe from the funding series alone, and plugging the artifact Sharpe into a portfolio formula would massively overstate the benefit. Promote to a full build IF/when basis data is sourced. As a *pulse* (does a gross, cost-surviving, uncorrelated carry exist?) the answer is decisively YES — unlike reversal.
+
+**Data-bug caught & fixed (the "improve" step):** first run returned n=42 because the filter gated on `openInterest>0`, but OI is placeholder-zero across this file. Re-gated on real funding (drop leading zero-funding placeholder rows) → n=3,219. Lesson: validate sample size before trusting a pulse.
+
+---
+
+## Next (iteration 3): Stat-arb cointegration pairs
+
+**Why:** relative-value family, but **multi-day hold** dodges the turnover wall that killed reversal (iter 1) — the cost ÷ signal ratio is the whole game. Lit prior strong (Fil & Kristoufek ~30%/yr gross). Pulse plan: screen the 20-coin panel for cointegrated pairs (Engle-Granger / rolling OLS hedge ratio + ADF on residual), trade the z-scored spread (enter |z|>2, exit |z|<0.5), hold days not hours → report gross vs net Sharpe at realistic 4-leg cost, and **% of pairs whose cointegration survives out-of-sample** (the real failure mode is spurious in-sample cointegration). Combine survivors into the book.
