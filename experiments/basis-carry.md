@@ -79,6 +79,13 @@ Real alt-spot borrow is 15-50%/yr → the market-neutral L/S is NOT deployable. 
 borrow): OOS **3.1%/yr Sharpe 2.77** vs absolute-EW OOS 1.6% — selection adds ~1.5pp but keeps
 the decaying common funding-level beta (corr 0.78 to absolute carry; IS 13.4%→OOS 3.1% = decays).
 
+## Aggregate-funding REGIME signal — NULL (`scripts/funding-regime-pulse.ts`)
+Distinct test from per-coin directional: panel-mean funding (EMA) as a leverage-sentiment gauge
+vs forward BTC return (1d/3d/7d). corr is tiny (−0.016..−0.029 IS) and flips OOS (+0.028 at 7d);
+quintile spreads ~0. No timing edge. Combined with the per-coin null, **funding has NO predictive
+value at any level (per-coin or aggregate) — it is a CARRY mechanism only, never a signal.** Closes
+funding-as-predictor for good.
+
 ### XS carry verdict
 Real, OOS-stable GROSS edge (funding differential) — but the clean market-neutral form is
 borrow-blocked and the borrow-free residual (long-only ~3%/yr OOS, decaying) is marginal.
