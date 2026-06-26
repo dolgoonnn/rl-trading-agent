@@ -72,11 +72,46 @@ gold London PM-fix down-drift −1.59bp/d into 15:00, t=−2.62, regime-stable, 
 friction — futures-tier overlay only." Two independent passes ⇒ the fix mechanism is solid;
 both reach "institutional/futures-tier only." Turn-of-month gold there = regime-unstable (dead).
 
-## SYSTEMS-LOOP TERMINAL VERDICT (gold intraday)
-The only gold intraday SYSTEM is the **fix mechanism** (pre-fix short + post-fix bounce, AM &
-PM): real, OOS-robust, mechanistically coherent, independently replicated — but **institutional/
-futures-only** (~0.6bp RT). No retail-deployable form exists (cost sensitivity + month-end both
-confirm). Candle patterns (~22 hyps), calendar (ToM/DOW/momentum), and events (FOMC/NFP) are all
-dead. Deployable gold edge stays the overnight/fix METALS BOOK; the loop's one actionable
-refinement is the tighter **14:30–15:00 pre-PM-fix window** (OOS 1.06 vs deployed 0.57) as a
-forward-test candidate for the existing fix-short leg.
+## Cross-metal confirmation — SILVER fix (`scripts/silver-fix-systems.ts`, 12:00 London auction)
+
+Silver has its own LBMA auction (12:00 London). The METALS BOOK already deploys "Ag fix-short
+11-12"; scanned the tighter-window + post-fix-bounce structure (never done on silver). At
+0.5bp/side (silver futures-tight):
+| silver window | IS Sharpe | OOS Sharpe | survive |
+|---|---|---|---|
+| pre-fix 11-12 SHORT (deployed) | 0.76 | **3.11** | ✅ |
+| pre-fix 11:30-12 SHORT (tighter) | 0.84 | 2.94 | ✅ |
+| pre-fix 10-12 SHORT | 0.72 | 2.33 | ✅ |
+| post-fix 12-12:30 LONG (bounce) | 0.50 | 0.76 | ✅ |
+
+The identical **pre-fix-short + post-fix-bounce** structure now confirmed across THREE
+independent auctions (gold PM 15:00, gold AM 10:30, silver 12:00) — strong mechanistic evidence
+the fix-flow edge is real, not mined. Silver's is the strongest (deployed leg OOS 3.11). The
+tighter 11:30-12 does NOT beat the deployed 11-12 (unlike gold, where 14:30-15 did) — silver's
+deployed window is already optimal. Post-fix 12-12:30 bounce = a coherent but weak (0.5-0.76)
+additive candidate for the futures-tier book.
+
+Two caveats (both honesty-critical): (1) **futures-tier only again** — at 2bp/side retail the
+*recent* 2020-26 (IS) period goes negative (deployed leg IS −0.41); only the older 2015-19 still
+clears. (2) **The edge is DECAYING** — on BOTH metals the 2015-19 (OOS) fix-drift is markedly
+stronger than 2020-26 (IS): gold 14:30-15 IS 0.39→OOS 1.06; silver 11-12 IS 0.76→OOS 3.11.
+Consistent with post-reform auction electronification reducing informed-flow leakage. Forward
+expectation should be anchored to the WEAKER recent (IS) numbers, not the OOS headline.
+
+## SYSTEMS-LOOP TERMINAL VERDICT (metals intraday)
+The only metals intraday SYSTEM is the **fix mechanism** (pre-fix short + post-fix bounce),
+confirmed across THREE auctions (gold PM 15:00, gold AM 10:30, silver 12:00): real, OOS-robust,
+mechanistically coherent, independently replicated — but **institutional/futures-only** (alive at
+0.3–0.5bp/side, dead at retail spot). No retail-deployable form exists (cost sensitivity +
+month-end + silver-retail all confirm). Candle patterns (~22 hyps), calendar (ToM/DOW/momentum),
+and events (FOMC/NFP) are all dead.
+
+**Deployable takeaways (futures-tier book):**
+1. Validates the two deployed METALS BOOK legs on the true 2015-19 holdout: gold fix-short
+   (OOS 0.57) and silver fix-short (OOS **3.11**, the strongest).
+2. Actionable refinement: gold's tighter **14:30–15:00** window (OOS 1.06 vs deployed 0.57) —
+   forward-test candidate. (Silver's deployed 11-12 is already optimal; no refinement.)
+3. New additive candidate: **post-fix bounce** (gold 15-15:30 LONG, silver 12-12:30 LONG) —
+   coherent across auctions but weak (Sharpe 0.5-0.76), futures-tier only.
+4. Caveat for sizing: the edge is **decaying** (2020-26 IS << 2015-19 OOS on both metals) —
+   anchor forward expectations to the weaker recent numbers.
