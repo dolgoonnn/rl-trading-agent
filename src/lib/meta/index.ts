@@ -8,3 +8,5 @@ export { vectorize } from './vectorize';
 export type { LogisticModel, FitOpts } from './logistic';
 export { fitLogistic, predictProbaLogistic } from './logistic';
 export { auc, topQuantileLift } from './eval';
+export type { ProbeOpts, ProbeResult, FoldStat } from './probe-core';
+export { runProbe } from './probe-core';
