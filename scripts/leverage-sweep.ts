@@ -14,7 +14,7 @@ function arg(name: string, def: string): string {
 }
 
 const tapePath = arg('--tape', 'tape.json');
-const grid = arg('--leverage-grid', '1,2,5,10,25,50,100,125').split(',').map(Number);
+const grid = arg('--leverage-grid', '1,2,5,10,25,50,100,125').split(',').map(Number).sort((a, b) => a - b);
 const marginFraction = Number(arg('--margin-fraction', '1'));
 const mmr = Number(arg('--mmr', '0.005'));
 const slippageBps = Number(arg('--slippage-bps', '3'));
@@ -68,5 +68,5 @@ for (const r of results) {
   console.log(`${String(r.leverage).padStart(5)} | ${'#'.repeat(Math.max(0, n))}`);
 }
 
-writeFileSync(outPath, JSON.stringify({ config: { marginFraction, mmr, slippageBps, fundingRate8h, ruinThreshold, mcIterations }, symbols, tradeCount: tape.length, lStar: star.leverage, lRuin: ruinLevel?.leverage ?? null, results }, null, 2));
+writeFileSync(outPath, JSON.stringify({ config: { grid, marginFraction, mmr, slippageBps, fundingRate8h, ruinThreshold, mcIterations }, symbols, tradeCount: tape.length, lStar: star.leverage, lRuin: ruinLevel?.leverage ?? null, results }, null, 2));
 console.log(`\nWrote report to ${outPath}`);
