@@ -3,3 +3,8 @@ export { buildTradeFeatureRow } from './dataset';
 export { augmentFeatures } from './features';
 export type { CvSample, CvFold } from './purged-cv';
 export { purgedKFold } from './purged-cv';
+export type { VectorizeResult } from './vectorize';
+export { vectorize } from './vectorize';
+export type { LogisticModel, FitOpts } from './logistic';
+export { fitLogistic, predictProbaLogistic } from './logistic';
+export { auc, topQuantileLift } from './eval';
