@@ -74,5 +74,5 @@ The scorer needs adjustment before proceeding. Focus areas:
 3. Review strategy entry conditions for each failing symbol
 
 ---
-_Generated: 2026-06-25T10:57:47.610Z_
+_Generated: 2026-06-21T17:03:03.100Z_
 _Script: scripts/backtest-confluence.ts_
