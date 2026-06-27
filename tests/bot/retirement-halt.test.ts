@@ -561,3 +561,47 @@ describe('PositionTracker entry-window + deflated-sharpe wrappers', () => {
     expect(tracker.getRollingDeflatedSharpe(100)).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// trade-count gate — never hard-halt for edge decay without a real TRADE
+// track record. Regression for the spurious halt observed live: a FLAT,
+// untraded equity curve (0 trades) accumulated >= MinTRL hourly snapshots,
+// produced ~0 Sharpe → DSR < c → sustained streak → HARD halt of a strategy
+// that had simply never traded.
+// ---------------------------------------------------------------------------
+describe('checkRetirementHalt — DSR hard-halt requires a real trade track record', () => {
+  // A sustained-DSR-breach scenario that WOULD hard-halt (n>=MinTRL, DSR<c, streak>=k).
+  const sustainedBreach = (over: Partial<RetirementHaltInputs> = {}): RetirementHaltInputs =>
+    baseInputs({
+      drawdown: 0.0, // no DD halt/derisk — isolate the DSR leg
+      rollingSharpe: 0.1, // < minAcceptableSharpe 0.5 ⇒ DSR insignificant
+      snapshotCount: 500, // >= MinTRL 50 (hourly marks of a flat curve)
+      dsrBreachConsecutive: 5,
+      dsrBreachK: 3,
+      ...over,
+    });
+
+  it('flat/untraded curve (tradeCount=0 < minTradesForHalt) ⇒ NOT a hard halt', () => {
+    const r = checkRetirementHalt(sustainedBreach({ tradeCount: 0, minTradesForHalt: 20 }));
+    expect(r.action).not.toBe('halt'); // derisk at most — never retire a strategy that never traded
+  });
+
+  it('same breach WITH a real trade track record (tradeCount >= minTradesForHalt) ⇒ HARD halt', () => {
+    const r = checkRetirementHalt(sustainedBreach({ tradeCount: 50, minTradesForHalt: 20 }));
+    expect(r.action).toBe('halt');
+    expect(r.cause).toMatch(/sustained DSR/i);
+  });
+
+  it('default (no minTradesForHalt configured) preserves legacy halt behavior', () => {
+    // back-compat: callers/tests that omit the gate still hard-halt on sustained breach.
+    const r = checkRetirementHalt(sustainedBreach());
+    expect(r.action).toBe('halt');
+  });
+
+  it('absolute-DD hard stop is NEVER gated by tradeCount', () => {
+    const inp = baseInputs();
+    const r = checkRetirementHalt({ ...inp, drawdown: inp.hardKillDD, tradeCount: 0, minTradesForHalt: 20 });
+    expect(r.action).toBe('halt');
+    expect(r.cause).toMatch(/hard.*drawdown|absolute|hardKillDD/i);
+  });
+});

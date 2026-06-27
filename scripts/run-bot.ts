@@ -643,6 +643,10 @@ class TradingBot {
       drawdown: this.tracker.getDrawdown(),
       deflatedSharpe,
       snapshotCount,
+      // Realized live trade count — the DSR edge-decay hard halts require a real
+      // trade track record (config.minTradesForHalt). A flat/untraded curve (0
+      // trades) accrues hourly snapshots but has no edge to decay → never retire it.
+      tradeCount: this.tracker.getTotalTrades(),
       regimeCause: this.consumeRegimeCause(),
       charterBreachConsecutive: this.charterBreachConsecutive,
       dsrBreachConsecutive: this.dsrBreachConsecutive,
