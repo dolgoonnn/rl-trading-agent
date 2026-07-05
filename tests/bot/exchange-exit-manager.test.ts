@@ -19,6 +19,75 @@ function mockClient(overrides: Partial<ExchangeExitClient> = {}): ExchangeExitCl
   };
 }
 
+/** Config with an instant sleep so retry-backoff tests don't wait real time. */
+const RETRY_CFG = { enabled: true as const, triggerBy: 'MarkPrice' as const, sleep: () => Promise.resolve() };
+
+describe('ExchangeExitManager — transient-failure retry (idempotent calls only)', () => {
+  it('armExits RETRIES a transient network failure then succeeds', async () => {
+    const setTradingStop = vi
+      .fn()
+      .mockRejectedValueOnce(Object.assign(new Error('ETIMEDOUT'), { code: 'ETIMEDOUT' }))
+      .mockResolvedValue({ retCode: 0, retMsg: 'OK' });
+    const mgr = new ExchangeExitManager(mockClient({ setTradingStop }), RETRY_CFG);
+
+    const res = await mgr.armExits('BTCUSDT', 60000, 65000);
+
+    expect(res.ok).toBe(true);
+    expect(setTradingStop).toHaveBeenCalledTimes(2);
+  });
+
+  it('armExits RETRIES a transient Bybit retCode (10006 rate limit) then succeeds', async () => {
+    const setTradingStop = vi
+      .fn()
+      .mockResolvedValueOnce({ retCode: 10006, retMsg: 'rate limit' })
+      .mockResolvedValue({ retCode: 0, retMsg: 'OK' });
+    const mgr = new ExchangeExitManager(mockClient({ setTradingStop }), RETRY_CFG);
+
+    const res = await mgr.armExits('BTCUSDT', 60000, 65000);
+
+    expect(res.ok).toBe(true);
+    expect(setTradingStop).toHaveBeenCalledTimes(2);
+  });
+
+  it('getOpenSize RETRIES a transient read failure (reconcile depends on it)', async () => {
+    const getPositionInfo = vi
+      .fn()
+      .mockRejectedValueOnce(Object.assign(new Error('ECONNRESET'), { code: 'ECONNRESET' }))
+      .mockResolvedValue({ retCode: 0, retMsg: 'OK', result: { list: [{ size: '0.5', side: 'Buy', avgPrice: '50000' }] } });
+    const mgr = new ExchangeExitManager(mockClient({ getPositionInfo }), RETRY_CFG);
+
+    const res = await mgr.getOpenSize('BTCUSDT');
+
+    expect(res).toEqual({ size: 0.5, avgPrice: 50000 });
+    expect(getPositionInfo).toHaveBeenCalledTimes(2);
+  });
+
+  it('marketClose does NOT retry (non-idempotent — double-fill risk)', async () => {
+    const submitOrder = vi
+      .fn()
+      .mockRejectedValueOnce(Object.assign(new Error('ETIMEDOUT'), { code: 'ETIMEDOUT' }))
+      .mockResolvedValue({ retCode: 0, retMsg: 'OK', result: { orderId: 'x' } });
+    const mgr = new ExchangeExitManager(mockClient({ submitOrder }), RETRY_CFG);
+
+    const res = await mgr.marketClose('BTCUSDT', 'Sell', '0.5');
+
+    // Called exactly ONCE — a transient failure must NOT be retried; the caller
+    // re-decides on fresh position state instead of risking a double close.
+    expect(submitOrder).toHaveBeenCalledTimes(1);
+    expect(res.ok).toBe(false);
+  });
+
+  it('does NOT retry a non-retryable Bybit error (auth 10003)', async () => {
+    const getPositionInfo = vi.fn().mockResolvedValue({ retCode: 10003, retMsg: 'invalid api key', result: { list: [] } });
+    const mgr = new ExchangeExitManager(mockClient({ getPositionInfo }), RETRY_CFG);
+
+    const res = await mgr.getOpenSize('BTCUSDT');
+
+    expect(res).toBeNull(); // UNKNOWN — fail closed
+    expect(getPositionInfo).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('ExchangeExitManager.armExits', () => {
   it('sends SL+TP as a Full-mode position stop with the configured trigger', async () => {
     const client = mockClient();
