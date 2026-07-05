@@ -4,12 +4,12 @@
 A weighted scoring system selecting strategies based on ICT confluence factors will be more robust than the RL meta-agent because it cannot overfit.
 
 ## Implementation Summary
-- Confluence Scorer with 10 factors, threshold=4.048
-- Walk-forward validation: 37 windows per symbol
-- Symbols: BTCUSDT, ETHUSDT, SOLUSDT
+- Confluence Scorer with 10 factors, threshold=4
+- Walk-forward validation: 9 windows per symbol
+- Symbols: R_25, R_75, R_100
 - Commission: 0.1% per side
 - Slippage: 0.05% per side
-- Max position hold: 160 bars
+- Max position hold: 100 bars
 
 ### Confluence Weights
 | Factor | Weight |
@@ -26,46 +26,46 @@ A weighted scoring system selecting strategies based on ICT confluence factors w
 | OB+FVG Confluence | 1 |
 
 **Max possible score:** 10.5
-**Threshold:** 4.048
+**Threshold:** 4
 
 ## Results
 
 ### Walk-Forward Summary
 | Symbol | Windows | Positive | Avg Sharpe | Worst Sharpe | Status |
 |--------|---------|----------|------------|--------------|--------|
-| BTCUSDT | 37 | 24/37 | 16.51 | -237.25 | FAIL |
-| ETHUSDT | 37 | 21/37 | -29.79 | -801.23 | FAIL |
-| SOLUSDT | 37 | 27/37 | 6.04 | -115.64 | FAIL |
+| R_25 | 9 | 1/9 | -858.47 | -6704.39 | FAIL |
+| R_75 | 9 | 3/9 | -19.54 | -90.63 | FAIL |
+| R_100 | 9 | 5/9 | -7.24 | -50.73 | FAIL |
 
 
-**Overall pass rate:** 64.9%
+**Overall pass rate:** 33.3%
 **Overall verdict:** FAILED
 
 ### Per-Strategy Breakdown
 | Strategy | Signals | Trades | Wins | Losses | Win Rate | Avg PnL | Total PnL |
 |----------|---------|--------|------|--------|----------|---------|-----------|
-| order_block | 3638 | 657 | 293 | 364 | 44.6% | 0.35% | 231.77% |
-| fvg | 0 | 0 | 0 | 0 | 0.0% | 0.00% | 0.00% |
+| order_block | 428 | 108 | 41 | 67 | 38.0% | -0.10% | -11.07% |
+| fvg | 543 | 454 | 125 | 329 | 27.5% | -0.34% | -153.81% |
 | bos_continuation | 0 | 0 | 0 | 0 | 0.0% | 0.00% | 0.00% |
 | choch_reversal | 0 | 0 | 0 | 0 | 0.0% | 0.00% | 0.00% |
 
 
-**Total trades:** 657
-**Overall win rate:** 44.6%
-**Overall PnL:** 309.81%
+**Total trades:** 562
+**Overall win rate:** 29.5%
+**Overall PnL:** -85.07%
 
 ### Comparison to RL (exp-014)
 _No exp-014 RL results found for comparison. Run walk-forward-validate.ts with the RL model first._
 
 
 ## Key Learnings
-- **Low win rate (44.6%).** May need to increase threshold or add additional filters.
-- **order_block** is the most active strategy (657 trades, 44.6% win rate).
-- **Dead strategies (0 trades):** fvg, bos_continuation, choch_reversal. These may need looser entry conditions or the confluence threshold may be filtering them out.
-- **Failed symbols:** BTCUSDT, ETHUSDT, SOLUSDT. The confluence scorer may need symbol-specific weight tuning.
-- **Signal-to-trade conversion:** 18.1% (657 trades from 3638 signals above threshold).
+- **Low win rate (29.5%).** May need to increase threshold or add additional filters.
+- **fvg** is the most active strategy (454 trades, 27.5% win rate).
+- **Dead strategies (0 trades):** bos_continuation, choch_reversal. These may need looser entry conditions or the confluence threshold may be filtering them out.
+- **Failed symbols:** R_25, R_75, R_100. The confluence scorer may need symbol-specific weight tuning.
+- **Signal-to-trade conversion:** 57.9% (562 trades from 971 signals above threshold).
 
-## Decision: Adjust -- the system shows promise but needs threshold/weight tuning before proceeding
+## Decision: Pivot -- fundamental approach may need rethinking. Consider different confluence factors or entry logic.
 
 ## Impact on Next Iteration
 The scorer needs adjustment before proceeding. Focus areas:
@@ -74,5 +74,5 @@ The scorer needs adjustment before proceeding. Focus areas:
 3. Review strategy entry conditions for each failing symbol
 
 ---
-_Generated: 2026-06-21T17:03:03.100Z_
+_Generated: 2026-06-29T06:48:40.975Z_
 _Script: scripts/backtest-confluence.ts_
