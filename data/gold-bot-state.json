@@ -3,8 +3,9 @@
   "initialCapital": 10000,
   "position": null,
   "trades": [],
-  "lastTickTimestamp": 1782432000000,
+  "lastTickTimestamp": 1783209600000,
   "rolling30dReturns": [
+    0,
     0,
     0,
     0,

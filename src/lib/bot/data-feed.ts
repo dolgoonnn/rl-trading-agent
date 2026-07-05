@@ -13,6 +13,7 @@ import type { BotSymbol, OrderbookSnapshot } from '@/types/bot';
 import { db } from '@/lib/data/db';
 import { botCandles } from '@/lib/data/schema';
 import { BYBIT_CATEGORY, BYBIT_INTERVAL } from './config';
+import { withRetry, BybitApiError } from './retry';
 
 /**
  * Minimum candles needed for ICT analysis (structure, regime, etc.).
@@ -89,6 +90,41 @@ export class DataFeed {
   }
 
   /**
+   * Run one Bybit REST call with transient-failure retry (backoff + jitter)
+   * and uniform retCode validation. A DNS blip or rate-limit is ridden out
+   * in-process instead of crashing the bot (the 2026-06-27 outage killed the
+   * fleet via PM2 restart exhaustion during startup backfill).
+   *
+   * `maxAttempts: Number.POSITIVE_INFINITY` is reserved for startup paths
+   * (backfill) where the right behavior during an outage is to wait, capped
+   * at 60s between tries, until the network returns.
+   */
+  private async bybitCall<T extends { retCode: number; retMsg: string }>(
+    label: string,
+    fn: () => Promise<T>,
+    opts: { maxAttempts?: number } = {},
+  ): Promise<T> {
+    return withRetry(
+      async () => {
+        const response = await fn();
+        if (response.retCode !== 0) {
+          throw new BybitApiError(`${label}: ${response.retMsg}`, response.retCode);
+        }
+        return response;
+      },
+      {
+        maxAttempts: opts.maxAttempts ?? 5,
+        onRetry: (err, attempt, delayMs) => {
+          const detail = err instanceof Error ? err.message : String(err);
+          console.warn(
+            `[data-feed] ${label} attempt ${attempt} failed (${detail}); retrying in ${Math.round(delayMs)}ms`,
+          );
+        },
+      },
+    );
+  }
+
+  /**
    * Fetch latest candles from Bybit for a symbol.
    * Returns new candles since the last fetch.
    */
@@ -96,16 +132,14 @@ export class DataFeed {
     symbol: BotSymbol,
     limit = MIN_CANDLES_FOR_ANALYSIS,
   ): Promise<{ candles: Candle[]; newCandles: Candle[] }> {
-    const response = await this.client.getKline({
-      category: BYBIT_CATEGORY,
-      symbol,
-      interval: BYBIT_INTERVAL,
-      limit,
-    });
-
-    if (response.retCode !== 0) {
-      throw new Error(`Bybit API error: ${response.retMsg} (code: ${response.retCode})`);
-    }
+    const response = await this.bybitCall(`getKline ${symbol}`, () =>
+      this.client.getKline({
+        category: BYBIT_CATEGORY,
+        symbol,
+        interval: BYBIT_INTERVAL,
+        limit,
+      }),
+    );
 
     // Successful exchange round-trip — record the heartbeat timestamp.
     this.lastFeedUpdateMs = Date.now();
@@ -160,17 +194,20 @@ export class DataFeed {
       const remaining = targetCandles - allFetched.length;
       const limit = Math.min(remaining, BYBIT_MAX_LIMIT);
 
-      const response = await this.client.getKline({
-        category: BYBIT_CATEGORY,
-        symbol,
-        interval: BYBIT_INTERVAL,
-        limit,
-        ...(endTime ? { end: endTime } : {}),
-      });
-
-      if (response.retCode !== 0) {
-        throw new Error(`Bybit API error: ${response.retMsg} (code: ${response.retCode})`);
-      }
+      // Startup path: ride out a network outage in-process (capped 60s between
+      // tries) instead of crashing into PM2's max_restarts budget.
+      const response = await this.bybitCall(
+        `backfill getKline ${symbol}`,
+        () =>
+          this.client.getKline({
+            category: BYBIT_CATEGORY,
+            symbol,
+            interval: BYBIT_INTERVAL,
+            limit,
+            ...(endTime ? { end: endTime } : {}),
+          }),
+        { maxAttempts: Number.POSITIVE_INFINITY },
+      );
 
       const rawCandles = response.result.list;
       if (!rawCandles || rawCandles.length === 0) break;
@@ -348,16 +385,14 @@ export class DataFeed {
     interval: string,
     limit = 100,
   ): Promise<Candle[]> {
-    const response = await this.client.getKline({
-      category: BYBIT_CATEGORY,
-      symbol,
-      interval: interval as '1' | '3' | '5' | '15' | '30' | '60',
-      limit,
-    });
-
-    if (response.retCode !== 0) {
-      throw new Error(`Bybit API error (LTF): ${response.retMsg} (code: ${response.retCode})`);
-    }
+    const response = await this.bybitCall(`getKline LTF ${symbol}/${interval}m`, () =>
+      this.client.getKline({
+        category: BYBIT_CATEGORY,
+        symbol,
+        interval: interval as '1' | '3' | '5' | '15' | '30' | '60',
+        limit,
+      }),
+    );
 
     const rawCandles = response.result.list;
     if (!rawCandles || rawCandles.length === 0) {
@@ -419,14 +454,12 @@ export class DataFeed {
       return cached.price;
     }
 
-    const response = await this.client.getTickers({
-      category: BYBIT_CATEGORY,
-      symbol,
-    });
-
-    if (response.retCode !== 0) {
-      throw new Error(`Bybit API error (tickers): ${response.retMsg} (code: ${response.retCode})`);
-    }
+    const response = await this.bybitCall(`getTickers ${symbol}`, () =>
+      this.client.getTickers({
+        category: BYBIT_CATEGORY,
+        symbol,
+      }),
+    );
 
     const ticker = response.result.list[0];
     if (!ticker) {
@@ -460,17 +493,13 @@ export class DataFeed {
       return cached.snapshot;
     }
 
-    const response = await this.client.getOrderbook({
-      category: BYBIT_CATEGORY,
-      symbol,
-      limit: ORDERBOOK_DEPTH_LEVELS,
-    });
-
-    if (response.retCode !== 0) {
-      throw new Error(
-        `Bybit API error (orderbook): ${response.retMsg} (code: ${response.retCode})`,
-      );
-    }
+    const response = await this.bybitCall(`getOrderbook ${symbol}`, () =>
+      this.client.getOrderbook({
+        category: BYBIT_CATEGORY,
+        symbol,
+        limit: ORDERBOOK_DEPTH_LEVELS,
+      }),
+    );
 
     const book = response.result;
     const bids = book.b ?? [];
@@ -547,19 +576,20 @@ export class DataFeed {
 
       // Guard against an unbounded loop on a misbehaving endpoint.
       for (let page = 0; page < 50; page++) {
-        const response = await this.client.getFundingRateHistory({
-          category: BYBIT_CATEGORY,
-          symbol,
-          startTime: startMs,
-          endTime,
-          limit: BYBIT_FUNDING_MAX_LIMIT,
-        });
-
-        if (response.retCode !== 0) {
-          throw new Error(
-            `Bybit API error (funding/history): ${response.retMsg} (code: ${response.retCode})`,
-          );
-        }
+        // 3 attempts only: this path already fail-safes to [] and must not
+        // stall a position close for long.
+        const response = await this.bybitCall(
+          `getFundingRateHistory ${symbol}`,
+          () =>
+            this.client.getFundingRateHistory({
+              category: BYBIT_CATEGORY,
+              symbol,
+              startTime: startMs,
+              endTime,
+              limit: BYBIT_FUNDING_MAX_LIMIT,
+            }),
+          { maxAttempts: 3 },
+        );
 
         const rows = response.result.list;
         if (!rows || rows.length === 0) break;
