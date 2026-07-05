@@ -48,7 +48,7 @@ import {
   skipTrades,
   type MCTradeResult,
 } from '../src/lib/rl/utils/monte-carlo';
-import { calculateDeflatedSharpe } from '../src/lib/rl/utils/deflated-sharpe';
+import { deflatedSharpePerObs } from '../src/lib/rl/utils/deflated-sharpe';
 import { estimatePBO, type WindowResult } from '../src/lib/rl/utils/pbo';
 
 // ============================================
@@ -228,13 +228,21 @@ function main(): void {
   // ============================================
   console.log('--- Check 3: Deflated Sharpe Ratio ---');
 
-  const dsrResult = calculateDeflatedSharpe(
-    wfResult.aggregate.sharpe,
-    wfResult.allOOSTrades.length,
-    opts.numTrials,
-  );
+  // Deflate the PER-TRADE Sharpe, not the annualized wfResult.aggregate.sharpe —
+  // Lo's Var(SR)=(1+0.5SR²)/T is per-observation (T = trade count here).
+  const pnls = wfResult.allOOSTrades.map((t) => t.pnlPercent);
+  const pMean = pnls.reduce((a, r) => a + r, 0) / (pnls.length || 1);
+  const pStd = Math.sqrt(pnls.reduce((a, r) => a + (r - pMean) ** 2, 0) / (pnls.length || 1));
+  const perObsSharpe = pStd > 0 ? pMean / pStd : 0;
 
-  console.log(`  Original Sharpe: ${dsrResult.originalSharpe.toFixed(2)}`);
+  const dsrResult = deflatedSharpePerObs({
+    perObsSharpe,
+    numObservations: wfResult.allOOSTrades.length,
+    numTrials: opts.numTrials,
+  });
+
+  console.log(`  Annualized Sharpe: ${wfResult.aggregate.sharpe.toFixed(2)} (display only)`);
+  console.log(`  Original Sharpe: ${dsrResult.originalSharpe.toFixed(2)} (per-trade, deflated)`);
   console.log(`  Haircut: ${dsrResult.haircut.toFixed(2)} (${opts.numTrials} trials)`);
   console.log(`  DSR: ${dsrResult.deflatedSharpe.toFixed(2)} (threshold: >0)\n`);
 
