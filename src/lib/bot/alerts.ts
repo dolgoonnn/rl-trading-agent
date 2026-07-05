@@ -159,6 +159,26 @@ export class AlertManager {
     });
   }
 
+  /**
+   * Startup exchange-position reconciliation result. `level` maps the reconcile
+   * severity (info/warn/critical) onto the alert channel so an operator is paged
+   * only for real divergence (orphan / mismatch / unconfirmed state).
+   */
+  async startupReconcile(
+    level: 'info' | 'warning' | 'critical',
+    symbol: string,
+    state: string,
+    reason: string,
+  ): Promise<void> {
+    await this.send({
+      level,
+      event: 'startup_reconcile',
+      message: `[reconcile] ${symbol} ${state}: ${reason}`,
+      details: { symbol, state },
+      timestamp: Date.now(),
+    });
+  }
+
   // ============================================
   // Core Send Logic
   // ============================================

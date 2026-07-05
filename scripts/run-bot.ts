@@ -53,6 +53,7 @@ import { computePositionSize } from '../src/lib/bot/guards';
 import { shouldSnapshot } from '../src/lib/bot/snapshot';
 import { logSkippedSignal, appendDecisionLog } from '../src/lib/bot/decision-log';
 import { isKilled, setKillFlag, type KillFlag } from '../src/lib/bot/kill-switch';
+import { decideStartupReconcile, reconcileSeverity } from '../src/lib/bot/startup-reconcile';
 import {
   evaluateRetirementHalt,
   resolveEffectiveKill,
@@ -397,6 +398,10 @@ class TradingBot {
       console.log(`  ${symbol}: ${count} candles cached`);
     }
 
+    // Startup exchange-position reconciliation: catch ghost/orphan divergence
+    // between the shadow book and the real exchange before the first tick.
+    await this.reconcileOnStartup();
+
     // Save initial state
     this.tracker.saveState();
     this.tracker.recordSnapshot();
@@ -486,6 +491,88 @@ class TradingBot {
     this.tracker.recordSnapshot();
     await this.alerts.botStopped(reason);
     console.log(`Bot stopped: ${reason}`);
+  }
+
+  // ============================================
+  // Startup Reconciliation
+  // ============================================
+
+  /**
+   * Diff the shadow book against the real exchange on startup and act on any
+   * divergence. Only meaningful with real keys (exchange-exits enabled); in
+   * paper/disabled mode getOpenSize confirms flat, so the only reachable
+   * non-sync state is a stale DB_GHOST shadow row — still worth catching.
+   *
+   * Actions are SAFE-by-default: a DB_GHOST books the missed exit on the shadow
+   * book (no exchange call); an EXCHANGE_ORPHAN or SIZE_MISMATCH latches a
+   * new-entry halt and pages the operator (never auto-opens or adopts an unknown
+   * live position); an UNKNOWN venue keeps managing the shadow rather than
+   * closing on an unconfirmed flat.
+   */
+  private async reconcileOnStartup(): Promise<void> {
+    // Without a live exchange client there is nothing authoritative to diff
+    // against (getOpenSize would fabricate a flat), so skip cleanly in paper mode.
+    if (!this.exchangeExitManager?.isEnabled) return;
+
+    console.log('\nReconciling shadow book against exchange...');
+    for (const symbol of this.config.symbols) {
+      const shadowPos = this.tracker.getOpenPosition(symbol);
+      const exchange = await this.exchangeExitManager.getOpenSize(symbol);
+
+      const decision = decideStartupReconcile({
+        shadow: shadowPos
+          ? {
+              symbol: shadowPos.symbol,
+              direction: shadowPos.direction,
+              positionSizeUSDT: shadowPos.positionSizeUSDT,
+              entryPrice: shadowPos.entryPrice,
+            }
+          : null,
+        exchange,
+      });
+
+      const severity = reconcileSeverity(decision.state);
+      console.log(`  ${symbol}: ${decision.state} — ${decision.reason}`);
+      const alertLevel = severity === 'critical' ? 'critical' : severity === 'warn' ? 'warning' : 'info';
+      await this.alerts.startupReconcile(alertLevel, symbol, decision.state, decision.reason);
+
+      switch (decision.action) {
+        case 'close_shadow': {
+          // The venue closed it (stop/TP/manual) while we were down. Book the
+          // missed exit on the shadow book at the best price we can get; a real
+          // realized-close reconcile happens on the next tick via
+          // decideExchangeReconcile once getRealizedClose is available.
+          if (shadowPos) {
+            const price = await this.dataFeed.getLatestPrice(symbol);
+            if (price !== null) {
+              const result = this.orderManager.forceClose(shadowPos, price, 'startup_reconcile');
+              const fundingSeries = await this.buildFundingSeries(result.position);
+              this.tracker.closePosition(result.position, fundingSeries);
+              console.log(`  ${symbol}: booked missed exit at $${price} (DB_GHOST reconciled)`);
+            } else {
+              console.error(`  ${symbol}: DB_GHOST but no price to book the missed exit — leaving shadow, will retry on tick`);
+            }
+          }
+          break;
+        }
+        case 'halt_and_alert': {
+          // Latch a new-entry halt: an unmanaged live position or size mismatch
+          // is a state only an operator should resolve. Reduce-only by design —
+          // existing shadow management still runs.
+          setKillFlag(db, {
+            halted: true,
+            source: 'reconcile',
+            reason: `startup ${decision.state} on ${symbol}: ${decision.reason}`,
+          });
+          console.error(`  ${symbol}: HALTED new entries (${decision.state}) — operator review required`);
+          break;
+        }
+        case 'keep_managing':
+        case 'alert':
+        case 'none':
+          break;
+      }
+    }
   }
 
   // ============================================
