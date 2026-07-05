@@ -191,6 +191,15 @@ export interface RetirementConfig {
   psr: number;
   /** Minimum live observations before the DSR layer may HARD-halt. */
   minTrackRecordLength: number;
+  /**
+   * Minimum realized TRADES before the DSR edge-decay layer may HARD-halt.
+   * `minTrackRecordLength` counts hourly equity snapshots, which a FLAT, untraded
+   * curve accrues without ever trading — yielding ~0 Sharpe and a spurious
+   * "edge decay" retirement. A strategy with no trades has no edge to decay, so
+   * the DSR hard-halt legs additionally require this many realized trades. The
+   * absolute-drawdown hard stop is NEVER gated by this.
+   */
+  minTradesForHalt: number;
   /** Max NEW entries per symbol per 24h (independent of strategy cooldownBars). */
   maxEntriesPerDay: number;
   /** Consecutive losses per symbol that pause THAT symbol (not the whole book). */

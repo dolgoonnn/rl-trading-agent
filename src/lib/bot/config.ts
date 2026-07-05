@@ -264,6 +264,12 @@ export const RETIREMENT_CONFIG: RetirementConfig = {
   minAcceptableSharpe: 0.5,
   psr: 0.95,
   minTrackRecordLength: 50,
+  // minTradesForHalt 20 → the DSR edge-decay HARD halts require >=20 realized
+  // trades, so a FLAT/untraded curve (which accrues hourly snapshots but never
+  // trades → ~0 Sharpe → DSR < c) can NOT spuriously retire the strategy. The
+  // absolute-DD hard stop is unaffected. (Regression: a live sleeve self-halted
+  // on a flat 10k curve with 0 trades — see tests/bot/retirement-halt.test.ts.)
+  minTradesForHalt: 20,
   maxEntriesPerDay: 3,
   maxConsecutiveLossesPerSymbol: 4,
   heartbeatTimeoutMs: 7_200_000,

@@ -102,6 +102,20 @@ export interface RetirementHaltInputs {
   snapshotCount: number;
   /** Minimum track-record length before the DSR layer may HARD-halt. */
   minTrackRecordLength: number;
+  /**
+   * Realized live trade count. The DSR edge-decay HARD-halt legs additionally
+   * require a real TRADE track record — `snapshotCount` alone counts hourly
+   * equity marks, so ~50 marks of a FLAT, untraded curve would otherwise satisfy
+   * MinTRL and (with ~0 Sharpe) trip a spurious "edge decay" halt. A strategy
+   * that hasn't traded has no edge to decay. Defaults to +Infinity (permissive)
+   * so existing callers/tests that omit it are unchanged. The absolute-DD stop
+   * (leg 1) is NEVER gated by this. */
+  tradeCount?: number;
+  /**
+   * Minimum realized trades before the DSR layer may HARD-halt for edge decay.
+   * Defaults to 0 (gate disabled) for back-compat; the live path sets it from
+   * RETIREMENT_CONFIG.minTradesForHalt. */
+  minTradesForHalt?: number;
   /** Benchmark Sharpe `c` the deflated Sharpe must clear (NOT zero; default 0.5). */
   minAcceptableSharpe: number;
   /** PSR threshold (e.g. 0.95). Kept for config symmetry; DSR>c is the gate. */
@@ -193,6 +207,8 @@ export function checkRetirementHalt(inputs: RetirementHaltInputs): RetirementDec
     trialCount,
     snapshotCount,
     minTrackRecordLength: minTRL,
+    tradeCount = Number.POSITIVE_INFINITY,
+    minTradesForHalt = 0,
     minAcceptableSharpe,
     regimeHaltEnabled = false,
     charterPathHaltEnabled = false,
@@ -239,10 +255,16 @@ export function checkRetirementHalt(inputs: RetirementHaltInputs): RetirementDec
   // leg is PROVABLY SKIPPED, so a stray/stale regimeCause=true can NOT escalate a
   // sub-floor DSR to a HARD halt. The ACTIVE durable-edge-collapse signal is the
   // sustained-DSR streak (3b), which needs no regime cause.
-  if (regimeHaltEnabled && dsrInsignificant && snapshotCount >= minTRL && regimeCause) {
+  if (
+    regimeHaltEnabled &&
+    dsrInsignificant &&
+    snapshotCount >= minTRL &&
+    tradeCount >= minTradesForHalt &&
+    regimeCause
+  ) {
     return {
       action: 'halt',
-      cause: `DSR conclusive: deflated Sharpe < c=${minAcceptableSharpe} (n=${snapshotCount} >= MinTRL=${minTRL}) + regime cause`,
+      cause: `DSR conclusive: deflated Sharpe < c=${minAcceptableSharpe} (n=${snapshotCount} >= MinTRL=${minTRL}, trades=${tradeCount} >= minTradesForHalt=${minTradesForHalt}) + regime cause`,
       multiplier: 0,
     };
   }
@@ -256,12 +278,13 @@ export function checkRetirementHalt(inputs: RetirementHaltInputs): RetirementDec
   if (
     dsrInsignificant &&
     snapshotCount >= minTRL &&
+    tradeCount >= minTradesForHalt &&
     dsrBreachK > 0 &&
     dsrBreachConsecutive >= dsrBreachK
   ) {
     return {
       action: 'halt',
-      cause: `sustained DSR breach: deflated Sharpe < c=${minAcceptableSharpe} for ${dsrBreachConsecutive} consecutive checks (>= dsrBreachK=${dsrBreachK}, n=${snapshotCount} >= MinTRL=${minTRL})`,
+      cause: `sustained DSR breach: deflated Sharpe < c=${minAcceptableSharpe} for ${dsrBreachConsecutive} consecutive checks (>= dsrBreachK=${dsrBreachK}, n=${snapshotCount} >= MinTRL=${minTRL}, trades=${tradeCount} >= minTradesForHalt=${minTradesForHalt})`,
       multiplier: 0,
     };
   }
@@ -378,6 +401,9 @@ export interface RetirementTickInputs {
   deflatedSharpe: number | null;
   /** Number of live return observations backing the deflated Sharpe. */
   snapshotCount: number;
+  /** Realized live trade count — gates the DSR edge-decay HARD halts so a flat,
+   * untraded curve can never retire the strategy. Defaults to +Infinity. */
+  tradeCount?: number;
   /** Edge-triggered regime/mechanism cause (fresh detection only — see contract). */
   regimeCause: boolean;
   /** Consecutive charter-p5 breaches (caller-tracked). */
@@ -393,6 +419,8 @@ export interface RetirementTickInputs {
     minAcceptableSharpe: number;
     psr: number;
     minTrackRecordLength: number;
+    /** Minimum realized trades before the DSR layer may HARD-halt (default 0). */
+    minTradesForHalt?: number;
     charterBreachK: number;
     dsrBreachK: number;
     /** FIX-3 feature flag — gate the regime/mechanism legs (default false). */
@@ -452,6 +480,8 @@ export function evaluateRetirementHalt(inputs: RetirementTickInputs): Retirement
     trialCount: 1, // already deflated by the caller — no second haircut
     snapshotCount: inputs.snapshotCount,
     minTrackRecordLength: config.minTrackRecordLength,
+    tradeCount: inputs.tradeCount ?? Number.POSITIVE_INFINITY,
+    minTradesForHalt: config.minTradesForHalt ?? 0,
     minAcceptableSharpe: config.minAcceptableSharpe,
     psr: config.psr,
     // FIX-3: pass the feature flags so the gated legs are skipped unless enabled.
