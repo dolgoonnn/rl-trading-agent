@@ -35,8 +35,8 @@ import {
   type TradeResult,
 } from './walk-forward-validate';
 import {
-  calculateDeflatedSharpe,
   getMinSignificantSharpe,
+  deflatedSharpePerObs,
 } from '../src/lib/rl/utils/deflated-sharpe';
 
 // ============================================
@@ -402,6 +402,8 @@ function computeMinBacktestLength(sharpe: number, numTrials: number): number {
 
 interface DSRValidationResult {
   config: string;
+  annualizedSharpe: number;
+  perObsSharpe: number;
   originalSharpe: number;
   deflatedSharpe: number;
   haircut: number;
@@ -431,14 +433,29 @@ async function runDSRValidation(
   const skewness = calcSkewness(returns);
   const kurtosis = calcKurtosis(returns);
 
-  log(`  Sharpe:    ${sharpe.toFixed(4)}`);
+  // HONEST DSR: the deflation family (DSR, MBL, min-significant-SR) are all
+  // PER-OBSERVATION formulas (Lo's Var(SR) ≈ (1+0.5·SR²)/T, T = trades). They
+  // must be fed the per-TRADE Sharpe, NOT the annualized one that `sharpe`
+  // holds (calculateSharpe multiplies by √8760 ≈ 93.6). Feeding annualized SR
+  // into per-obs T inflated the DSR ~50-80× and made every config "pass".
+  const rMean = returns.reduce((s, r) => s + r, 0) / (returns.length || 1);
+  const rStd = Math.sqrt(
+    returns.reduce((s, r) => s + (r - rMean) ** 2, 0) / (returns.length || 1),
+  );
+  const perObsSharpe = rStd > 0 ? rMean / rStd : 0;
+
+  log(`  Sharpe (annualized):  ${sharpe.toFixed(4)}`);
+  log(`  Sharpe (per-trade):   ${perObsSharpe.toFixed(4)}  ← deflated on this scale`);
   log(`  Trades:    ${trades.length}`);
   log(`  Skewness:  ${skewness.toFixed(4)}`);
   log(`  Kurtosis:  ${kurtosis.toFixed(4)}`);
   log('');
 
-  // Compute DSR
-  const dsrResult = calculateDeflatedSharpe(sharpe, trades.length, numTrials, {
+  // Compute DSR on the per-observation Sharpe.
+  const dsrResult = deflatedSharpePerObs({
+    perObsSharpe,
+    numObservations: trades.length,
+    numTrials,
     skewness,
     kurtosis,
   });
@@ -446,29 +463,34 @@ async function runDSRValidation(
   log(`  Trial count:          ${numTrials}`);
   log(`  Sharpe variance:      ${dsrResult.sharpeVariance.toFixed(6)}`);
   log(`  Haircut:              ${dsrResult.haircut.toFixed(4)}`);
-  log(`  Original Sharpe:      ${dsrResult.originalSharpe.toFixed(4)}`);
+  log(`  Original Sharpe:      ${dsrResult.originalSharpe.toFixed(4)}  (per-trade)`);
   log(`  Deflated Sharpe:      ${dsrResult.deflatedSharpe.toFixed(4)}`);
   log(`  Significant (DSR>0):  ${dsrResult.isSignificant ? '\x1b[32mYES\x1b[0m' : '\x1b[31mNO\x1b[0m'}`);
   log('');
 
-  // Minimum Backtest Length
-  const mbl = computeMinBacktestLength(sharpe, numTrials);
+  // Minimum Backtest Length — per-observation formula, use the per-trade Sharpe.
+  const mbl = computeMinBacktestLength(perObsSharpe, numTrials);
   const mblPass = trades.length >= mbl;
   log(`  Min Backtest Length:  ${mbl} trades`);
   log(`  Actual trades:        ${trades.length}`);
   log(`  MBL check:            ${mblPass ? '\x1b[32mPASS\x1b[0m' : '\x1b[31mFAIL\x1b[0m'} (have ${trades.length}/${mbl})`);
   log('');
 
-  // Minimum significant Sharpe
+  // Minimum significant Sharpe — per-observation, compare to the per-trade SR.
   const minSharpe = getMinSignificantSharpe(numTrials, trades.length);
-  const aboveMinSharpe = sharpe >= minSharpe;
+  const aboveMinSharpe = perObsSharpe >= minSharpe;
   log(`  Min significant SR:   ${minSharpe.toFixed(4)} (for ${numTrials} trials, ${trades.length} trades)`);
-  log(`  Observed SR:          ${sharpe.toFixed(4)}`);
+  log(`  Observed SR:          ${perObsSharpe.toFixed(4)}  (per-trade)`);
   log(`  Above minimum:        ${aboveMinSharpe ? '\x1b[32mYES\x1b[0m' : '\x1b[31mNO\x1b[0m'}`);
 
   return {
     config: cfg.name,
-    originalSharpe: sharpe,
+    annualizedSharpe: sharpe,
+    perObsSharpe,
+    // originalSharpe is the number that was DEFLATED — per-trade, to match the
+    // per-observation variance formula. (Historically this stored the annualized
+    // Sharpe, which is the units bug that inflated the DSR.)
+    originalSharpe: perObsSharpe,
     deflatedSharpe: dsrResult.deflatedSharpe,
     haircut: dsrResult.haircut,
     numTrials,
