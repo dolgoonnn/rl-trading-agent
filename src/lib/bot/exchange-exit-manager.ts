@@ -16,6 +16,7 @@
 // lazily inside method bodies (ES live binding), never at module-init time.
 // Do not reference BYBIT_CATEGORY at top level here, or it will be undefined.
 import { BYBIT_CATEGORY } from './config';
+import { withRetry, BybitApiError } from './retry';
 
 /** Structural slice of RestClientV5 we depend on (lets tests inject a mock). */
 export interface ExchangeExitClient {
@@ -55,6 +56,8 @@ export interface ExchangeExitConfig {
   enabled: boolean;
   /** Trigger reference for SL/TP. MarkPrice avoids wick-hunt liquidations. */
   triggerBy: 'LastPrice' | 'MarkPrice' | 'IndexPrice';
+  /** Injectable sleep for retry backoff (tests pass an instant resolver). */
+  sleep?: (ms: number) => Promise<void>;
 }
 
 export const DEFAULT_EXCHANGE_EXIT_CONFIG: ExchangeExitConfig = {
@@ -77,23 +80,45 @@ export class ExchangeExitManager {
     return this.config.enabled;
   }
 
+  /**
+   * Run an IDEMPOTENT Bybit call with transient-failure retry (3 attempts,
+   * backoff + jitter). Throws `BybitApiError` on a non-zero retCode so
+   * `withRetry` can retry the transient ones (rate-limit / system-error) and let
+   * the rest propagate to the caller's try/catch. Use ONLY for reads and
+   * position-attached-stop replaces — never for order submission (see
+   * `marketClose`), where a retried timeout could double-fill.
+   */
+  private async retryIdempotent<T extends { retCode: number; retMsg: string }>(
+    label: string,
+    fn: () => Promise<T>,
+  ): Promise<T> {
+    return withRetry(
+      async () => {
+        const resp = await fn();
+        if (resp.retCode !== 0) throw new BybitApiError(`${label}: ${resp.retMsg}`, resp.retCode);
+        return resp;
+      },
+      { maxAttempts: 3, sleep: this.config.sleep },
+    );
+  }
+
   /** Remove the position-attached SL/TP (Bybit clears with the string "0"). */
   async clearExits(symbol: string): Promise<ExitOpResult> {
     // Defense-in-depth: never touch the live exchange when disabled, even if a
     // caller forgets to gate on `isEnabled`. Paper/backtest has no real position.
     if (!this.config.enabled) return { ok: true };
     try {
-      const resp = await this.client.setTradingStop({
-        category: BYBIT_CATEGORY,
-        symbol,
-        positionIdx: 0,
-        tpslMode: 'Full',
-        stopLoss: '0',
-        takeProfit: '0',
-      });
-      if (resp.retCode !== 0) {
-        return { ok: false, reason: `clearExits retCode=${resp.retCode}: ${resp.retMsg}` };
-      }
+      // Idempotent (Bybit treats a repeat setTradingStop as a replace) → retry.
+      await this.retryIdempotent('clearExits', () =>
+        this.client.setTradingStop({
+          category: BYBIT_CATEGORY,
+          symbol,
+          positionIdx: 0,
+          tpslMode: 'Full',
+          stopLoss: '0',
+          takeProfit: '0',
+        }),
+      );
       return { ok: true };
     } catch (err) {
       return { ok: false, reason: err instanceof Error ? err.message : String(err) };
@@ -105,6 +130,11 @@ export class ExchangeExitManager {
     // Defense-in-depth: never touch the live exchange when disabled, even if a
     // caller forgets to gate on `isEnabled`. Paper/backtest has no real position.
     if (!this.config.enabled) return { ok: true };
+    // NOT retried: submitOrder is NON-idempotent. If the first order fills but its
+    // response times out, a retry could double the close (and even reduceOnly can
+    // leave the shadow book out of sync). On a transient failure we return
+    // ok:false and let the caller re-check position state and re-decide on the
+    // next tick — never a blind resubmit.
     try {
       const resp = await this.client.submitOrder({
         category: BYBIT_CATEGORY,
@@ -134,13 +164,15 @@ export class ExchangeExitManager {
     // Disabled (paper) has no real position → confirmed flat (callers gate on isEnabled anyway).
     if (!this.config.enabled) return { size: 0, avgPrice: 0 };
     try {
-      const resp = await this.client.getPositionInfo({ category: BYBIT_CATEGORY, symbol });
-      if (resp.retCode !== 0) return null; // venue state UNKNOWN — not "flat"
+      // Idempotent read → retry transient failures (reconcile depends on it).
+      const resp = await this.retryIdempotent('getPositionInfo', () =>
+        this.client.getPositionInfo({ category: BYBIT_CATEGORY, symbol }),
+      );
       const row = resp.result.list[0];
       if (!row) return { size: 0, avgPrice: 0 }; // empty list ⇒ genuinely flat
       return { size: parseFloat(row.size) || 0, avgPrice: parseFloat(row.avgPrice) || 0 };
     } catch {
-      return null; // network error ⇒ UNKNOWN, not flat
+      return null; // exhausted retries / non-retryable ⇒ UNKNOWN, not flat
     }
   }
 
@@ -154,8 +186,11 @@ export class ExchangeExitManager {
   ): Promise<{ exitPrice: number; closedPnl: number; closedAtMs: number } | null> {
     if (!this.config.enabled) return null;
     try {
-      const resp = await this.client.getClosedPnL({ category: BYBIT_CATEGORY, symbol, limit: 1 });
-      const row = resp.retCode === 0 ? resp.result.list[0] : undefined;
+      // Idempotent read → retry transient failures.
+      const resp = await this.retryIdempotent('getClosedPnL', () =>
+        this.client.getClosedPnL({ category: BYBIT_CATEGORY, symbol, limit: 1 }),
+      );
+      const row = resp.result.list[0];
       if (!row) return null;
       const exitPrice = parseFloat(row.avgExitPrice);
       if (!Number.isFinite(exitPrice) || exitPrice <= 0) return null;
@@ -182,19 +217,20 @@ export class ExchangeExitManager {
     // caller forgets to gate on `isEnabled`. Paper/backtest has no real position.
     if (!this.config.enabled) return { ok: true };
     try {
-      const resp = await this.client.setTradingStop({
-        category: BYBIT_CATEGORY,
-        symbol,
-        positionIdx: 0,
-        tpslMode: 'Full',
-        stopLoss: stopLoss.toString(),
-        takeProfit: takeProfit.toString(),
-        slTriggerBy: this.config.triggerBy,
-        tpTriggerBy: this.config.triggerBy,
-      });
-      if (resp.retCode !== 0) {
-        return { ok: false, reason: `setTradingStop retCode=${resp.retCode}: ${resp.retMsg}` };
-      }
+      // Idempotent (repeat setTradingStop = replace) → retry: arming the crash-
+      // safety stop reliably is worth a few transient-failure retries.
+      await this.retryIdempotent('setTradingStop', () =>
+        this.client.setTradingStop({
+          category: BYBIT_CATEGORY,
+          symbol,
+          positionIdx: 0,
+          tpslMode: 'Full',
+          stopLoss: stopLoss.toString(),
+          takeProfit: takeProfit.toString(),
+          slTriggerBy: this.config.triggerBy,
+          tpTriggerBy: this.config.triggerBy,
+        }),
+      );
       return { ok: true };
     } catch (err) {
       return { ok: false, reason: err instanceof Error ? err.message : String(err) };
