@@ -130,6 +130,55 @@ export function calculateDeflatedSharpe(
 }
 
 /**
+ * The annualization factor the project's `calculateSharpe` applies by default:
+ * sqrt(365 * 24) ≈ 93.59, for 24/7 hourly-bar crypto returns.
+ *
+ * CRITICAL CONVENTION: Lo's Var(SR) ≈ (1 + 0.5·SR²)/T formula and the DSR/MinTRL
+ * built on it are PER-OBSERVATION — SR and T must share one frequency. The
+ * historical DSR validation fed an ANNUALIZED Sharpe (per-trade SR × this factor)
+ * into the formula with T = trade count, which inflates the deflated Sharpe by
+ * ~50x and makes any config "PASS". Deflate the per-observation Sharpe with the
+ * observation count, or convert first via `annualizedToPerObs`.
+ */
+export const HOURLY_ANNUALIZATION_FACTOR = Math.sqrt(365 * 24);
+
+/** Undo an annualization to recover the per-observation Sharpe for honest deflation. */
+export function annualizedToPerObs(annualizedSharpe: number, annualizationFactor: number): number {
+  if (!(annualizationFactor > 0)) {
+    throw new Error(`annualizedToPerObs: annualizationFactor must be > 0, got ${annualizationFactor}`);
+  }
+  return annualizedSharpe / annualizationFactor;
+}
+
+export interface PerObsDeflatedResult extends DeflatedSharpeResult {
+  /** The per-observation Sharpe that was deflated (echoed for clarity). */
+  perObsSharpe: number;
+}
+
+/**
+ * Honest, frequency-correct Deflated Sharpe on the per-OBSERVATION scale.
+ *
+ * Thin wrapper over `calculateDeflatedSharpe` whose name and signature force the
+ * caller to pass a PER-OBSERVATION Sharpe (not an annualized one), closing the
+ * units bug that inflated the historical validation. Use `annualizedToPerObs`
+ * first if you only have an annualized number.
+ */
+export function deflatedSharpePerObs(args: {
+  perObsSharpe: number;
+  numObservations: number;
+  numTrials: number;
+  skewness?: number;
+  kurtosis?: number;
+}): PerObsDeflatedResult {
+  const { perObsSharpe, numObservations, numTrials, skewness, kurtosis } = args;
+  const base = calculateDeflatedSharpe(perObsSharpe, numObservations, numTrials, {
+    skewness,
+    kurtosis,
+  });
+  return { ...base, perObsSharpe };
+}
+
+/**
  * Calculate Deflated Sharpe Ratio for a set of trial results
  *
  * Uses the best Sharpe from all trials and applies appropriate correction
