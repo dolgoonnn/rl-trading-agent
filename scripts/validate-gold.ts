@@ -37,8 +37,8 @@ import {
 } from './walk-forward-validate';
 import { estimatePBO, type WindowResult as PBOWindowResult } from '../src/lib/rl/utils/pbo';
 import {
-  calculateDeflatedSharpe,
   getMinSignificantSharpe,
+  deflatedSharpePerObs,
 } from '../src/lib/rl/utils/deflated-sharpe';
 import {
   reshuffleTrades,
@@ -536,26 +536,34 @@ async function runDSRValidation(tradesData: {
 
   const annFactor = getAnnualizationFactor(GOLD_SYMBOLS);
   log(`  Trades:    ${trades.length}`);
-  log(`  Sharpe:    ${sharpe.toFixed(4)} (per-trade, annualized with factor=${annFactor.toFixed(1)})`);
-  log(`  NOTE:      Per-trade Sharpe with ${trades.length} trades over ~11K bars is inflated vs per-bar Sharpe.`);
-  log(`             Focus on WR, profit factor, and pass rate for honest assessment.`);
+  // Deflate on the PER-TRADE scale — Lo's Var(SR)=(1+0.5SR²)/T is per-obs, so the
+  // annualized `sharpe` (×factor) must NOT be fed to DSR/MBL/min-sig.
+  const rMean = returns.reduce((a, r) => a + r, 0) / (returns.length || 1);
+  const rStd = Math.sqrt(returns.reduce((a, r) => a + (r - rMean) ** 2, 0) / (returns.length || 1));
+  const perObsSharpe = rStd > 0 ? rMean / rStd : 0;
+
+  log(`  Sharpe (annualized):  ${sharpe.toFixed(4)} (factor=${annFactor.toFixed(1)})`);
+  log(`  Sharpe (per-trade):   ${perObsSharpe.toFixed(4)}  ← deflated on this scale`);
   log(`  Skewness:  ${skewness.toFixed(4)}`);
   log(`  Kurtosis:  ${kurtosis.toFixed(4)}`);
   log('');
 
-  const dsrResult = calculateDeflatedSharpe(sharpe, trades.length, numTrials, {
+  const dsrResult = deflatedSharpePerObs({
+    perObsSharpe,
+    numObservations: trades.length,
+    numTrials,
     skewness,
     kurtosis,
   });
 
   log(`  Sharpe variance:      ${dsrResult.sharpeVariance.toFixed(6)}`);
   log(`  Haircut:              ${dsrResult.haircut.toFixed(4)}`);
-  log(`  Original Sharpe:      ${dsrResult.originalSharpe.toFixed(4)}`);
+  log(`  Original Sharpe:      ${dsrResult.originalSharpe.toFixed(4)}  (per-trade)`);
   log(`  Deflated Sharpe:      ${dsrResult.deflatedSharpe.toFixed(4)}`);
   log(`  Significant (DSR>0):  ${dsrResult.isSignificant ? '\x1b[32mYES\x1b[0m' : '\x1b[31mNO\x1b[0m'}`);
   log('');
 
-  const mbl = computeMinBacktestLength(sharpe, numTrials);
+  const mbl = computeMinBacktestLength(perObsSharpe, numTrials);
   const mblPass = trades.length >= mbl;
   log(`  Min Backtest Length:  ${mbl} trades`);
   log(`  Actual trades:        ${trades.length}`);
@@ -564,8 +572,8 @@ async function runDSRValidation(tradesData: {
 
   const minSharpe = getMinSignificantSharpe(numTrials, trades.length);
   log(`  Min significant SR:   ${minSharpe.toFixed(4)}`);
-  log(`  Observed SR:          ${sharpe.toFixed(4)}`);
-  log(`  Above minimum:        ${sharpe >= minSharpe ? '\x1b[32mYES\x1b[0m' : '\x1b[31mNO\x1b[0m'}`);
+  log(`  Observed SR:          ${perObsSharpe.toFixed(4)}  (per-trade)`);
+  log(`  Above minimum:        ${perObsSharpe >= minSharpe ? '\x1b[32mYES\x1b[0m' : '\x1b[31mNO\x1b[0m'}`);
 
   return {
     originalSharpe: sharpe,

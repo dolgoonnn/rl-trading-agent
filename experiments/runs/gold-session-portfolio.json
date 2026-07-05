@@ -1,37 +1,37 @@
 {
-  "days": 3366,
+  "days": 3539,
   "range": [
-    "2013-08-26",
+    "2015-01-02",
     "2026-06-09"
   ],
-  "correlation": 0.252,
+  "correlation": -0.0249,
   "legs": {
     "session": {
       "totalPct": 149.85,
-      "sharpe": 1.45,
+      "sharpe": 1.42,
       "maxDDPct": 13.44
     },
     "f2f": {
-      "totalPct": 16.28,
-      "sharpe": 0.46,
-      "maxDDPct": 5.58
+      "totalPct": 23.73,
+      "sharpe": 0.65,
+      "maxDDPct": 1.86
     },
     "combo5050": {
-      "totalPct": 83.06,
-      "sharpe": 1.42,
-      "maxDDPct": 6.72
+      "totalPct": 86.79,
+      "sharpe": 1.57,
+      "maxDDPct": 5.97
     },
     "volWeighted": {
       "wSession": 0.256,
-      "totalPct": 50.52,
-      "sharpe": 1.21,
-      "maxDDPct": 3.45
+      "totalPct": 55.96,
+      "sharpe": 1.48,
+      "maxDDPct": 2.91
     }
   },
   "dsr": {
-    "sharpe": 1.55,
-    "haircut": 0.26,
-    "deflated": 1.29,
+    "sharpe": 0.1,
+    "haircut": 0.05,
+    "deflated": 0.05,
     "trials": 15
   }
 }

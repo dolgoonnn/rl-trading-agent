@@ -28,7 +28,7 @@ import { generateSignals } from '../src/lib/gold/signals';
 import { runF2FSimulation } from '../src/lib/gold/strategy';
 import { runWalkForwardOptimization } from '../src/lib/gold/optimizer';
 import { F2F_DEFAULT_WF_CONFIG } from '../src/lib/gold/types';
-import { calculateDeflatedSharpe } from '../src/lib/rl/utils/deflated-sharpe';
+import { deflatedSharpePerObs } from '../src/lib/rl/utils/deflated-sharpe';
 
 const SESSION_FRICTION = 0.00005; // 0.5bp/side
 const F2F_FRICTION = 0.0005;      // F2F's validated assumption
@@ -202,7 +202,12 @@ async function main(): Promise<void> {
   const m = mean(sessRets); const s = std(sessRets);
   const skew = s > 0 ? mean(sessRets.map((x) => ((x - m) / s) ** 3)) : 0;
   const kurt = s > 0 ? mean(sessRets.map((x) => ((x - m) / s) ** 4)) : 3;
-  const dsr = calculateDeflatedSharpe(sharpe(sessRets), sessRets.length, DSR_TRIALS, {
+  // Deflate the PER-OBSERVATION (per-day) Sharpe (m/s), NOT the annualized
+  // sharpe() (×√252) — Lo's Var(SR)=(1+0.5SR²)/T is per-observation.
+  const dsr = deflatedSharpePerObs({
+    perObsSharpe: s > 0 ? m / s : 0,
+    numObservations: sessRets.length,
+    numTrials: DSR_TRIALS,
     skewness: skew,
     kurtosis: kurt,
   });
