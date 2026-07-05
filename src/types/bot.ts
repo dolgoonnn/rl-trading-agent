@@ -261,7 +261,8 @@ export type ExitReason =
   | 'manual'
   | 'circuit_breaker'
   | 'shutdown'
-  | 'ltf_timeout';
+  | 'ltf_timeout'
+  | 'startup_reconcile';
 
 /** A live/paper position tracked by the bot */
 export interface BotPosition {
@@ -444,7 +445,8 @@ export type AlertEvent =
   | 'arb_position_closed'
   | 'funding_settlement'
   | 'arb_daily_summary'
-  | 'degradation_alert';
+  | 'degradation_alert'
+  | 'startup_reconcile';
 
 /** An alert to be sent */
 export interface BotAlert {
