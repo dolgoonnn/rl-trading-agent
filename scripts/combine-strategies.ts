@@ -356,8 +356,22 @@ function runMethod(
   let rebalCostDebitTotal = 0;
   for (let t = WARMUP_DAYS; t < T; t++) {
     if (init && ewmaVar > 0) {
-      // (a) Fractional-Kelly target vol off the rolling DEFLATED Sharpe of the
+      // (a) Conviction-ramped target vol off the rolling Sharpe of the
       // funding-net book up to (but excluding) t — no look-ahead.
+      //
+      // SCALE NOTE (2026-07-06): `deflatedSharpeRolling` here is on the
+      // ANNUALIZED scale — annSharpe() is √252-scaled, and the 4-trial haircut
+      // over it is tiny — so `fractionalKellyVolTarget` acts as a ramp that
+      // reaches the full PORTFOLIO_VOL_TARGET_ANN once the rolling annualized
+      // Sharpe clears ~2 and stands the book down only when it goes non-positive.
+      // KELLY_FRACTION=0.5 is calibrated to THIS annualized scale (consistent
+      // with the live governor, which also gates on annualized rolling Sharpe).
+      // Do NOT swap in a per-observation/per-trade deflated Sharpe here without
+      // recalibrating KELLY_FRACTION — the honest per-day DSR is ~0.07, which at
+      // fraction 0.5 would collapse the target to ~0.4% vol (a 30× de-lever), a
+      // behavior change, not a bug fix. See experiments/honest-dsr-recompute.md.
+      // The edge itself is unaffected (Sharpe is scale-invariant); this ramp only
+      // governs how hard the book levers a real but thin edge.
       const past = dailyRaw.slice(WARMUP_DAYS, t);
       let usedTargetAnn = PORTFOLIO_VOL_TARGET_ANN;
       if (past.length >= 20) {

@@ -37,24 +37,38 @@ observation count. New guardrails: `deflatedSharpePerObs()`, `annualizedToPerObs
   skew 3.4 / kurt 35.5 = heavy jump risk in the daily book. The +0.07 margin is
   real but not comfortable — this is a book that survives, not one that dominates.
 
-## Decision point — LIVE Kelly sizing (needs owner judgment, NOT auto-fixed)
+## CORRECTION (2026-07-06): the LIVE path is CLEAN — no live sizing bug
 
-`scripts/combine-strategies.ts:364` feeds the **same inflated DSR** into the LIVE
-fractional-Kelly vol target (`fractionalKellyVolTarget`, `src/lib/risk/sizing.ts`).
-That function returns **0 exposure whenever DSR ≤ 0**, and the honest rolling
-per-day DSR hovers near zero. So naively correcting the convention there would make
-the book **size to zero** most of the time — because `KELLY_FRACTION` and the DSR→
-target mapping were (unknowingly) calibrated to the inflated number.
+An earlier note in this session claimed the inflated DSR was "actively driving live
+Kelly sizing." **That was wrong, and it is corrected here.** Verified:
 
-This is a sizing-policy recalibration, not a mechanical bug fix, so it is **left for
-an explicit decision**. Options:
-1. Recalibrate `KELLY_FRACTION` / the DSR→vol-target map to the honest per-day DSR
-   scale (keeps Kelly sizing, honestly parameterized).
-2. Drop the DSR-driven Kelly leg entirely and size at a fixed vol target
-   (simpler; removes a fragile input the book barely clears).
-3. Gate Kelly on the book-level daily DSR (which passes) instead of a per-config or
-   annualized proxy.
+- The **live governance** (`src/lib/bot/book-governance.ts`, `scripts/run-allocator.ts`)
+  uses **rolling annualized Sharpe as thresholds** — WATCH < 0, BREACH < −1.0 — which
+  is a correct use of annualized Sharpe against a constant. It uses **no DSR at all**.
+  No inflation bug in live sizing or halting.
+- `fractionalKellyVolTarget` / `calculateDeflatedSharpe` appear ONLY in
+  `scripts/combine-strategies.ts`, an offline **research/backtest** script (not imported
+  by any bot). The DSR inflation was confined to offline research/validation — it
+  affected the NUMBERS used to justify deployment, never live behavior.
 
-Until decided, the live path keeps its current (inflated-DSR) behavior — which is
-equivalent to "always full base vol target", i.e. no Kelly de-sizing. That is a
-known, bounded behavior (the vol target itself caps exposure), not a latent blow-up.
+### combine-strategies.ts — mislabel, not a return-inflating bug (no numeric change made)
+
+`combine-strategies.ts:364` deflates an **annualized** rolling Sharpe with a 4-trial
+haircut and feeds it to `fractionalKellyVolTarget` with `KELLY_FRACTION = 0.5`. On the
+annualized scale this acts as a **conviction ramp**: full 12% vol target once rolling
+annualized Sharpe clears ~2, standing down only when it goes non-positive. Crucially:
+
+- **This does not inflate the edge or the returns.** Sharpe is scale-invariant, so the
+  honest book Sharpe (2.27 ann / DSR +0.07) is unaffected; the ~40%/yr headline is a
+  LEVERAGE choice (lever a real, thin edge to 12% vol), which is honest.
+- **Naively swapping in the honest per-day DSR (~0.07) with the same fraction would
+  collapse the book to ~0.4% vol** — a 30× de-lever. That is a behavior change, NOT a
+  bug fix, and would misrepresent the book. So the numeric path was left unchanged and
+  a scale-note comment was added at the call site to prevent a future naive "fix".
+
+### The only genuine owner decision left (low-stakes, research-only)
+
+Whether to keep the current conviction-ramp sizing (annualized-Sharpe-gated 12% vol
+target, consistent with the live governor) or re-express it as a recalibrated
+per-observation fractional-Kelly. Either is defensible; the edge and the live path are
+unaffected either way. Not urgent, not a safety issue.
