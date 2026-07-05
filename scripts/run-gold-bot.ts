@@ -29,6 +29,7 @@ import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { RestClientV5 } from 'bybit-api';
 import type { Candle } from '../src/types/candle';
 import { AlertManager } from '../src/lib/bot/alerts';
+import { withRetry, BybitApiError } from '../src/lib/bot/retry';
 import { isKilled, type KillDb } from '../src/lib/bot/kill-switch';
 import { readBookGovernanceSignal, BOOK_GOVERNANCE_CONFIG } from '../src/lib/bot/book-governance';
 import * as dbSchema from '../src/lib/data/schema';
@@ -261,16 +262,28 @@ async function fetchDailyCandles(
   client: RestClientV5,
   limit: number,
 ): Promise<Candle[]> {
-  const response = await client.getKline({
-    category: BYBIT_CATEGORY,
-    symbol: SYMBOL,
-    interval: BYBIT_INTERVAL,
-    limit,
-  });
-
-  if (response.retCode !== 0) {
-    throw new Error(`Bybit API error: ${response.retMsg} (code: ${response.retCode})`);
-  }
+  const response = await withRetry(
+    async () => {
+      const res = await client.getKline({
+        category: BYBIT_CATEGORY,
+        symbol: SYMBOL,
+        interval: BYBIT_INTERVAL,
+        limit,
+      });
+      if (res.retCode !== 0) {
+        throw new BybitApiError(`getKline ${SYMBOL}: ${res.retMsg}`, res.retCode);
+      }
+      return res;
+    },
+    {
+      onRetry: (err, attempt, delayMs) => {
+        const detail = err instanceof Error ? err.message : String(err);
+        console.warn(
+          `[gold-bot] getKline attempt ${attempt} failed (${detail}); retrying in ${Math.round(delayMs)}ms`,
+        );
+      },
+    },
+  );
 
   const rawCandles = response.result.list;
   if (!rawCandles || rawCandles.length === 0) {
