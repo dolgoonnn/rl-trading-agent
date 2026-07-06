@@ -13,7 +13,34 @@
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
-import { summarizeSleeve, combineSleeves, type SleeveSummary } from '../src/lib/bot/track-record';
+import {
+  summarizeSleeve,
+  combineSleeves,
+  partitionByHoldCap,
+  type SleeveSummary,
+} from '../src/lib/bot/track-record';
+
+/** Holds beyond this are downtime-stranded artifacts, not strategy trades. */
+const STALE_HOLD_CAP_MS = 120 * 3_600_000; // 120h — above the longest legit hold (weekend ~85h)
+
+interface MetalsTrade {
+  leg: string;
+  entryTime: string;
+  exitTime: string;
+  pnlPct: number;
+}
+
+/** Metals strategy-vs-stale partition, computed from trade hold durations. */
+function metalsHonestPnl(): { strategyPnlPct: number; strategyCount: number; stalePnlPct: number; staleCount: number } | null {
+  const d = readJson(path.resolve('data/metals-bot-state.json')) as { trades?: MetalsTrade[] } | null;
+  const trades = d?.trades;
+  if (!trades || trades.length === 0) return null;
+  const withHold = trades.map((t) => ({
+    holdMs: Math.max(0, Date.parse(t.exitTime) - Date.parse(t.entryTime)),
+    pnlPct: t.pnlPct,
+  }));
+  return partitionByHoldCap(withHold, STALE_HOLD_CAP_MS);
+}
 
 function readJson(p: string): unknown {
   try {
@@ -70,6 +97,17 @@ function main(): void {
     );
   }
   console.log('-'.repeat(72));
+
+  // Honest metals attribution: strip downtime-stranded positions.
+  const honest = metalsHonestPnl();
+  if (honest && honest.staleCount > 0) {
+    console.log(
+      `session/metals HONEST: strategy ${honest.strategyPnlPct.toFixed(2)}% (${honest.strategyCount} normal-hold trades)` +
+        ` | ${honest.staleCount} downtime-stranded artifacts ${honest.stalePnlPct.toFixed(2)}% (held >120h during bot outages — NOT strategy)`,
+    );
+    console.log('-'.repeat(72));
+  }
+
   console.log(
     `TOTAL: ${combined.totalClosedTrades} closed trades, ${combined.totalOpenPositions} open across ${combined.activeSleeves}/${sleeves.length} active sleeves`,
   );

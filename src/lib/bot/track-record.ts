@@ -48,6 +48,42 @@ export interface CombinedSummary {
   idleSleeves: string[];
 }
 
+export interface HoldPartition {
+  strategyPnlPct: number;
+  strategyCount: number;
+  stalePnlPct: number;
+  staleCount: number;
+}
+
+/**
+ * Split trades into strategy vs downtime-stranded by hold duration.
+ *
+ * A session-based sleeve (e.g. the metals book) intends short holds — overnight
+ * ~9h, weekend ~60-85h. When the bot is DOWN through a position's scheduled exit
+ * window (a deploy gap, an outage), the position rides open until the bot
+ * resumes, booking days of unmanaged drift as if it were a strategy trade. Any
+ * hold beyond `capMs` (set above the longest legitimate hold, e.g. 120h) is such
+ * an artifact — separating it keeps the live track record honest about
+ * strategy-attributable PnL. Boundary is strict (> capMs), so a hold exactly at
+ * the cap counts as strategy.
+ */
+export function partitionByHoldCap(
+  trades: Array<{ holdMs: number; pnlPct: number }>,
+  capMs: number,
+): HoldPartition {
+  const out: HoldPartition = { strategyPnlPct: 0, strategyCount: 0, stalePnlPct: 0, staleCount: 0 };
+  for (const t of trades) {
+    if (t.holdMs > capMs) {
+      out.stalePnlPct += t.pnlPct;
+      out.staleCount += 1;
+    } else {
+      out.strategyPnlPct += t.pnlPct;
+      out.strategyCount += 1;
+    }
+  }
+  return out;
+}
+
 /** Aggregate sleeve summaries into a combined-book view. */
 export function combineSleeves(sleeves: SleeveSummary[]): CombinedSummary {
   return {
