@@ -1,5 +1,41 @@
 import { describe, it, expect } from 'vitest';
-import { summarizeSleeve, combineSleeves, type SleeveSummary } from '../../src/lib/bot/track-record';
+import {
+  summarizeSleeve,
+  combineSleeves,
+  partitionByHoldCap,
+  type SleeveSummary,
+} from '../../src/lib/bot/track-record';
+
+const H = 3_600_000; // ms per hour
+
+describe('partitionByHoldCap — separate downtime-stranded trades from strategy', () => {
+  it('classifies trades held beyond the cap as stale, keeps the rest as strategy', () => {
+    const p = partitionByHoldCap(
+      [
+        { holdMs: 9 * H, pnlPct: 0.5 }, // normal overnight
+        { holdMs: 296 * H, pnlPct: -8.9 }, // stranded 12 days
+        { holdMs: 60 * H, pnlPct: 1.0 }, // normal weekend
+        { holdMs: 226 * H, pnlPct: 4.8 }, // stranded ~9 days
+      ],
+      120 * H,
+    );
+    expect(p.staleCount).toBe(2);
+    expect(p.strategyCount).toBe(2);
+    expect(p.stalePnlPct).toBeCloseTo(-4.1, 6); // -8.9 + 4.8
+    expect(p.strategyPnlPct).toBeCloseTo(1.5, 6); // 0.5 + 1.0
+  });
+
+  it('all-normal holds → zero stale, strategy == total', () => {
+    const p = partitionByHoldCap([{ holdMs: 9 * H, pnlPct: -0.5 }, { holdMs: 12 * H, pnlPct: 0.3 }], 120 * H);
+    expect(p.staleCount).toBe(0);
+    expect(p.strategyPnlPct).toBeCloseTo(-0.2, 6);
+  });
+
+  it('boundary: hold exactly at cap is NOT stale (strictly greater)', () => {
+    const p = partitionByHoldCap([{ holdMs: 120 * H, pnlPct: 1.0 }], 120 * H);
+    expect(p.staleCount).toBe(0);
+  });
+});
 
 describe('summarizeSleeve', () => {
   it('summarizes closed trades: count, cumulative PnL, win rate', () => {
