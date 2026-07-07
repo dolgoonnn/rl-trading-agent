@@ -58,6 +58,14 @@ const HOUR_MS = 3_600_000;
 const DAY_MS = 24 * HOUR_MS;
 const WEEK_MS = 7 * DAY_MS;
 
+/**
+ * Minimum resolved trades before the deflated-Sharpe SIZING HALT may engage.
+ * Below this, a rolling Sharpe is noise (and a flat, tradeless equity curve
+ * yields exactly 0), so sizing stays at full — otherwise the halt zeroes size
+ * before the first trade can ever book (chicken-and-egg).
+ */
+const MIN_TRADES_FOR_SHARPE_GATE = 20;
+
 export class RiskEngine {
   private cbConfig: CircuitBreakerConfig;
   private drawdownTiers: DrawdownTier[];
@@ -513,6 +521,14 @@ export class RiskEngine {
   }): number {
     const { rollingSharpe, numTrades, trialCount, minAcceptableSharpe } = args;
     if (rollingSharpe === null) return 1.0; // Not enough data yet — cold start
+
+    // COLD-START GUARD (regression fix): the deflated-Sharpe SIZING HALT must not
+    // engage before there is a meaningful trade sample. Otherwise a flat equity
+    // curve (no trades) yields rollingSharpe 0, which deflates ≤ 0 and returns 0 —
+    // zeroing position size so the bot can NEVER open its first trade
+    // (chicken-and-egg). A rolling Sharpe over a handful of trades is noise, not an
+    // edge-decay signal, so full-size until the sample is real.
+    if (numTrades < MIN_TRADES_FOR_SHARPE_GATE) return 1.0;
 
     const dsr = calculateDeflatedSharpe(
       rollingSharpe,
