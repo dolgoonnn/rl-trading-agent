@@ -1033,8 +1033,24 @@ class TradingBot {
     );
 
     if (multiplier === 0) {
-      if (this.config.verbose) {
-        console.log(`  ${symbol}: signal detected but sizing multiplier is 0 (dd=${breakdown.drawdown}, regime=${breakdown.regime}, sharpe=${breakdown.sharpe})`);
+      // ALWAYS log + persist this skip. A silent verbose-only gate here hid the
+      // cold-start sizing-halt bug for 3 weeks (signal fired, entry vanished,
+      // zero trace). Any gate that eats a signal must leave a paper trail.
+      console.warn(
+        `  ${symbol}: signal detected but sizing multiplier is 0 (dd=${breakdown.drawdown}, regime=${breakdown.regime}, sharpe=${breakdown.sharpe})`,
+      );
+      try {
+        logSkippedSignal(db, {
+          ts: nowMs,
+          symbol,
+          reason: 'sizing_multiplier_zero',
+          signalEntry: result.signal.signal.entryPrice,
+          score: result.signal.totalScore,
+          regime: result.regime,
+          detail: { breakdown },
+        });
+      } catch (err) {
+        console.warn('[run-bot] failed to persist sizing_multiplier_zero skip:', err);
       }
       return;
     }
