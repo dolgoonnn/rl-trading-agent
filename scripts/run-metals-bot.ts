@@ -29,6 +29,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { readBookGovernanceSignal, BOOK_GOVERNANCE_CONFIG } from '../src/lib/bot/book-governance';
+import { isStrandedHold } from '../src/lib/bot/metals-stale';
 
 const STATE_PATH = path.resolve(__dirname, '..', 'data', 'metals-bot-state.json');
 const TICK_MS = 30_000;
@@ -69,6 +70,7 @@ interface TradeLog {
   entryTime: string;
   exitTime: string;
   pnlPct: number; // net of paper friction
+  stale?: boolean; // held beyond leg cap (downtime-stranded) → exclude from strategy attribution
 }
 
 interface BotState {
@@ -150,7 +152,7 @@ function openPosition(state: BotState, p: Position): void {
   log(`OPEN ${p.leg} ${p.side} ${p.metal} @ ${p.entryPrice.toFixed(3)}`);
 }
 
-function closePosition(state: BotState, pos: Position, exitPrice: number): void {
+function closePosition(state: BotState, pos: Position, exitPrice: number, stale = false): void {
   const raw = pos.side === 'long'
     ? Math.log(exitPrice / pos.entryPrice)
     : Math.log(pos.entryPrice / exitPrice);
@@ -164,10 +166,11 @@ function closePosition(state: BotState, pos: Position, exitPrice: number): void 
     entryTime: new Date(pos.entryTime).toISOString(),
     exitTime: new Date().toISOString(),
     pnlPct: Math.round(pnl * 1e6) / 1e4,
+    ...(stale ? { stale: true } : {}),
   });
   state.totalPnlPct = Math.round((state.totalPnlPct + pnl * 100) * 1e4) / 1e4;
   state.positions = state.positions.filter((x) => x !== pos);
-  log(`CLOSE ${pos.leg} ${pos.metal} @ ${exitPrice.toFixed(3)} pnl=${(pnl * 100).toFixed(3)}% total=${state.totalPnlPct.toFixed(2)}%`);
+  log(`CLOSE${stale ? ' [STALE]' : ''} ${pos.leg} ${pos.metal} @ ${exitPrice.toFixed(3)} pnl=${(pnl * 100).toFixed(3)}% total=${state.totalPnlPct.toFixed(2)}%`);
 }
 
 async function tick(state: BotState): Promise<void> {
@@ -205,6 +208,14 @@ async function tick(state: BotState): Promise<void> {
   for (const pos of [...state.positions]) {
     const q = quotes[pos.metal];
     if (!q) continue;
+    // Downtime guard: any position held far beyond its leg's sane window is
+    // stranded (the bot was down through its normal exit). Flatten it NOW at
+    // market regardless of window, and flag it stale so its drift is excluded
+    // from strategy attribution. Dormant in normal operation.
+    if (isStrandedHold(pos.leg, now - pos.entryTime)) {
+      closePosition(state, pos, q.price, true);
+      continue;
+    }
     if ((pos.leg === 'overnight' || pos.leg === 'weekend')
       && utcMin >= 7 * 60 + 1 && utcMin < 20 * 60
       && now - pos.entryTime >= 5 * 3_600_000) {
