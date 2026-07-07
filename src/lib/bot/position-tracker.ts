@@ -613,7 +613,11 @@ export class PositionTracker {
     const variance = returns.reduce((s, r) => s + (r - mean) ** 2, 0) / returns.length;
     const stdDev = Math.sqrt(variance);
 
-    if (stdDev === 0) return mean > 0 ? Infinity : 0;
+    // Flat equity (no P&L variation — e.g. no trades have resolved yet) carries
+    // NO Sharpe information → null (cold start), NOT 0. Returning 0 here made the
+    // Sharpe sizing gate deflate to ≤0 and zero position size, blocking the first
+    // trade forever. Only a strictly-declining flat line (mean<0) is a real 0.
+    if (stdDev === 0) return mean > 0 ? Infinity : mean < 0 ? 0 : null;
 
     // Annualize: assume ~1 snapshot per hour, ~24 per day
     // Sharpe = mean / stdDev * sqrt(periods_per_year)
