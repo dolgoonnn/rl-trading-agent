@@ -27,6 +27,22 @@ const MIN_CANDLES_FOR_ANALYSIS = 2500;
 /** Max candles per Bybit API request */
 const BYBIT_MAX_LIMIT = 200;
 
+/**
+ * One bar's duration in ms (BYBIT_INTERVAL is minutes, '60' = 1h). A bar whose
+ * start + duration is still in the future is FORMING — a partial snapshot whose
+ * OHLC will keep changing until close. Forming bars must never be analyzed or
+ * cached: the insert-only cache used to freeze them seconds after open, leaving
+ * the entire candle history materially wrong (verified live: 20/25 BTC bars
+ * diverged from true OHLC — closes off by $470, ranges truncated ~10x), which
+ * corrupted structure/ATR/regime analysis AND the intrabar SL/TP checks.
+ */
+const BAR_MS = parseInt(BYBIT_INTERVAL, 10) * 60_000;
+
+/** Keep only bars that have CLOSED as of `nowMs`. */
+function closedBarsOnly(candles: Candle[], nowMs: number): Candle[] {
+  return candles.filter((c) => c.timestamp + BAR_MS <= nowMs);
+}
+
 /** Mark-price cache TTL (ms) — avoid hammering the tickers endpoint on each tick */
 const MARK_PRICE_CACHE_MS = 5_000;
 
@@ -149,17 +165,21 @@ export class DataFeed {
       return { candles: [], newCandles: [] };
     }
 
-    // Bybit returns newest first, reverse to chronological order
-    const candles: Candle[] = rawCandles
-      .map((row) => ({
-        timestamp: parseInt(row[0], 10),
-        open: parseFloat(row[1]),
-        high: parseFloat(row[2]),
-        low: parseFloat(row[3]),
-        close: parseFloat(row[4]),
-        volume: parseFloat(row[5]),
-      }))
-      .reverse();
+    // Bybit returns newest first, reverse to chronological order — then DROP the
+    // still-forming bar so analysis/caching only ever see final closed OHLC.
+    const candles: Candle[] = closedBarsOnly(
+      rawCandles
+        .map((row) => ({
+          timestamp: parseInt(row[0], 10),
+          open: parseFloat(row[1]),
+          high: parseFloat(row[2]),
+          low: parseFloat(row[3]),
+          close: parseFloat(row[4]),
+          volume: parseFloat(row[5]),
+        }))
+        .reverse(),
+      Date.now(),
+    );
 
     // Detect new candles since last fetch
     const lastTs = this.lastTimestamps.get(symbol) ?? 0;
@@ -231,8 +251,9 @@ export class DataFeed {
       if (batch.length < limit) break; // No more data available
     }
 
-    // Reverse to chronological order and deduplicate
-    const candles = allFetched.reverse();
+    // Reverse to chronological order, deduplicate, and drop the forming bar —
+    // backfill's first page includes it and it must never enter the cache.
+    const candles = closedBarsOnly(allFetched.reverse(), Date.now());
     const seen = new Set<number>();
     const uniqueCandles = candles.filter((c) => {
       if (seen.has(c.timestamp)) return false;
@@ -240,29 +261,9 @@ export class DataFeed {
       return true;
     });
 
-    // Upsert into cache
+    // Upsert into cache (heals any stale/partial row left by older code).
     for (const candle of uniqueCandles) {
-      const existingRow = db.select()
-        .from(botCandles)
-        .where(
-          and(
-            eq(botCandles.symbol, symbol),
-            eq(botCandles.timestamp, candle.timestamp),
-          ),
-        )
-        .get();
-
-      if (!existingRow) {
-        db.insert(botCandles).values({
-          symbol,
-          timestamp: candle.timestamp,
-          open: candle.open,
-          high: candle.high,
-          low: candle.low,
-          close: candle.close,
-          volume: candle.volume,
-        }).run();
-      }
+      this.upsertCandle(symbol, candle);
     }
 
     if (uniqueCandles.length > 0) {
@@ -283,31 +284,16 @@ export class DataFeed {
     latestCandle: Candle | null;
     isNew: boolean;
   }> {
-    const { newCandles } = await this.fetchCandles(symbol);
+    const { candles, newCandles } = await this.fetchCandles(symbol);
 
-    // Cache new candles
-    for (const candle of newCandles) {
-      const existingRow = db.select()
-        .from(botCandles)
-        .where(
-          and(
-            eq(botCandles.symbol, symbol),
-            eq(botCandles.timestamp, candle.timestamp),
-          ),
-        )
-        .get();
-
-      if (!existingRow) {
-        db.insert(botCandles).values({
-          symbol,
-          timestamp: candle.timestamp,
-          open: candle.open,
-          high: candle.high,
-          low: candle.low,
-          close: candle.close,
-          volume: candle.volume,
-        }).run();
-      }
+    // Cache new candles, plus re-upsert the last few closed bars so any stale
+    // row at the cache tip (e.g. a partial frozen by pre-fix code, or a Bybit
+    // revision) self-heals without a full re-backfill.
+    const healTail = candles.slice(-3);
+    const toCache = new Map<number, Candle>();
+    for (const c of [...healTail, ...newCandles]) toCache.set(c.timestamp, c);
+    for (const candle of toCache.values()) {
+      this.upsertCandle(symbol, candle);
     }
 
     const isNew = newCandles.length > 0;
@@ -318,6 +304,50 @@ export class DataFeed {
     const latestCandle = allCandles.length > 0 ? allCandles[allCandles.length - 1]! : null;
 
     return { allCandles, latestCandle, isNew };
+  }
+
+  /**
+   * Insert the candle, or update the existing row when its OHLCV differs.
+   * The update leg is what heals frozen partial bars left by pre-closed-bar
+   * code (and absorbs any venue-side bar revision).
+   */
+  private upsertCandle(symbol: BotSymbol, candle: Candle): void {
+    const existingRow = db.select()
+      .from(botCandles)
+      .where(and(eq(botCandles.symbol, symbol), eq(botCandles.timestamp, candle.timestamp)))
+      .get();
+
+    if (!existingRow) {
+      db.insert(botCandles).values({
+        symbol,
+        timestamp: candle.timestamp,
+        open: candle.open,
+        high: candle.high,
+        low: candle.low,
+        close: candle.close,
+        volume: candle.volume,
+      }).run();
+      return;
+    }
+
+    const differs =
+      existingRow.open !== candle.open ||
+      existingRow.high !== candle.high ||
+      existingRow.low !== candle.low ||
+      existingRow.close !== candle.close ||
+      existingRow.volume !== candle.volume;
+    if (differs) {
+      db.update(botCandles)
+        .set({
+          open: candle.open,
+          high: candle.high,
+          low: candle.low,
+          close: candle.close,
+          volume: candle.volume,
+        })
+        .where(and(eq(botCandles.symbol, symbol), eq(botCandles.timestamp, candle.timestamp)))
+        .run();
+    }
   }
 
   /**
@@ -399,7 +429,9 @@ export class DataFeed {
       return [];
     }
 
-    // Bybit returns newest first, reverse to chronological order
+    // Bybit returns newest first, reverse to chronological order, and drop the
+    // forming LTF bar (same partial-snapshot hazard as the 1h feed).
+    const ltfBarMs = parseInt(interval, 10) * 60_000;
     return rawCandles
       .map((row) => ({
         timestamp: parseInt(row[0], 10),
@@ -409,7 +441,8 @@ export class DataFeed {
         close: parseFloat(row[4]),
         volume: parseFloat(row[5]),
       }))
-      .reverse();
+      .reverse()
+      .filter((c) => c.timestamp + ltfBarMs <= Date.now());
   }
 
   /**
@@ -425,7 +458,9 @@ export class DataFeed {
     nowMs?: number,
     maxAgeMs?: number,
   ): Promise<number | null> {
-    const { candles } = await this.fetchCandles(symbol, 1);
+    // limit 2: the newest kline is the forming bar (dropped by fetchCandles),
+    // so fetching 1 would return nothing — the last CLOSED bar is second.
+    const { candles } = await this.fetchCandles(symbol, 2);
     if (candles.length === 0) {
       throw new Error(`No candle data for ${symbol}`);
     }
