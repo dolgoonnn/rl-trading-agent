@@ -28,15 +28,24 @@ interface MetalsTrade {
   entryTime: string;
   exitTime: string;
   pnlPct: number;
+  stale?: boolean; // bot-flagged (per-leg cap) — authoritative when present
 }
 
-/** Metals strategy-vs-stale partition, computed from trade hold durations. */
+/**
+ * Metals strategy-vs-stale partition. Prefer the bot's own `stale` flag (set at
+ * close via per-leg caps); fall back to the hold-duration heuristic for older
+ * trades booked before the flag existed.
+ */
 function metalsHonestPnl(): { strategyPnlPct: number; strategyCount: number; stalePnlPct: number; staleCount: number } | null {
   const d = readJson(path.resolve('data/metals-bot-state.json')) as { trades?: MetalsTrade[] } | null;
   const trades = d?.trades;
   if (!trades || trades.length === 0) return null;
   const withHold = trades.map((t) => ({
-    holdMs: Math.max(0, Date.parse(t.exitTime) - Date.parse(t.entryTime)),
+    // Flagged-stale trades force holdMs above the cap so the partition counts
+    // them as stale; unflagged trades use their real hold vs the 120h fallback.
+    holdMs: t.stale === true
+      ? STALE_HOLD_CAP_MS + 1
+      : Math.max(0, Date.parse(t.exitTime) - Date.parse(t.entryTime)),
     pnlPct: t.pnlPct,
   }));
   return partitionByHoldCap(withHold, STALE_HOLD_CAP_MS);
