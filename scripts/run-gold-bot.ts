@@ -30,6 +30,7 @@ import { RestClientV5 } from 'bybit-api';
 import type { Candle } from '../src/types/candle';
 import { AlertManager } from '../src/lib/bot/alerts';
 import { withRetry, BybitApiError } from '../src/lib/bot/retry';
+import { nextGoldPollDelayMs, GOLD_MAX_POLL_MS } from '../src/lib/gold/schedule';
 import { isKilled, type KillDb } from '../src/lib/bot/kill-switch';
 import { readBookGovernanceSignal, BOOK_GOVERNANCE_CONFIG } from '../src/lib/bot/book-governance';
 import * as dbSchema from '../src/lib/data/schema';
@@ -683,11 +684,14 @@ async function main(): Promise<void> {
     if (running) {
       const now = Date.now();
       const msUntilMidnightUTC = getMsUntilNextDailyClose(now);
-      const waitMs = msUntilMidnightUTC + POST_CLOSE_DELAY_MS;
+      // Sleep-robust: never wait more than GOLD_MAX_POLL_MS in one go. Far from
+      // the close this re-polls every ~30 min (dedupe skips until a new daily bar
+      // appears), so a laptop sleep can't leave the daily tick hours overdue.
+      const waitMs = nextGoldPollDelayMs(msUntilMidnightUTC, POST_CLOSE_DELAY_MS);
 
-      if (opts.verbose) {
-        const nextTick = new Date(now + waitMs);
-        console.log(`  Next tick: ${nextTick.toISOString()} (${(waitMs / 3600000).toFixed(1)}h)`);
+      if (opts.verbose && waitMs >= msUntilMidnightUTC + POST_CLOSE_DELAY_MS) {
+        const nextTick = new Date(now + msUntilMidnightUTC + POST_CLOSE_DELAY_MS);
+        console.log(`  Next daily close tick: ${nextTick.toISOString()} (polling every ${(GOLD_MAX_POLL_MS / 60000).toFixed(0)}m until then)`);
       }
 
       await sleep(waitMs);
