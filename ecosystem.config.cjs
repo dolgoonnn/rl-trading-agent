@@ -32,7 +32,7 @@ module.exports = {
       // backtest-dump path so bot_trades stays an honest forward record.
       name: 'ict-bot-forward',
       script: './node_modules/.bin/tsx',
-      args: 'scripts/run-bot.ts --mode paper-forward --symbols BTCUSDT,ETHUSDT,SOLUSDT --resume',
+      args: 'scripts/run-bot.ts --mode paper-forward --symbols BTCUSDT,ETHUSDT,SOLUSDT --resume --verbose',
       cwd: __dirname,
       instances: 1,
       exec_mode: 'fork', // tsx interpreter cannot run under cluster mode
