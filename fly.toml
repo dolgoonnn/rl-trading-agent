@@ -1,0 +1,30 @@
+# Fly.io — ICT paper fleet (5 background bot processes; NOT a web app).
+#
+# Reuses the validated Dockerfile. State persists to a Fly VOLUME mounted at
+# /app/data (same path the entrypoint + bots use). There is intentionally NO
+# [http_service] — nothing listens on a port; Fly runs it as a plain worker.
+#
+# IMPORTANT: keep this at exactly ONE machine. Two machines would each get a
+# SEPARATE volume and fork the track record (and race the shared state files).
+
+app = "ict-paper-fleet"          # <-- change to your app name (set during `fly launch`)
+primary_region = "sin"           # Singapore (near Bybit). Pick your closest region.
+
+[build]
+  dockerfile = "Dockerfile"
+
+# Persistent state volume. Create it once BEFORE first deploy:
+#   fly volumes create ict_data --size 1 --region sin
+# An empty volume self-initializes (run-bot migrates the DB on startup).
+[mounts]
+  source = "ict_data"
+  destination = "/app/data"
+
+# One always-on machine, never auto-stopped (a trading fleet must stay up).
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1024mb"             # 5 tsx processes; drop to 512mb if cost-sensitive
+
+[deploy]
+  # If a core bot dies the entrypoint exits → Fly restarts the machine clean.
+  strategy = "immediate"
