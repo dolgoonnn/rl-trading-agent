@@ -4,10 +4,14 @@ node_modules
 *.db
 *.db-wal
 *.db-shm
-drizzle/
 knowledge-base/
 experiments/
 docs/
 models/
 .env
 .env.local
+data/orderflow/
+data/*_1m.json
+data/.duka-1m-chunks-*/
+data/.gold-1m-chunks/
+# NOTE: drizzle/ is NOT ignored — migrations are needed for migrate-on-startup.

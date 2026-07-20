@@ -1,0 +1,57 @@
+# Railway deployment — paper fleet (5 processes)
+
+The `Dockerfile` + `scripts/docker-entrypoint.sh` run the **current** 5-process
+paper fleet in one container:
+
+1. `run-bot.ts` — crypto forward bot (Run 20, BTC/ETH/SOL, paper-forward)
+2. `run-gold-bot.ts` — gold F2F daily bot (XAUTUSDT, zscore50)
+3. `run-metals-bot.ts` — session/metals book
+4. `run-governor-loop.ts` — book-level governance signal (every 15m)
+5. `collect-btc-orderflow.ts` — L2 order-flow collector (non-fatal)
+
+Validated locally with `docker build` + `docker run` (all 5 start, better-sqlite3
+compiles, migrations run on a fresh volume, crypto backfills from Bybit, state
+persists to the mounted volume).
+
+## Deploy steps (needs your Railway account)
+
+1. **Create the service** from this repo (Railway auto-detects the Dockerfile via
+   `railway.toml`, builder = dockerfile).
+
+2. **Attach a persistent volume** — THE critical step. Mount path **`/app/data`**.
+   Without it, every restart wipes all trades/equity/positions (the container FS
+   is ephemeral). An empty volume self-initializes: `run-bot.ts` migrates the DB
+   on startup, and the gold/metals bots create their JSON state files.
+
+3. **(Optional) Telegram alerts** — set env vars `TELEGRAM_BOT_TOKEN` and
+   `TELEGRAM_CHAT_ID` to get halt/trade pings.
+
+4. **Do NOT set exchange keys** — this is paper-only. Going live is a separate,
+   explicit decision (never add `BYBIT_API_KEY`/`BYBIT_API_SECRET` here).
+
+5. **Restart policy** — `railway.toml` sets `ON_FAILURE`, max 5 retries. If a CORE
+   trading process dies, the entrypoint exits non-zero → Railway restarts the
+   container clean and the bots resume from the volume.
+
+## Why Railway over the laptop
+
+The laptop host caused the degraded track record: intermittent system sleep
+(strands open positions) and severe DNS instability (`getaddrinfo ENOTFOUND
+api.bybit.com` — 5,888 failures over 12 days, peaking 600+/day, making the bot
+skip past signal bars). A stable always-on host with reliable DNS fixes all of
+it. This is the #1 lever for a trustworthy September track record.
+
+## Migrating existing state (optional)
+
+To carry over the current local track record instead of starting fresh, copy the
+local `data/ict-trading.db`, `data/gold-bot-state.json`, and
+`data/metals-bot-state.json` into the Railway volume once (via `railway run` or a
+one-off shell). Otherwise the cloud fleet starts a clean forward record — which,
+given the local record is mostly downtime-contaminated, is arguably cleaner.
+
+## First-run sanity check
+
+After deploy, the container logs should show all five starting, then
+`Backfilling candle history... BTCUSDT: 2499 candles cached` and
+`Bot started successfully`. `railway run` a check:
+`sqlite3 /app/data/ict-trading.db "SELECT COUNT(*) FROM bot_candles;"`

@@ -1,36 +1,47 @@
 FROM node:20-slim
 
-# Install pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# Build toolchain for better-sqlite3's native module (the whole fleet — crypto,
+# gold, metals — persists to SQLite via better-sqlite3). ca-certificates so the
+# bots' HTTPS calls to Bybit/Yahoo resolve.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 make g++ ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+# pnpm via corepack — pin to the version that generated the lockfile (pnpm@latest
+# is now 11.x which needs Node 22+; this image is Node 20).
+RUN corepack enable && corepack prepare pnpm@10.34.1 --activate
 
 WORKDIR /app
 
-# Install dependencies
-# 1. --ignore-scripts skips native compilation (better-sqlite3, @tensorflow/tfjs-node)
-# 2. pnpm rebuild esbuild re-runs only esbuild's postinstall to download its platform binary
-#    (esbuild is required by tsx for TypeScript execution)
+# Install deps. --ignore-scripts skips ALL native postinstalls (incl. the heavy
+# @tensorflow/tfjs-node, which the live fleet does not use); then rebuild only
+# the two the fleet DOES need: esbuild (tsx's TS runtime) and better-sqlite3.
 COPY package.json pnpm-lock.yaml ./
+# --ignore-scripts skips ALL native postinstalls (incl. the heavy, unused
+# @tensorflow/tfjs-node). Then build the two the live fleet needs: esbuild
+# (tsx's runtime) via pnpm rebuild, and better-sqlite3's native addon by running
+# its OWN build-release script directly (pnpm 10 gates build scripts behind an
+# allowlist, so `pnpm rebuild better-sqlite3` is a silent no-op → the runtime
+# "Could not locate the bindings file" crash). Compiling in-place bypasses that.
 RUN pnpm install --frozen-lockfile --ignore-scripts && \
-    pnpm rebuild esbuild
+    pnpm rebuild esbuild && \
+    cd "$(node -p "require('path').dirname(require.resolve('better-sqlite3/package.json'))")" && \
+    npm run build-release
 
-# Copy source
-COPY tsconfig.json ./
+# App source + migrations. The whole scripts/ dir is copied so no entry script
+# is missing a sibling import; drizzle/ holds the migrations run on startup.
+COPY tsconfig.json drizzle.config.ts ./
 COPY src/ ./src/
-COPY scripts/paper-trade-confluence.ts scripts/run-gold-bot.ts scripts/docker-entrypoint.sh ./scripts/
+COPY drizzle/ ./drizzle/
+COPY scripts/ ./scripts/
 
-# Copy market data (needed for --backtest mode, optional for live)
-COPY data/BTCUSDT_1h.json data/ETHUSDT_1h.json data/SOLUSDT_1h.json ./data/
+RUN chmod +x /app/scripts/docker-entrypoint.sh
 
-# Ensure writable dirs (gold bot persists state to data/gold-bot-state.json)
-RUN addgroup --system app && adduser --system --ingroup app app && \
-    chown -R app:app /app/data && \
-    chmod +x /app/scripts/docker-entrypoint.sh
+# Runs as root: Railway mounts the /app/data volume root-owned, and running as
+# root sidesteps volume-permission friction for a paper bot. HOME set so npx/pnpm
+# don't write to /nonexistent.
+ENV HOME=/app NODE_ENV=production
 
-# Set HOME so npx doesn't write to /nonexistent
-ENV HOME=/app
-
-USER app
-
-# Shell entrypoint runs both crypto + gold bots as background processes.
-# Railway restart policy handles container-level restarts on failure.
+# NOTE: attach a Railway VOLUME mounted at /app/data or all state is lost on
+# restart. An empty volume self-initializes (run-bot.ts migrates on startup).
 CMD ["/app/scripts/docker-entrypoint.sh"]
