@@ -1,50 +1,70 @@
 #!/bin/sh
-# Docker entrypoint: runs both crypto and gold bots as background processes.
-# If either exits, the other is killed and the container restarts via Railway.
+# Docker/Railway entrypoint — runs the CURRENT 5-process paper fleet as
+# background jobs under a simple supervisor. If any CORE trading process dies,
+# we kill the rest and exit non-zero so Railway's restart policy relaunches the
+# whole container clean (bots resume from the persistent /app/data volume:
+# ict-trading.db + gold/metals JSON state). Mirrors ecosystem.config.cjs.
+#
+# PERSISTENCE: /app/data MUST be a mounted Railway volume, or all state (trades,
+# equity, positions) is lost on every restart. run-bot.ts migrates-on-startup,
+# so an EMPTY volume self-initializes (fresh DB + migrations, fresh state files).
+#
+# PAPER ONLY: no exchange keys. Going live is a separate, explicit decision.
 
 set -e
 
-echo "=== Starting ICT Trading Bots ==="
-echo "  Crypto: 10-symbol, Run 20 defaults"
-echo "  Gold F2F: XAUTUSDT, zscore50 filter, lambda=0.95, theta=0.91"
-echo ""
+echo "=== Starting ICT paper fleet (5 processes) ==="
+mkdir -p /app/data /app/logs
 
-# Start crypto bot
-npx tsx scripts/paper-trade-confluence.ts \
-  --symbols BTCUSDT,ETHUSDT,SOLUSDT,LINKUSDT,DOGEUSDT,NEARUSDT,ADAUSDT,APTUSDT,ARBUSDT,MATICUSDT &
+# 1. Crypto forward bot (Run 20, BTC/ETH/SOL, paper-forward, resumes state)
+npx tsx scripts/run-bot.ts --mode paper-forward --symbols BTCUSDT,ETHUSDT,SOLUSDT --resume &
 CRYPTO_PID=$!
 
-# Start gold F2F bot
+# 2. Gold F2F daily bot (XAUTUSDT, zscore50 regime filter)
 npx tsx scripts/run-gold-bot.ts --verbose --regime-filter zscore50 &
 GOLD_PID=$!
 
-echo "  Crypto PID: $CRYPTO_PID"
-echo "  Gold PID: $GOLD_PID"
+# 3. Session/metals book bot
+npx tsx scripts/run-metals-bot.ts --verbose &
+METALS_PID=$!
 
-# Forward signals to children (use TERM/INT for dash compatibility)
+# 4. Book-governor (writes data/book-governance.json every 15m; bots fail-open)
+npx tsx scripts/run-governor-loop.ts &
+GOV_PID=$!
+
+# 5. L2 order-flow collector (read-only public WS; non-fatal research feed)
+npx tsx scripts/collect-btc-orderflow.ts &
+FLOW_PID=$!
+
+echo "  crypto=$CRYPTO_PID gold=$GOLD_PID metals=$METALS_PID governor=$GOV_PID orderflow=$FLOW_PID"
+
+# Core processes whose death should restart the whole container.
+CORE_PIDS="$CRYPTO_PID $GOLD_PID $METALS_PID $GOV_PID"
+
 cleanup() {
-  echo "Received shutdown signal, stopping bots..."
-  kill "$CRYPTO_PID" "$GOLD_PID" 2>/dev/null || true
+  echo "Received shutdown signal, stopping fleet..."
+  kill "$CRYPTO_PID" "$GOLD_PID" "$METALS_PID" "$GOV_PID" "$FLOW_PID" 2>/dev/null || true
   wait 2>/dev/null || true
-  echo "Bots stopped."
+  echo "Fleet stopped."
   exit 0
 }
 trap cleanup TERM INT
 
-# Monitor both processes — if either exits, restart both
+# Supervise: exit (→ container restart) if any CORE process dies. The orderflow
+# collector is non-fatal — if it dies we log but keep trading.
+FLOW_WARNED=0
 while true; do
-  # Check if either process has died
-  if ! kill -0 "$CRYPTO_PID" 2>/dev/null; then
-    echo "Crypto bot (PID $CRYPTO_PID) exited, shutting down..."
-    kill "$GOLD_PID" 2>/dev/null || true
-    wait 2>/dev/null || true
-    exit 1
+  for pid in $CORE_PIDS; do
+    if ! kill -0 "$pid" 2>/dev/null; then
+      echo "CORE process $pid exited — restarting container to recover clean fleet."
+      kill "$CRYPTO_PID" "$GOLD_PID" "$METALS_PID" "$GOV_PID" "$FLOW_PID" 2>/dev/null || true
+      wait 2>/dev/null || true
+      exit 1
+    fi
+  done
+  if [ "$FLOW_WARNED" -eq 0 ] && ! kill -0 "$FLOW_PID" 2>/dev/null; then
+    echo "WARN: orderflow collector ($FLOW_PID) exited (non-fatal); trading continues."
+    FLOW_WARNED=1
   fi
-  if ! kill -0 "$GOLD_PID" 2>/dev/null; then
-    echo "Gold bot (PID $GOLD_PID) exited, shutting down..."
-    kill "$CRYPTO_PID" 2>/dev/null || true
-    wait 2>/dev/null || true
-    exit 1
-  fi
-  sleep 30
+  sleep 15
 done
