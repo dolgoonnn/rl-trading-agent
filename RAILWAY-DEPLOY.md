@@ -18,18 +18,29 @@ persists to the mounted volume).
 1. **Create the service** from this repo (Railway auto-detects the Dockerfile via
    `railway.toml`, builder = dockerfile).
 
-2. **Attach a persistent volume** — THE critical step. Mount path **`/app/data`**.
+2. **Set the region to Southeast Asia (Singapore) — THE critical step.** Service →
+   Settings → Deploy → Regions → `asia-southeast1`. Railway defaults new services
+   to a **US region**, but Bybit geo-blocks the US at the CloudFront layer: every
+   REST call returns `403 Forbidden — "The Amazon CloudFront distribution is
+   configured to block access from your country"`, a core bot throws a fatal error,
+   the entrypoint exits, and Railway crash-loops the container. (The public
+   WebSocket connects fine from the US, which is misleading — REST is what's
+   blocked, and both crypto backfill and the gold bot need it.) Region is NOT
+   settable via `railway.toml` or the CLI — it's a dashboard-only setting. If
+   Singapore isn't offered on your plan, pick EU West (Amsterdam); never a US region.
+
+3. **Attach a persistent volume** — THE critical step. Mount path **`/app/data`**.
    Without it, every restart wipes all trades/equity/positions (the container FS
    is ephemeral). An empty volume self-initializes: `run-bot.ts` migrates the DB
    on startup, and the gold/metals bots create their JSON state files.
 
-3. **(Optional) Telegram alerts** — set env vars `TELEGRAM_BOT_TOKEN` and
+4. **(Optional) Telegram alerts** — set env vars `TELEGRAM_BOT_TOKEN` and
    `TELEGRAM_CHAT_ID` to get halt/trade pings.
 
-4. **Do NOT set exchange keys** — this is paper-only. Going live is a separate,
+5. **Do NOT set exchange keys** — this is paper-only. Going live is a separate,
    explicit decision (never add `BYBIT_API_KEY`/`BYBIT_API_SECRET` here).
 
-5. **Restart policy** — `railway.toml` sets `ON_FAILURE`, max 5 retries. If a CORE
+6. **Restart policy** — `railway.toml` sets `ON_FAILURE`, max 5 retries. If a CORE
    trading process dies, the entrypoint exits non-zero → Railway restarts the
    container clean and the bots resume from the volume.
 
