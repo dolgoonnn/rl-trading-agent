@@ -97,4 +97,56 @@ describe('positions & trades readers', () => {
     expect(readOpenPositions(dir)).toEqual([]);
     expect(readRecentTrades(10, dir)).toEqual([]);
   });
+
+  it('merges gold/metals JSON state with crypto SQLite, tagged by sleeve', () => {
+    const db = new Database(path.join(dir, 'ict-trading.db'));
+    db.exec(`
+      CREATE TABLE bot_positions (id TEXT PRIMARY KEY, symbol TEXT, direction TEXT, status TEXT,
+        entry_price REAL, entry_timestamp INTEGER, position_size_usdt REAL, strategy TEXT);
+      CREATE TABLE bot_trades (id TEXT PRIMARY KEY, symbol TEXT, direction TEXT,
+        entry_timestamp INTEGER, exit_timestamp INTEGER, pnl_percent REAL, pnl_usdt REAL, exit_reason TEXT);
+      INSERT INTO bot_positions VALUES ('p1','BTCUSDT','long','open',63000,1700000000000,258.2,'order_block');
+      INSERT INTO bot_trades VALUES ('t1','BTCUSDT','short',1,300000,0.5,1.2,'take_profit');
+    `);
+    db.close();
+
+    fs.writeFileSync(
+      path.join(dir, 'gold-bot-state.json'),
+      JSON.stringify({
+        position: { direction: 'long', entryPrice: 1900, entryTime: 1700000000000 },
+        trades: [
+          { direction: 'short', entryTime: '1970-01-01T00:00:00.100Z', exitTime: '1970-01-01T00:00:00.200Z', pnlPct: 1.1 },
+        ],
+      }),
+    );
+    fs.writeFileSync(
+      path.join(dir, 'metals-bot-state.json'),
+      JSON.stringify({
+        positions: [{ leg: 'silver-overnight', direction: 'long', entryPrice: 24, entryTime: 1700000000000 }],
+        trades: [
+          { leg: 'gold-fix', entryTime: '1970-01-01T00:00:00.050Z', exitTime: '1970-01-01T00:00:00.100Z', pnlPct: -0.4 },
+        ],
+      }),
+    );
+
+    const positions = readOpenPositions(dir);
+    const posSleeves = positions.map((p) => p.sleeve);
+    expect(posSleeves).toContain('crypto');
+    expect(posSleeves).toContain('gold');
+    expect(posSleeves).toContain('metals');
+
+    const trades = readRecentTrades(10, dir);
+    expect(trades).toHaveLength(3);
+    const tradeSleeves = trades.map((t) => t.sleeve);
+    // Deterministic exit order: crypto (300000ms) > gold (200ms) > metals (100ms).
+    expect(tradeSleeves).toEqual(['crypto', 'gold', 'metals']);
+    expect(tradeSleeves).toContain('crypto');
+    expect(tradeSleeves).toContain('gold');
+    expect(tradeSleeves).toContain('metals');
+    expect(trades[0]?.exitTimestamp ?? 0).toBeGreaterThanOrEqual(trades[1]?.exitTimestamp ?? 0);
+    expect(trades[1]?.exitTimestamp ?? 0).toBeGreaterThanOrEqual(trades[2]?.exitTimestamp ?? 0);
+
+    // limit clamps the MERGED set, not just the crypto SQL query.
+    expect(readRecentTrades(2, dir)).toHaveLength(2);
+  });
 });
