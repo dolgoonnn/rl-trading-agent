@@ -10,6 +10,9 @@ import {
   readAllSleeves,
   readOpenPositions,
   readRecentTrades,
+  readEquityCurve,
+  readFreshness,
+  readGovernance,
 } from '../../src/lib/bot/sleeve-readers';
 
 let dir: string;
@@ -148,5 +151,38 @@ describe('positions & trades readers', () => {
 
     // limit clamps the MERGED set, not just the crypto SQL query.
     expect(readRecentTrades(2, dir)).toHaveLength(2);
+  });
+});
+
+describe('curve/freshness/governance readers', () => {
+  it('reads the crypto equity curve and sums current sleeve equity', () => {
+    const db = new Database(path.join(dir, 'ict-trading.db'));
+    db.exec(`
+      CREATE TABLE bot_state (id INTEGER PRIMARY KEY, equity REAL);
+      CREATE TABLE bot_equity_snapshots (id INTEGER PRIMARY KEY, timestamp INTEGER, equity REAL, drawdown REAL);
+      INSERT INTO bot_state VALUES (1, 10050);
+      INSERT INTO bot_equity_snapshots (timestamp, equity, drawdown) VALUES (100, 10000, 0), (200, 10050, 0.01);
+    `);
+    db.close();
+    fs.writeFileSync(path.join(dir, 'gold-bot-state.json'), JSON.stringify({ equity: 10200 }));
+    const c = readEquityCurve(dir);
+    expect(c.crypto).toHaveLength(2);
+    expect(c.crypto[1]?.timestamp).toBe(200);
+    expect(c.crypto[1]?.equity).toBeCloseTo(10050);
+    expect(c.currentEquity.crypto).toBeCloseTo(10050);
+    expect(c.currentEquity.gold).toBeCloseTo(10200);
+    expect(c.currentEquity.metals).toBeCloseTo(10000); // default when file absent
+    expect(c.currentEquity.total).toBeCloseTo(30250);
+  });
+
+  it('reads governance status, available:false when file absent', () => {
+    expect(readGovernance(dir)).toEqual({ available: false, status: null });
+    fs.writeFileSync(path.join(dir, 'book-governance.json'), JSON.stringify({ status: 'WATCH' }));
+    expect(readGovernance(dir)).toEqual({ available: true, status: 'WATCH' });
+  });
+
+  it('reports freshness nulls on a fresh volume', () => {
+    const f = readFreshness(dir);
+    expect(f.cryptoLatestCandleMs).toBeNull();
   });
 });

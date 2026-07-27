@@ -28,13 +28,24 @@ function openReadonly(dataDir: string): Database.Database | null {
   return db;
 }
 
+/** Guard against querying a table that doesn't exist yet (fresh/partial schema). */
+function tableExists(db: Database.Database, name: string): boolean {
+  return db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(name) !== undefined;
+}
+
 export function readCryptoSleeve(dataDir: string = defaultDataDir()): SleeveSummary {
   const db = openReadonly(dataDir);
   if (!db) return summarizeSleeve('crypto (Run 20)', [], 0, 10000);
   try {
-    const rows = db.prepare('SELECT pnl_percent FROM bot_trades').all() as Array<{ pnl_percent: number }>;
-    const state = db.prepare('SELECT equity FROM bot_state WHERE id = 1').get() as { equity: number } | undefined;
-    const open = (db.prepare("SELECT COUNT(*) n FROM bot_positions WHERE status = 'open'").get() as { n: number }).n;
+    const rows = tableExists(db, 'bot_trades')
+      ? (db.prepare('SELECT pnl_percent FROM bot_trades').all() as Array<{ pnl_percent: number }>)
+      : [];
+    const state = tableExists(db, 'bot_state')
+      ? (db.prepare('SELECT equity FROM bot_state WHERE id = 1').get() as { equity: number } | undefined)
+      : undefined;
+    const open = tableExists(db, 'bot_positions')
+      ? (db.prepare("SELECT COUNT(*) n FROM bot_positions WHERE status = 'open'").get() as { n: number }).n
+      : 0;
     return summarizeSleeve('crypto (Run 20)', rows.map((r) => r.pnl_percent), open, state?.equity ?? 10000);
   } finally {
     db.close();
@@ -136,4 +147,65 @@ export function readRecentTrades(limit: number, dataDir: string = defaultDataDir
     out.push({ sleeve: 'metals', symbol: t.leg ?? 'metals', direction: '—', entryTimestamp: t.entryTime ? Date.parse(t.entryTime) : 0, exitTimestamp: t.exitTime ? Date.parse(t.exitTime) : 0, pnlPct: t.pnlPct ?? 0, pnlUsdt: null, exitReason: t.stale ? 'stale (downtime)' : null });
   }
   return out.sort((a, b) => b.exitTimestamp - a.exitTimestamp).slice(0, limit);
+}
+
+export interface EquityPoint { timestamp: number; equity: number; drawdown: number }
+export interface EquityCurve {
+  crypto: EquityPoint[];
+  currentEquity: { crypto: number; gold: number; metals: number; total: number };
+}
+
+export function readEquityCurve(dataDir: string = defaultDataDir()): EquityCurve {
+  const cryptoSummary = readCryptoSleeve(dataDir);
+  const gold = readGoldSleeve(dataDir);
+  const metals = readMetalsSleeve(dataDir);
+  let crypto: EquityPoint[] = [];
+  const db = openReadonly(dataDir);
+  if (db) {
+    try {
+      // Only query if the snapshots table exists (older/fresh DBs may lack it).
+      if (tableExists(db, 'bot_equity_snapshots')) {
+        crypto = db.prepare('SELECT timestamp, equity, drawdown FROM bot_equity_snapshots ORDER BY timestamp ASC').all() as EquityPoint[];
+      }
+    } finally {
+      db.close();
+    }
+  }
+  const cur = { crypto: cryptoSummary.equity, gold: gold.equity, metals: metals.equity, total: 0 };
+  cur.total = cur.crypto + cur.gold + cur.metals;
+  return { crypto, currentEquity: cur };
+}
+
+export interface Freshness { cryptoLatestCandleMs: number | null; goldStateMtimeMs: number | null; metalsStateMtimeMs: number | null }
+
+function mtimeMs(p: string): number | null {
+  try { return fs.statSync(p).mtimeMs; } catch { return null; }
+}
+
+export function readFreshness(dataDir: string = defaultDataDir()): Freshness {
+  let cryptoLatestCandleMs: number | null = null;
+  const db = openReadonly(dataDir);
+  if (db) {
+    try {
+      if (tableExists(db, 'bot_candles')) {
+        const row = db.prepare('SELECT MAX(timestamp) ts FROM bot_candles').get() as { ts: number | null };
+        cryptoLatestCandleMs = row?.ts ?? null;
+      }
+    } finally {
+      db.close();
+    }
+  }
+  return {
+    cryptoLatestCandleMs,
+    goldStateMtimeMs: mtimeMs(path.join(dataDir, 'gold-bot-state.json')),
+    metalsStateMtimeMs: mtimeMs(path.join(dataDir, 'metals-bot-state.json')),
+  };
+}
+
+export interface GovernanceStatus { available: boolean; status: string | null }
+
+export function readGovernance(dataDir: string = defaultDataDir()): GovernanceStatus {
+  const d = readJson(path.join(dataDir, 'book-governance.json')) as { status?: string } | null;
+  if (!d) return { available: false, status: null };
+  return { available: true, status: d.status ?? null };
 }
