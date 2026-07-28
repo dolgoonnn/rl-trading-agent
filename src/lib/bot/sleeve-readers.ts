@@ -389,3 +389,36 @@ export function readDrawdownCurve(dataDir: string = defaultDataDir()): EquityPoi
     db.close();
   }
 }
+
+export interface CostSummary {
+  totalGross: number;
+  totalFriction: number;
+  totalFunding: number;
+  totalNet: number;
+  fundingBySymbol: Array<{ symbol: string; fundingPaidUsdt: number }>;
+}
+
+export function readCosts(dataDir: string = defaultDataDir()): CostSummary {
+  const empty: CostSummary = { totalGross: 0, totalFriction: 0, totalFunding: 0, totalNet: 0, fundingBySymbol: [] };
+  const db = openReadonly(dataDir);
+  if (!db) return empty;
+  try {
+    if (!tableExists(db, 'bot_trades')) return empty;
+    const rows = db.prepare(
+      'SELECT symbol, gross_return, friction_return, funding_return, net_return, funding_paid_usdt FROM bot_trades',
+    ).all() as Array<{ symbol: string; gross_return: number; friction_return: number; funding_return: number; net_return: number; funding_paid_usdt: number }>;
+    const bySymbol = new Map<string, number>();
+    const out: CostSummary = { ...empty, fundingBySymbol: [] };
+    for (const r of rows) {
+      out.totalGross += r.gross_return;
+      out.totalFriction += r.friction_return;
+      out.totalFunding += r.funding_return;
+      out.totalNet += r.net_return;
+      bySymbol.set(r.symbol, (bySymbol.get(r.symbol) ?? 0) + r.funding_paid_usdt);
+    }
+    out.fundingBySymbol = [...bySymbol].map(([symbol, fundingPaidUsdt]) => ({ symbol, fundingPaidUsdt }));
+    return out;
+  } finally {
+    db.close();
+  }
+}
