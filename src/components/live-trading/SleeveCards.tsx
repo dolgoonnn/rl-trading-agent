@@ -43,7 +43,8 @@ export function SleeveCards() {
                 {status}
               </span>
             </div>
-            <p className={`mt-2 text-2xl font-bold font-mono ${pnlColor}`}>{formatPnlPct(s.cumPnlPct)}</p>
+            {/* cumPnlPct is fraction-scale (sum of fraction-scale per-trade pnlPct); multiply by 100 before formatPnlPct */}
+            <p className={`mt-2 text-2xl font-bold font-mono ${pnlColor}`}>{formatPnlPct(s.cumPnlPct * 100)}</p>
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-zinc-500">
               <span>equity {formatUsd(s.equity)}</span>
               <span>{s.closedTrades} closed</span>

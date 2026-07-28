@@ -1,10 +1,13 @@
 'use client';
 
+import { useState } from 'react';
 import { trpc } from '@/lib/trpc/client';
 import { formatUsd, formatPnlPct } from '@/lib/bot/format';
+import { TradeDetailDrawer } from './TradeDetailDrawer';
 
 export function RecentTradesTable() {
   const q = trpc.dashboard.book.trades.useQuery({ limit: 50 }, { refetchInterval: 30_000 });
+  const [openId, setOpenId] = useState<string | null>(null);
 
   return (
     <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
@@ -31,7 +34,11 @@ export function RecentTradesTable() {
             </thead>
             <tbody>
               {q.data.map((t, i) => (
-                <tr key={`${t.sleeve}-${t.symbol}-${t.exitTimestamp}-${i}`} className="border-b border-zinc-800/60 last:border-0">
+                <tr
+                  key={`${t.sleeve}-${t.symbol}-${t.exitTimestamp}-${i}`}
+                  onClick={() => setOpenId(t.id)}
+                  className="cursor-pointer border-b border-zinc-800/60 last:border-0 hover:bg-white/5"
+                >
                   <td className="px-3 py-2">
                     <span className="rounded border border-zinc-700 bg-zinc-800/60 px-1.5 py-0.5 text-[11px] text-zinc-300">
                       {t.sleeve}
@@ -44,7 +51,8 @@ export function RecentTradesTable() {
                     </span>
                   </td>
                   <td className={`px-3 py-2 text-right font-mono ${t.pnlPct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {formatPnlPct(t.pnlPct)}
+                    {/* pnlPct is fraction-scale (0.0271 = 2.71%); multiply by 100 before formatPnlPct */}
+                    {formatPnlPct(t.pnlPct * 100)}
                   </td>
                   <td className="px-3 py-2 text-right font-mono text-zinc-200">
                     {t.pnlUsdt !== null ? formatUsd(t.pnlUsdt) : '—'}
@@ -59,6 +67,7 @@ export function RecentTradesTable() {
           </table>
         </div>
       )}
+      <TradeDetailDrawer tradeId={openId} onClose={() => setOpenId(null)} />
     </section>
   );
 }
