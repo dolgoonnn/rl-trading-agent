@@ -8,10 +8,15 @@ paper fleet in one container:
 3. `run-metals-bot.ts` — session/metals book
 4. `run-governor-loop.ts` — book-level governance signal (every 15m)
 5. `collect-btc-orderflow.ts` — L2 order-flow collector (non-fatal)
+6. `next start` — read-only web dashboard (non-fatal, see "Web dashboard" below)
 
-Validated locally with `docker build` + `docker run` (all 5 start, better-sqlite3
-compiles, migrations run on a fresh volume, crypto backfills from Bybit, state
-persists to the mounted volume).
+The 5-bot fleet was validated locally with `docker build` + `docker run` (all
+5 core bots start, better-sqlite3 compiles, migrations run on a fresh volume,
+crypto backfills from Bybit, state persists to the mounted volume). The added
+`next build`/`next start` dashboard step was validated with `docker build`
+only (a full `docker run` would start live-trading bot processes, so it's
+left to the actual Railway deploy) — confirm `next start` prints `Ready on
+http://...` in the first Railway deploy log.
 
 ## Deploy steps (needs your Railway account)
 
@@ -43,6 +48,21 @@ persists to the mounted volume).
 6. **Restart policy** — `railway.toml` sets `ON_FAILURE`, max 5 retries. If a CORE
    trading process dies, the entrypoint exits non-zero → Railway restarts the
    container clean and the bots resume from the volume.
+
+## Web dashboard
+
+The container also serves a read-only Next.js dashboard on `$PORT` as a
+**non-core** 6th process — if it dies, trading continues uninterrupted (only
+the crypto/gold/metals/governor core dying restarts the container).
+
+- In Railway, enable **public networking**: Service → Settings → Networking →
+  Generate Domain.
+- Ensure the service has **≥2 GB RAM** — five bot processes plus a Next.js
+  server need more headroom than the bots alone.
+- Once deployed, the book is reachable at `https://<domain>/live-trading`.
+- View-only, no auth — acceptable because this is a paper-only fleet with no
+  control procedures exposed (all tRPC procedures are `query`, never
+  `mutation`).
 
 ## Why Railway over the laptop
 
