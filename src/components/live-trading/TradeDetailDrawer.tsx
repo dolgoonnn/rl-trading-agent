@@ -12,6 +12,10 @@ function fmtPrice(n: number | null): string {
   return n === null ? '—' : n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 });
 }
 
+// Convention: stored pnl/return fields (pnlPct, grossReturn, frictionReturn,
+// fundingReturn, netReturn) are FRACTIONS (e.g. 0.0271 = 2.71%). Always
+// multiply by 100 before passing to formatPnlPct.
+
 function WaterfallBar({ label, value }: { label: string; value: number }) {
   const isNeg = value < 0;
   const width = Math.min(100, Math.abs(value) * 100);
@@ -93,7 +97,7 @@ export function TradeDetailDrawer({ tradeId, onClose }: { tradeId: string | null
                 {data.exitReason ? <span className="text-zinc-500">· {data.exitReason}</span> : null}
               </div>
               <p className={`mt-2 text-2xl font-bold font-mono ${data.pnlPct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                {formatPnlPct(data.pnlPct)}
+                {formatPnlPct(data.pnlPct * 100)}
               </p>
               {data.pnlUsdt !== null ? (
                 <p className="mt-0.5 text-xs text-zinc-500">{formatUsd(data.pnlUsdt)}</p>

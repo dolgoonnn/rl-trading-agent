@@ -51,7 +51,8 @@ export function RecentTradesTable() {
                     </span>
                   </td>
                   <td className={`px-3 py-2 text-right font-mono ${t.pnlPct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {formatPnlPct(t.pnlPct)}
+                    {/* pnlPct is fraction-scale (0.0271 = 2.71%); multiply by 100 before formatPnlPct */}
+                    {formatPnlPct(t.pnlPct * 100)}
                   </td>
                   <td className="px-3 py-2 text-right font-mono text-zinc-200">
                     {t.pnlUsdt !== null ? formatUsd(t.pnlUsdt) : '—'}
