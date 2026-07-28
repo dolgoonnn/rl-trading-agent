@@ -4,7 +4,8 @@ node_modules
 *.db
 *.db-wal
 *.db-shm
-drizzle/
+# drizzle/ must be uploaded — the Dockerfile COPYs it for migrate-on-startup.
+# (Only .railwayignore is consulted by `railway up`; .dockerignore already keeps it.)
 knowledge-base/
 experiments/
 docs/
