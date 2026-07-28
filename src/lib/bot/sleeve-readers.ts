@@ -88,11 +88,13 @@ export function readOpenPositions(dataDir: string = defaultDataDir()): OpenPosit
   const out: OpenPosition[] = [];
   if (db) {
     try {
-      const rows = db.prepare(
-        "SELECT symbol, direction, entry_price, entry_timestamp, position_size_usdt, strategy FROM bot_positions WHERE status = 'open'",
-      ).all() as Array<{ symbol: string; direction: string; entry_price: number; entry_timestamp: number; position_size_usdt: number; strategy: string }>;
-      for (const r of rows) {
-        out.push({ sleeve: 'crypto', symbol: r.symbol, direction: r.direction, entryPrice: r.entry_price, sizeUsdt: r.position_size_usdt, entryTimestamp: r.entry_timestamp, strategy: r.strategy });
+      if (tableExists(db, 'bot_positions')) {
+        const rows = db.prepare(
+          "SELECT symbol, direction, entry_price, entry_timestamp, position_size_usdt, strategy FROM bot_positions WHERE status = 'open'",
+        ).all() as Array<{ symbol: string; direction: string; entry_price: number; entry_timestamp: number; position_size_usdt: number; strategy: string }>;
+        for (const r of rows) {
+          out.push({ sleeve: 'crypto', symbol: r.symbol, direction: r.direction, entryPrice: r.entry_price, sizeUsdt: r.position_size_usdt, entryTimestamp: r.entry_timestamp, strategy: r.strategy });
+        }
       }
     } finally {
       db.close();
@@ -127,11 +129,13 @@ export function readRecentTrades(limit: number, dataDir: string = defaultDataDir
   const db = openReadonly(dataDir);
   if (db) {
     try {
-      const rows = db.prepare(
-        'SELECT symbol, direction, entry_timestamp, exit_timestamp, pnl_percent, pnl_usdt, exit_reason FROM bot_trades ORDER BY exit_timestamp DESC LIMIT ?',
-      ).all(limit) as Array<{ symbol: string; direction: string; entry_timestamp: number; exit_timestamp: number; pnl_percent: number; pnl_usdt: number; exit_reason: string }>;
-      for (const r of rows) {
-        out.push({ sleeve: 'crypto', symbol: r.symbol, direction: r.direction, entryTimestamp: r.entry_timestamp, exitTimestamp: r.exit_timestamp, pnlPct: r.pnl_percent, pnlUsdt: r.pnl_usdt, exitReason: r.exit_reason });
+      if (tableExists(db, 'bot_trades')) {
+        const rows = db.prepare(
+          'SELECT symbol, direction, entry_timestamp, exit_timestamp, pnl_percent, pnl_usdt, exit_reason FROM bot_trades ORDER BY exit_timestamp DESC LIMIT ?',
+        ).all(limit) as Array<{ symbol: string; direction: string; entry_timestamp: number; exit_timestamp: number; pnl_percent: number; pnl_usdt: number; exit_reason: string }>;
+        for (const r of rows) {
+          out.push({ sleeve: 'crypto', symbol: r.symbol, direction: r.direction, entryTimestamp: r.entry_timestamp, exitTimestamp: r.exit_timestamp, pnlPct: r.pnl_percent, pnlUsdt: r.pnl_usdt, exitReason: r.exit_reason });
+        }
       }
     } finally {
       db.close();
@@ -202,10 +206,23 @@ export function readFreshness(dataDir: string = defaultDataDir()): Freshness {
   };
 }
 
-export interface GovernanceStatus { available: boolean; status: string | null }
+export interface GovernanceStatus {
+  available: boolean;
+  action: 'trade' | 'derisk' | 'halt' | null;
+  reason: string | null;
+  multiplier: number | null;
+}
 
 export function readGovernance(dataDir: string = defaultDataDir()): GovernanceStatus {
-  const d = readJson(path.join(dataDir, 'book-governance.json')) as { status?: string } | null;
-  if (!d) return { available: false, status: null };
-  return { available: true, status: d.status ?? null };
+  const d = readJson(path.join(dataDir, 'book-governance.json')) as
+    | { action?: string; reason?: string; multiplier?: number }
+    | null;
+  if (!d) return { available: false, action: null, reason: null, multiplier: null };
+  const action = d.action === 'trade' || d.action === 'derisk' || d.action === 'halt' ? d.action : null;
+  return {
+    available: true,
+    action,
+    reason: typeof d.reason === 'string' ? d.reason : null,
+    multiplier: typeof d.multiplier === 'number' ? d.multiplier : null,
+  };
 }

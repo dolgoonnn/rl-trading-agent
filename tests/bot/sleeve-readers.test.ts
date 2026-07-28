@@ -176,9 +176,30 @@ describe('curve/freshness/governance readers', () => {
   });
 
   it('reads governance status, available:false when file absent', () => {
-    expect(readGovernance(dir)).toEqual({ available: false, status: null });
-    fs.writeFileSync(path.join(dir, 'book-governance.json'), JSON.stringify({ status: 'WATCH' }));
-    expect(readGovernance(dir)).toEqual({ available: true, status: 'WATCH' });
+    expect(readGovernance(dir)).toEqual({ available: false, action: null, reason: null, multiplier: null });
+    fs.writeFileSync(
+      path.join(dir, 'book-governance.json'),
+      JSON.stringify({ action: 'derisk', reason: 'book BREACH: 60d Sharpe ...', multiplier: 0.5 }),
+    );
+    expect(readGovernance(dir)).toEqual({
+      available: true,
+      action: 'derisk',
+      reason: 'book BREACH: 60d Sharpe ...',
+      multiplier: 0.5,
+    });
+  });
+
+  it('reads a halted governance signal', () => {
+    fs.writeFileSync(
+      path.join(dir, 'book-governance.json'),
+      JSON.stringify({ action: 'halt', reason: 'book hard drawdown: 25.0% >= hardKillDD 20.0%', multiplier: 0 }),
+    );
+    expect(readGovernance(dir)).toEqual({
+      available: true,
+      action: 'halt',
+      reason: 'book hard drawdown: 25.0% >= hardKillDD 20.0%',
+      multiplier: 0,
+    });
   });
 
   it('reports freshness nulls on a fresh volume', () => {

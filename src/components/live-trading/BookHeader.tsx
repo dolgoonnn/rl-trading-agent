@@ -31,11 +31,22 @@ export function BookHeader() {
   }
 
   const d = q.data;
-  const govStyle = d.governance.available
-    ? d.governance.status === 'ok' || d.governance.status === 'active'
+  const govLabel = !d.governance.available
+    ? 'n/a'
+    : d.governance.action === 'trade'
+      ? 'trading'
+      : d.governance.action === 'derisk'
+        ? 'de-risking'
+        : d.governance.action === 'halt'
+          ? 'HALTED'
+          : 'unknown';
+  const govStyle = !d.governance.available
+    ? 'bg-zinc-700/30 text-zinc-400 border-zinc-700/50'
+    : d.governance.action === 'trade'
       ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40'
-      : 'bg-amber-500/15 text-amber-300 border-amber-500/40'
-    : 'bg-zinc-700/30 text-zinc-400 border-zinc-700/50';
+      : d.governance.action === 'halt'
+        ? 'bg-red-500/15 text-red-300 border-red-500/40'
+        : 'bg-amber-500/15 text-amber-300 border-amber-500/40';
 
   return (
     <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
@@ -44,8 +55,15 @@ export function BookHeader() {
           <span className="text-xs uppercase tracking-wider text-zinc-400">Total book equity</span>
           <p className="text-3xl font-bold font-mono text-zinc-50">{formatUsd(d.totalEquity)}</p>
         </div>
-        <div className={`rounded border px-2 py-0.5 text-[11px] font-semibold ${govStyle}`}>
-          governance: {d.governance.available ? (d.governance.status ?? 'unknown') : 'unavailable'}
+        <div className="flex flex-col items-end gap-0.5">
+          <div className={`rounded border px-2 py-0.5 text-[11px] font-semibold ${govStyle}`}>
+            governance: {govLabel}
+          </div>
+          {d.governance.reason ? (
+            <p className="max-w-xs text-right text-[10px] text-zinc-500" title={d.governance.reason}>
+              {d.governance.reason}
+            </p>
+          ) : null}
         </div>
       </div>
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
