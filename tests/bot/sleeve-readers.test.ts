@@ -207,3 +207,25 @@ describe('curve/freshness/governance readers', () => {
     expect(f.cryptoLatestCandleMs).toBeNull();
   });
 });
+
+describe('trade ids', () => {
+  it('exposes the crypto DB id and synthesises stable ids for json sleeves', () => {
+    const db = new Database(path.join(dir, 'ict-trading.db'));
+    db.exec(`
+      CREATE TABLE bot_trades (id TEXT PRIMARY KEY, symbol TEXT, direction TEXT,
+        entry_timestamp INTEGER, exit_timestamp INTEGER, pnl_percent REAL, pnl_usdt REAL, exit_reason TEXT);
+      INSERT INTO bot_trades VALUES ('abc-123','BTCUSDT','short',1,500,0.5,1.2,'take_profit');
+    `);
+    db.close();
+    fs.writeFileSync(path.join(dir, 'metals-bot-state.json'), JSON.stringify({
+      trades: [{ leg: 'overnight_au', entryTime: '2026-07-01T00:00:00Z', exitTime: '2026-07-01T09:00:00Z', pnlPct: 1 }],
+    }));
+    const trades = readRecentTrades(10, dir);
+    const crypto = trades.find((t) => t.sleeve === 'crypto');
+    const metals = trades.find((t) => t.sleeve === 'metals');
+    expect(crypto?.id).toBe('abc-123');
+    expect(metals?.id).toBe(`metals:overnight_au:${Date.parse('2026-07-01T09:00:00Z')}`);
+    // Stable across repeated reads.
+    expect(readRecentTrades(10, dir).find((t) => t.sleeve === 'metals')?.id).toBe(metals?.id);
+  });
+});
