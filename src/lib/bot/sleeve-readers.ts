@@ -127,6 +127,19 @@ export interface ClosedTrade {
   exitReason: string | null;
 }
 
+/**
+ * Stable synthetic id for a metals trade (its JSON state has no id column).
+ *
+ * MUST include `metal`: the gold and silver sides of a paired leg (e.g.
+ * `overnight`) close at the SAME exit timestamp, so leg+exitTime alone collides
+ * — both rows would resolve to one trade and the detail view would show the
+ * wrong numbers for one of them. Shared by the list and the lookup so the two
+ * can never drift apart.
+ */
+function metalsTradeId(t: { leg?: string; metal?: string; exitTime?: string }): string {
+  return `metals:${t.leg ?? 'metals'}:${t.metal ?? 'na'}:${t.exitTime ? Date.parse(t.exitTime) : 0}`;
+}
+
 export function readRecentTrades(limit: number, dataDir: string = defaultDataDir()): ClosedTrade[] {
   const out: ClosedTrade[] = [];
   const db = openReadonly(dataDir);
@@ -149,10 +162,10 @@ export function readRecentTrades(limit: number, dataDir: string = defaultDataDir
   for (const t of gold?.trades ?? []) {
     out.push({ id: `gold:${t.exitTime ? Date.parse(t.exitTime) : 0}`, sleeve: 'gold', symbol: 'XAUTUSDT', direction: t.direction ?? '—', entryTimestamp: t.entryTime ? Date.parse(t.entryTime) : 0, exitTimestamp: t.exitTime ? Date.parse(t.exitTime) : 0, pnlPct: t.pnlPct ?? t.pnlPercent ?? 0, pnlUsdt: null, exitReason: t.exitReason ?? null });
   }
-  const metals = readJson(path.join(dataDir, 'metals-bot-state.json')) as { trades?: Array<{ leg?: string; side?: string; entryTime?: string; exitTime?: string; pnlPct?: number; stale?: boolean }> } | null;
+  const metals = readJson(path.join(dataDir, 'metals-bot-state.json')) as { trades?: Array<{ leg?: string; metal?: string; side?: string; entryTime?: string; exitTime?: string; pnlPct?: number; stale?: boolean }> } | null;
   for (const t of metals?.trades ?? []) {
     // Metals state stores PERCENT (see run-metals-bot.ts); readers normalize to FRACTION.
-    out.push({ id: `metals:${t.leg ?? 'metals'}:${t.exitTime ? Date.parse(t.exitTime) : 0}`, sleeve: 'metals', symbol: t.leg ?? 'metals', direction: t.side ?? '—', entryTimestamp: t.entryTime ? Date.parse(t.entryTime) : 0, exitTimestamp: t.exitTime ? Date.parse(t.exitTime) : 0, pnlPct: (t.pnlPct ?? 0) / 100, pnlUsdt: null, exitReason: t.stale ? 'stale (downtime)' : null });
+    out.push({ id: metalsTradeId(t), sleeve: 'metals', symbol: t.leg ?? 'metals', direction: t.side ?? '—', entryTimestamp: t.entryTime ? Date.parse(t.entryTime) : 0, exitTimestamp: t.exitTime ? Date.parse(t.exitTime) : 0, pnlPct: (t.pnlPct ?? 0) / 100, pnlUsdt: null, exitReason: t.stale ? 'stale (downtime)' : null });
   }
   return out.sort((a, b) => b.exitTimestamp - a.exitTimestamp).slice(0, limit);
 }
@@ -341,10 +354,10 @@ export function readTradeDetail(id: string, dataDir: string = defaultDataDir()):
     }
   }
   const metals = readJson(path.join(dataDir, 'metals-bot-state.json')) as
-    | { trades?: Array<{ leg?: string; side?: string; entryPrice?: number; exitPrice?: number; entryTime?: string; exitTime?: string; pnlPct?: number; stale?: boolean }> }
+    | { trades?: Array<{ leg?: string; metal?: string; side?: string; entryPrice?: number; exitPrice?: number; entryTime?: string; exitTime?: string; pnlPct?: number; stale?: boolean }> }
     | null;
   for (const t of metals?.trades ?? []) {
-    const tid = `metals:${t.leg ?? 'metals'}:${t.exitTime ? Date.parse(t.exitTime) : 0}`;
+    const tid = metalsTradeId(t);
     if (tid === id) {
       // Metals state stores PERCENT (see run-metals-bot.ts); readers normalize to FRACTION.
       return {

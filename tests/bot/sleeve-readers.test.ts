@@ -227,9 +227,36 @@ describe('trade ids', () => {
     const crypto = trades.find((t) => t.sleeve === 'crypto');
     const metals = trades.find((t) => t.sleeve === 'metals');
     expect(crypto?.id).toBe('abc-123');
-    expect(metals?.id).toBe(`metals:overnight_au:${Date.parse('2026-07-01T09:00:00Z')}`);
+    // id carries `metal` to avoid same-ms collisions; this fixture has none → `na`.
+    expect(metals?.id).toBe(`metals:overnight_au:na:${Date.parse('2026-07-01T09:00:00Z')}`);
     // Stable across repeated reads.
     expect(readRecentTrades(10, dir).find((t) => t.sleeve === 'metals')?.id).toBe(metals?.id);
+  });
+
+  it('distinguishes metals legs that close in the same millisecond', () => {
+    // The gold and silver sides of a paired leg (e.g. `overnight`) close at the
+    // SAME exit timestamp, so leg+exitTime alone collides — both rows would then
+    // open the same detail and one would show the other trade's numbers.
+    const exitTime = '2026-07-01T09:00:00Z';
+    fs.writeFileSync(
+      path.join(dir, 'metals-bot-state.json'),
+      JSON.stringify({
+        trades: [
+          { leg: 'overnight', metal: 'gold', side: 'long', entryTime: '2026-07-01T00:00:00Z', exitTime, pnlPct: 3 },
+          { leg: 'overnight', metal: 'silver', side: 'long', entryTime: '2026-07-01T00:00:00Z', exitTime, pnlPct: -2 },
+        ],
+      }),
+    );
+    const ids = readRecentTrades(10, dir).map((t) => t.id);
+    expect(new Set(ids).size).toBe(2);
+
+    // Each id must resolve back to ITS OWN trade (pnlPct stored as percent → fraction).
+    const goldId = ids.find((id) => id.includes('gold'));
+    const silverId = ids.find((id) => id.includes('silver'));
+    expect(goldId).toBeDefined();
+    expect(silverId).toBeDefined();
+    expect(readTradeDetail(goldId ?? '', dir).pnlPct).toBeCloseTo(0.03);
+    expect(readTradeDetail(silverId ?? '', dir).pnlPct).toBeCloseTo(-0.02);
   });
 });
 
@@ -277,7 +304,7 @@ describe('detail readers', () => {
       trades: [{ leg: 'overnight_au', metal: 'au', side: 'long', entryPrice: 4000, exitPrice: 4040,
         entryTime: '2026-07-01T00:00:00Z', exitTime: '2026-07-01T09:00:00Z', pnlPct: 1 }],
     }));
-    const id = `metals:overnight_au:${Date.parse('2026-07-01T09:00:00Z')}`;
+    const id = `metals:overnight_au:au:${Date.parse('2026-07-01T09:00:00Z')}`;
     const d = readTradeDetail(id, dir);
     expect(d.found).toBe(true);
     expect(d.sleeve).toBe('metals');
@@ -309,7 +336,7 @@ describe('detail readers', () => {
     expect(goldRow?.pnlPct).toBeCloseTo(0.02); // gold unchanged
 
     // readTradeDetail — metals trade
-    const metalsId = `metals:overnight_au:${Date.parse('2026-07-01T09:00:00Z')}`;
+    const metalsId = `metals:overnight_au:na:${Date.parse('2026-07-01T09:00:00Z')}`;
     const metalsDetail = readTradeDetail(metalsId, dir);
     expect(metalsDetail.pnlPct).toBeCloseTo(0.025);
 
