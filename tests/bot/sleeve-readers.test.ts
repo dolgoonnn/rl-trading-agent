@@ -315,6 +315,30 @@ describe('detail readers', () => {
     expect(d.confluenceScore).toBeNull();
   });
 
+  it('derives metals equity from booked pnl instead of freezing at the starting notional', () => {
+    // The metals state has no `equity` field (it tracks totalPnlPct), so equity
+    // must be derived — otherwise the sleeve reports a flat $10,000 forever
+    // while its PnL says otherwise.
+    fs.writeFileSync(path.join(dir, 'metals-bot-state.json'), JSON.stringify({
+      trades: [
+        { leg: 'overnight', metal: 'gold', side: 'long', entryTime: '2026-07-01T00:00:00Z', exitTime: '2026-07-01T09:00:00Z', pnlPct: -2 },
+        { leg: 'fix-short', metal: 'gold', side: 'short', entryTime: '2026-07-02T00:00:00Z', exitTime: '2026-07-02T09:00:00Z', pnlPct: -0.72 },
+      ],
+      positions: [],
+    }));
+    const s = readMetalsSleeve(dir);
+    expect(s.cumPnlPct).toBeCloseTo(-0.0272); // -2.72% as a fraction
+    expect(s.equity).toBeCloseTo(9728); // 10000 * (1 - 0.0272)
+  });
+
+  it('reports the starting notional as metals equity when nothing has been booked', () => {
+    fs.writeFileSync(path.join(dir, 'metals-bot-state.json'), JSON.stringify({ trades: [], positions: [] }));
+    expect(readMetalsSleeve(dir).equity).toBeCloseTo(10000);
+    // Absent file → same starting notional, no throw.
+    fs.rmSync(path.join(dir, 'metals-bot-state.json'));
+    expect(readMetalsSleeve(dir).equity).toBeCloseTo(10000);
+  });
+
   it('normalizes metals PERCENT-scale pnlPct to FRACTION across all three metals readers, leaving gold untouched', () => {
     fs.writeFileSync(path.join(dir, 'metals-bot-state.json'), JSON.stringify({
       trades: [{ leg: 'overnight_au', side: 'long', entryTime: '2026-07-01T00:00:00Z', exitTime: '2026-07-01T09:00:00Z', pnlPct: 2.5 }],

@@ -34,9 +34,16 @@ function tableExists(db: Database.Database, name: string): boolean {
   return db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(name) !== undefined;
 }
 
+/**
+ * Paper notional each sleeve starts with. Crypto and gold persist a real running
+ * equity (bot_state / gold state); the metals state only records per-trade PnL,
+ * so its equity is DERIVED from this baseline — see readMetalsSleeve.
+ */
+export const SLEEVE_STARTING_EQUITY = 10000;
+
 export function readCryptoSleeve(dataDir: string = defaultDataDir()): SleeveSummary {
   const db = openReadonly(dataDir);
-  if (!db) return summarizeSleeve('crypto (Run 20)', [], 0, 10000);
+  if (!db) return summarizeSleeve('crypto (Run 20)', [], 0, SLEEVE_STARTING_EQUITY);
   try {
     const rows = tableExists(db, 'bot_trades')
       ? (db.prepare('SELECT pnl_percent FROM bot_trades').all() as Array<{ pnl_percent: number }>)
@@ -47,7 +54,7 @@ export function readCryptoSleeve(dataDir: string = defaultDataDir()): SleeveSumm
     const open = tableExists(db, 'bot_positions')
       ? (db.prepare("SELECT COUNT(*) n FROM bot_positions WHERE status = 'open'").get() as { n: number }).n
       : 0;
-    return summarizeSleeve('crypto (Run 20)', rows.map((r) => r.pnl_percent), open, state?.equity ?? 10000);
+    return summarizeSleeve('crypto (Run 20)', rows.map((r) => r.pnl_percent), open, state?.equity ?? SLEEVE_STARTING_EQUITY);
   } finally {
     db.close();
   }
@@ -59,7 +66,13 @@ export function readMetalsSleeve(dataDir: string = defaultDataDir()): SleeveSumm
     | null;
   const trades = d?.trades ?? [];
   // Metals state stores PERCENT (see run-metals-bot.ts); readers normalize to FRACTION.
-  return summarizeSleeve('session/metals', trades.map((t) => t.pnlPct / 100), (d?.positions ?? []).length, 10000);
+  const pnls = trades.map((t) => t.pnlPct / 100);
+  // The metals state carries no equity field, so derive it from booked PnL —
+  // otherwise the sleeve would report a flat starting notional forever while
+  // its own cumulative PnL says otherwise. Simple (non-compounded) aggregation,
+  // matching how cumPnlPct itself is summed, so the two always agree.
+  const equity = SLEEVE_STARTING_EQUITY * (1 + pnls.reduce((a, p) => a + p, 0));
+  return summarizeSleeve('session/metals', pnls, (d?.positions ?? []).length, equity);
 }
 
 export function readGoldSleeve(dataDir: string = defaultDataDir()): SleeveSummary {
@@ -68,7 +81,7 @@ export function readGoldSleeve(dataDir: string = defaultDataDir()): SleeveSummar
     | null;
   const trades = d?.trades ?? [];
   const pnls = trades.map((t) => t.pnlPct ?? t.pnlPercent ?? 0);
-  return summarizeSleeve('gold F2F', pnls, d?.position ? 1 : 0, d?.equity ?? 10000);
+  return summarizeSleeve('gold F2F', pnls, d?.position ? 1 : 0, d?.equity ?? SLEEVE_STARTING_EQUITY);
 }
 
 export function readAllSleeves(dataDir: string = defaultDataDir()): SleeveSummary[] {
