@@ -14,4 +14,10 @@ data/orderflow/
 data/*_1m.json
 data/.duka-1m-chunks-*/
 data/.gold-1m-chunks/
+# Broken/gitignored local Python venv (dangling symlink at venv/bin/python)
+# crashes `next build`'s directory walk if it ever ends up in the build
+# context. It's already gitignored but NOT dockerignored by default — the
+# COPY scripts/ ./scripts/ line below would otherwise pull it into the image.
+scripts/python/venv
+scripts/python/**/venv
 # NOTE: drizzle/ is NOT ignored — migrations are needed for migrate-on-startup.

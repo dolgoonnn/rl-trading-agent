@@ -1,10 +1,20 @@
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import * as schema from './schema';
+import fs from 'fs';
 import path from 'path';
 
 // Database path - stored in project data folder
-const DB_PATH = path.join(process.cwd(), 'data', 'ict-trading.db');
+const DB_DIR = path.join(process.cwd(), 'data');
+const DB_PATH = path.join(DB_DIR, 'ict-trading.db');
+
+// better-sqlite3 refuses to open a DB whose parent directory is missing. That
+// directory is normally present (tracked JSON caches locally; a mounted
+// Railway volume in prod), but `next build`'s page-data collection imports
+// this module in a fresh Docker build stage BEFORE the entrypoint's
+// `mkdir -p /app/data` (and before any volume is mounted) — so guarantee it
+// here too. Idempotent and harmless in every other environment.
+fs.mkdirSync(DB_DIR, { recursive: true });
 
 // Create database connection
 const sqlite = new Database(DB_PATH);

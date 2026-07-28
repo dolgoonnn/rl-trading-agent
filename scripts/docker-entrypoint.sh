@@ -36,14 +36,18 @@ GOV_PID=$!
 npx tsx scripts/collect-btc-orderflow.ts &
 FLOW_PID=$!
 
-echo "  crypto=$CRYPTO_PID gold=$GOLD_PID metals=$METALS_PID governor=$GOV_PID orderflow=$FLOW_PID"
+# 6. Read-only web dashboard (non-core: if it dies, trading continues).
+npx next start -p "${PORT:-3000}" &
+UI_PID=$!
+
+echo "  crypto=$CRYPTO_PID gold=$GOLD_PID metals=$METALS_PID governor=$GOV_PID orderflow=$FLOW_PID ui=$UI_PID"
 
 # Core processes whose death should restart the whole container.
 CORE_PIDS="$CRYPTO_PID $GOLD_PID $METALS_PID $GOV_PID"
 
 cleanup() {
   echo "Received shutdown signal, stopping fleet..."
-  kill "$CRYPTO_PID" "$GOLD_PID" "$METALS_PID" "$GOV_PID" "$FLOW_PID" 2>/dev/null || true
+  kill "$CRYPTO_PID" "$GOLD_PID" "$METALS_PID" "$GOV_PID" "$FLOW_PID" "$UI_PID" 2>/dev/null || true
   wait 2>/dev/null || true
   echo "Fleet stopped."
   exit 0
@@ -51,13 +55,15 @@ cleanup() {
 trap cleanup TERM INT
 
 # Supervise: exit (→ container restart) if any CORE process dies. The orderflow
-# collector is non-fatal — if it dies we log but keep trading.
+# collector and web dashboard are non-fatal — if either dies we log but keep
+# trading.
 FLOW_WARNED=0
+UI_WARNED=0
 while true; do
   for pid in $CORE_PIDS; do
     if ! kill -0 "$pid" 2>/dev/null; then
       echo "CORE process $pid exited — restarting container to recover clean fleet."
-      kill "$CRYPTO_PID" "$GOLD_PID" "$METALS_PID" "$GOV_PID" "$FLOW_PID" 2>/dev/null || true
+      kill "$CRYPTO_PID" "$GOLD_PID" "$METALS_PID" "$GOV_PID" "$FLOW_PID" "$UI_PID" 2>/dev/null || true
       wait 2>/dev/null || true
       exit 1
     fi
@@ -65,6 +71,10 @@ while true; do
   if [ "$FLOW_WARNED" -eq 0 ] && ! kill -0 "$FLOW_PID" 2>/dev/null; then
     echo "WARN: orderflow collector ($FLOW_PID) exited (non-fatal); trading continues."
     FLOW_WARNED=1
+  fi
+  if [ "$UI_WARNED" -eq 0 ] && ! kill -0 "$UI_PID" 2>/dev/null; then
+    echo "WARN: web dashboard ($UI_PID) exited (non-fatal); trading continues."
+    UI_WARNED=1
   fi
   sleep 15
 done

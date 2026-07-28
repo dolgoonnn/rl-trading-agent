@@ -10,15 +10,10 @@
  *
  *   npx tsx scripts/track-record-status.ts
  */
-import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
-import {
-  summarizeSleeve,
-  combineSleeves,
-  partitionByHoldCap,
-  type SleeveSummary,
-} from '../src/lib/bot/track-record';
+import { combineSleeves, partitionByHoldCap } from '../src/lib/bot/track-record';
+import { readCryptoSleeve, readMetalsSleeve, readGoldSleeve } from '../src/lib/bot/sleeve-readers';
 
 /** Holds beyond this are downtime-stranded artifacts, not strategy trades. */
 const STALE_HOLD_CAP_MS = 120 * 3_600_000; // 120h — above the longest legit hold (weekend ~85h)
@@ -59,37 +54,8 @@ function readJson(p: string): unknown {
   }
 }
 
-function cryptoSleeve(): SleeveSummary {
-  const db = new Database(path.resolve('data/ict-trading.db'), { readonly: true });
-  try {
-    const rows = db.prepare('SELECT pnl_percent FROM bot_trades').all() as Array<{ pnl_percent: number }>;
-    const state = db.prepare('SELECT equity FROM bot_state WHERE id = 1').get() as { equity: number } | undefined;
-    const open = (db.prepare("SELECT COUNT(*) n FROM bot_positions WHERE status = 'open'").get() as { n: number }).n;
-    return summarizeSleeve('crypto (Run 20)', rows.map((r) => r.pnl_percent), open, state?.equity ?? 10000);
-  } finally {
-    db.close();
-  }
-}
-
-function metalsSleeve(): SleeveSummary {
-  const d = readJson(path.resolve('data/metals-bot-state.json')) as
-    | { trades?: Array<{ pnlPct: number }>; positions?: unknown[]; totalPnlPct?: number }
-    | null;
-  const trades = d?.trades ?? [];
-  return summarizeSleeve('session/metals', trades.map((t) => t.pnlPct), (d?.positions ?? []).length, 10000);
-}
-
-function goldSleeve(): SleeveSummary {
-  const d = readJson(path.resolve('data/gold-bot-state.json')) as
-    | { trades?: Array<{ pnlPct?: number; pnlPercent?: number }>; equity?: number; position?: unknown }
-    | null;
-  const trades = d?.trades ?? [];
-  const pnls = trades.map((t) => t.pnlPct ?? t.pnlPercent ?? 0);
-  return summarizeSleeve('gold F2F', pnls, d?.position ? 1 : 0, d?.equity ?? 10000);
-}
-
 function main(): void {
-  const sleeves = [cryptoSleeve(), metalsSleeve(), goldSleeve()];
+  const sleeves = [readCryptoSleeve(), readMetalsSleeve(), readGoldSleeve()];
   const combined = combineSleeves(sleeves);
 
   console.log('='.repeat(72));
