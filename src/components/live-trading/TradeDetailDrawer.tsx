@@ -50,7 +50,13 @@ export function TradeDetailDrawer({ tradeId, onClose }: { tradeId: string | null
   if (tradeId === null) return null;
 
   const data = q.data;
-  const hasLevels = data && (data.stopLoss !== null || data.takeProfit !== null || data.riskAmountUsdt !== null);
+  const hasLevels =
+    data &&
+    (data.entryPrice !== null ||
+      data.exitPrice !== null ||
+      data.stopLoss !== null ||
+      data.takeProfit !== null ||
+      data.riskAmountUsdt !== null);
   const hasWaterfall = data && data.netReturn !== null;
   const hasFactors = data && data.factors !== null;
   const maxFactorValue = hasFactors && data.factors ? Math.max(...data.factors.map((f) => f.value), 0) : 0;

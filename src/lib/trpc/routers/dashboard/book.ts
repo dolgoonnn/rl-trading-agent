@@ -8,7 +8,7 @@ import {
 } from '../../../bot/sleeve-readers';
 import { combineSleeves } from '../../../bot/track-record';
 import { computePerfStats, groupBy, confluenceBucket, MIN_TRADES_FOR_STATS } from '../../../bot/trade-analytics';
-import { calculateMaxDrawdown, calculateSharpeRatio, calculateSortinoRatio } from '../../../rl/utils/gt-score';
+import { calculateSharpeRatio, calculateSortinoRatio } from '../../../rl/utils/gt-score';
 
 function dataDir(): string {
   return process.env.BOT_DATA_DIR ?? path.resolve('data');
@@ -42,11 +42,17 @@ export const bookRouter = router({
 
   stats: publicProcedure.query(() => {
     const trades = readAllTradesForStats(dataDir());
-    const returns = trades.map((t) => t.pnlPct / 100);
+    // pnlPct is already a FRACTION (bot_trades.pnl_percent) — do not divide again.
+    const returns = trades.map((t) => t.pnlPct);
+    // maxDrawdown must come from real equity snapshots, not per-trade notional
+    // returns — pnlPct is return on POSITION NOTIONAL, not account equity, so
+    // compounding it as if it were an equity-return series overstates drawdown.
+    const ddCurve = readDrawdownCurve(dataDir());
+    const maxDrawdown = ddCurve.reduce((m, p) => (p.drawdown > m ? p.drawdown : m), 0);
     return {
       ...computePerfStats(trades),
       // Per-trade (not annualized): annualizationFactor=1, targetReturn=0.
-      maxDrawdown: calculateMaxDrawdown(returns),
+      maxDrawdown,
       sharpe: calculateSharpeRatio(returns, 1),
       sortino: calculateSortinoRatio(returns, 0, 1),
       minTradesForStats: MIN_TRADES_FOR_STATS,

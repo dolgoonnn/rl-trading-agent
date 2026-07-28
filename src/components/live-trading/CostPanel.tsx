@@ -18,7 +18,7 @@ export function CostPanel() {
     );
   }
 
-  const { totalGross, totalFriction, totalFunding, totalNet, fundingBySymbol } = q.data;
+  const { totalGross, totalFriction, totalFunding, totalNet, fundingBySymbol, n } = q.data;
   const noData = totalGross === 0 && totalFriction === 0 && totalFunding === 0 && totalNet === 0 && fundingBySymbol.length === 0;
 
   if (noData) {
@@ -27,6 +27,7 @@ export function CostPanel() {
 
   return (
     <div>
+      <div className="mb-2 text-[11px] text-zinc-500">n = {n}</div>
       <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
         <div>
           <p className="text-[11px] uppercase tracking-wider text-zinc-500">Gross</p>

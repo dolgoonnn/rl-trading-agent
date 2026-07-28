@@ -58,7 +58,8 @@ export function readMetalsSleeve(dataDir: string = defaultDataDir()): SleeveSumm
     | { trades?: Array<{ pnlPct: number }>; positions?: unknown[] }
     | null;
   const trades = d?.trades ?? [];
-  return summarizeSleeve('session/metals', trades.map((t) => t.pnlPct), (d?.positions ?? []).length, 10000);
+  // Metals state stores PERCENT (see run-metals-bot.ts); readers normalize to FRACTION.
+  return summarizeSleeve('session/metals', trades.map((t) => t.pnlPct / 100), (d?.positions ?? []).length, 10000);
 }
 
 export function readGoldSleeve(dataDir: string = defaultDataDir()): SleeveSummary {
@@ -148,9 +149,10 @@ export function readRecentTrades(limit: number, dataDir: string = defaultDataDir
   for (const t of gold?.trades ?? []) {
     out.push({ id: `gold:${t.exitTime ? Date.parse(t.exitTime) : 0}`, sleeve: 'gold', symbol: 'XAUTUSDT', direction: t.direction ?? '—', entryTimestamp: t.entryTime ? Date.parse(t.entryTime) : 0, exitTimestamp: t.exitTime ? Date.parse(t.exitTime) : 0, pnlPct: t.pnlPct ?? t.pnlPercent ?? 0, pnlUsdt: null, exitReason: t.exitReason ?? null });
   }
-  const metals = readJson(path.join(dataDir, 'metals-bot-state.json')) as { trades?: Array<{ leg?: string; entryTime?: string; exitTime?: string; pnlPct?: number; stale?: boolean }> } | null;
+  const metals = readJson(path.join(dataDir, 'metals-bot-state.json')) as { trades?: Array<{ leg?: string; side?: string; entryTime?: string; exitTime?: string; pnlPct?: number; stale?: boolean }> } | null;
   for (const t of metals?.trades ?? []) {
-    out.push({ id: `metals:${t.leg ?? 'metals'}:${t.exitTime ? Date.parse(t.exitTime) : 0}`, sleeve: 'metals', symbol: t.leg ?? 'metals', direction: '—', entryTimestamp: t.entryTime ? Date.parse(t.entryTime) : 0, exitTimestamp: t.exitTime ? Date.parse(t.exitTime) : 0, pnlPct: t.pnlPct ?? 0, pnlUsdt: null, exitReason: t.stale ? 'stale (downtime)' : null });
+    // Metals state stores PERCENT (see run-metals-bot.ts); readers normalize to FRACTION.
+    out.push({ id: `metals:${t.leg ?? 'metals'}:${t.exitTime ? Date.parse(t.exitTime) : 0}`, sleeve: 'metals', symbol: t.leg ?? 'metals', direction: t.side ?? '—', entryTimestamp: t.entryTime ? Date.parse(t.entryTime) : 0, exitTimestamp: t.exitTime ? Date.parse(t.exitTime) : 0, pnlPct: (t.pnlPct ?? 0) / 100, pnlUsdt: null, exitReason: t.stale ? 'stale (downtime)' : null });
   }
   return out.sort((a, b) => b.exitTimestamp - a.exitTimestamp).slice(0, limit);
 }
@@ -344,12 +346,13 @@ export function readTradeDetail(id: string, dataDir: string = defaultDataDir()):
   for (const t of metals?.trades ?? []) {
     const tid = `metals:${t.leg ?? 'metals'}:${t.exitTime ? Date.parse(t.exitTime) : 0}`;
     if (tid === id) {
+      // Metals state stores PERCENT (see run-metals-bot.ts); readers normalize to FRACTION.
       return {
         ...NOT_FOUND, found: true, id: tid, sleeve: 'metals', symbol: t.leg ?? 'metals',
         direction: t.side ?? '—', entryPrice: t.entryPrice ?? null, exitPrice: t.exitPrice ?? null,
         entryTimestamp: t.entryTime ? Date.parse(t.entryTime) : 0,
         exitTimestamp: t.exitTime ? Date.parse(t.exitTime) : 0,
-        pnlPct: t.pnlPct ?? 0, exitReason: t.stale ? 'stale (downtime)' : null,
+        pnlPct: (t.pnlPct ?? 0) / 100, exitReason: t.stale ? 'stale (downtime)' : null,
       };
     }
   }
@@ -396,10 +399,11 @@ export interface CostSummary {
   totalFunding: number;
   totalNet: number;
   fundingBySymbol: Array<{ symbol: string; fundingPaidUsdt: number }>;
+  n: number;
 }
 
 export function readCosts(dataDir: string = defaultDataDir()): CostSummary {
-  const empty: CostSummary = { totalGross: 0, totalFriction: 0, totalFunding: 0, totalNet: 0, fundingBySymbol: [] };
+  const empty: CostSummary = { totalGross: 0, totalFriction: 0, totalFunding: 0, totalNet: 0, fundingBySymbol: [], n: 0 };
   const db = openReadonly(dataDir);
   if (!db) return empty;
   try {
@@ -417,6 +421,7 @@ export function readCosts(dataDir: string = defaultDataDir()): CostSummary {
       bySymbol.set(r.symbol, (bySymbol.get(r.symbol) ?? 0) + r.funding_paid_usdt);
     }
     out.fundingBySymbol = [...bySymbol].map(([symbol, fundingPaidUsdt]) => ({ symbol, fundingPaidUsdt }));
+    out.n = rows.length;
     return out;
   } finally {
     db.close();

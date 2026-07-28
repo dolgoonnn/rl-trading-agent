@@ -281,9 +281,42 @@ describe('detail readers', () => {
     const d = readTradeDetail(id, dir);
     expect(d.found).toBe(true);
     expect(d.sleeve).toBe('metals');
-    expect(d.pnlPct).toBeCloseTo(1);
+    // Metals state stores PERCENT (pnlPct: 1 === 1%) — reader normalizes to FRACTION.
+    expect(d.pnlPct).toBeCloseTo(0.01);
+    expect(d.direction).toBe('long'); // t.side, matching readRecentTrades
     expect(d.factors).toBeNull();
     expect(d.confluenceScore).toBeNull();
+  });
+
+  it('normalizes metals PERCENT-scale pnlPct to FRACTION across all three metals readers, leaving gold untouched', () => {
+    fs.writeFileSync(path.join(dir, 'metals-bot-state.json'), JSON.stringify({
+      trades: [{ leg: 'overnight_au', side: 'long', entryTime: '2026-07-01T00:00:00Z', exitTime: '2026-07-01T09:00:00Z', pnlPct: 2.5 }],
+      positions: [],
+    }));
+    fs.writeFileSync(path.join(dir, 'gold-bot-state.json'), JSON.stringify({
+      trades: [{ direction: 'long', entryTime: '2026-07-01T00:00:00Z', exitTime: '2026-07-01T09:00:00Z', pnlPct: 0.02 }],
+    }));
+
+    // readMetalsSleeve — cumPnlPct
+    const metalsSummary = readMetalsSleeve(dir);
+    expect(metalsSummary.cumPnlPct).toBeCloseTo(0.025);
+
+    // readRecentTrades — metals row
+    const trades = readRecentTrades(10, dir);
+    const metalsRow = trades.find((t) => t.sleeve === 'metals');
+    expect(metalsRow?.pnlPct).toBeCloseTo(0.025);
+    const goldRow = trades.find((t) => t.sleeve === 'gold');
+    expect(goldRow?.pnlPct).toBeCloseTo(0.02); // gold unchanged
+
+    // readTradeDetail — metals trade
+    const metalsId = `metals:overnight_au:${Date.parse('2026-07-01T09:00:00Z')}`;
+    const metalsDetail = readTradeDetail(metalsId, dir);
+    expect(metalsDetail.pnlPct).toBeCloseTo(0.025);
+
+    // readTradeDetail — gold trade still unchanged
+    const goldId = `gold:${Date.parse('2026-07-01T09:00:00Z')}`;
+    const goldDetail = readTradeDetail(goldId, dir);
+    expect(goldDetail.pnlPct).toBeCloseTo(0.02);
   });
 
   it('feeds analytics and the drawdown curve, empty on a fresh volume', () => {
