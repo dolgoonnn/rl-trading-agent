@@ -117,6 +117,15 @@ export class SignalEngine {
         regimeThresholdOverrides: config.regimeThresholds,
         strategyConfig: {
           ...PRODUCTION_STRATEGY_CONFIG,
+          // SIM/LIVE PARITY — do not "tidy" this away.
+          // Run 20 was optimized and validated by train-cmaes-production.ts, which
+          // invokes the backtest WITHOUT `--production`. Every candidate was therefore
+          // scored against DEFAULT_CONFIG's maxStructureAge of 75, with only
+          // `--sl-mode dynamic_rr` layered on top. PRODUCTION_STRATEGY_CONFIG tightens
+          // this to 50, which would deploy a stricter entry gate than anything that was
+          // validated (identical data: 645 trades vs 657, materially worse PnL).
+          // Pin to the validated value. Guarded by tests/bot/run20-config-parity.test.ts.
+          maxStructureAge: 75,
         },
       });
       this.scorers.set(symbol, scorer);
