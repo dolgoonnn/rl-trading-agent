@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 import { summarizeSleeve, type SleeveSummary } from './track-record';
+import type { AnalyticsTrade } from './trade-analytics';
 
 export function defaultDataDir(): string {
   return path.resolve('data');
@@ -226,4 +227,165 @@ export function readGovernance(dataDir: string = defaultDataDir()): GovernanceSt
     reason: typeof d.reason === 'string' ? d.reason : null,
     multiplier: typeof d.multiplier === 'number' ? d.multiplier : null,
   };
+}
+
+export interface FactorScore { name: string; value: number }
+
+export interface TradeDetail {
+  found: boolean;
+  id: string | null;
+  sleeve: string;
+  symbol: string;
+  direction: string;
+  entryPrice: number | null;
+  exitPrice: number | null;
+  entryTimestamp: number;
+  exitTimestamp: number;
+  pnlPct: number;
+  pnlUsdt: number | null;
+  exitReason: string | null;
+  stopLoss: number | null;
+  takeProfit: number | null;
+  riskAmountUsdt: number | null;
+  positionSizeUsdt: number | null;
+  regime: string | null;
+  barsHeld: number | null;
+  confluenceScore: number | null;
+  factors: FactorScore[] | null;
+  grossReturn: number | null;
+  frictionReturn: number | null;
+  fundingReturn: number | null;
+  netReturn: number | null;
+  fundingPaidUsdt: number | null;
+  rMultiple: number | null;
+}
+
+const NOT_FOUND: TradeDetail = {
+  found: false, id: null, sleeve: '', symbol: '', direction: '',
+  entryPrice: null, exitPrice: null, entryTimestamp: 0, exitTimestamp: 0,
+  pnlPct: 0, pnlUsdt: null, exitReason: null, stopLoss: null, takeProfit: null,
+  riskAmountUsdt: null, positionSizeUsdt: null, regime: null, barsHeld: null,
+  confluenceScore: null, factors: null, grossReturn: null, frictionReturn: null,
+  fundingReturn: null, netReturn: null, fundingPaidUsdt: null, rMultiple: null,
+};
+
+/** Parse the stored factor_breakdown JSON into sorted scores; null if unusable. */
+function parseFactors(raw: unknown): FactorScore[] | null {
+  if (typeof raw !== 'string') return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
+  const out: FactorScore[] = [];
+  for (const [name, value] of Object.entries(parsed as Record<string, unknown>)) {
+    if (typeof value === 'number' && Number.isFinite(value)) out.push({ name, value });
+  }
+  return out.sort((a, b) => b.value - a.value);
+}
+
+function rMultipleOf(pnlUsdt: number | null, risk: number | null): number | null {
+  return pnlUsdt !== null && risk !== null && risk > 0 ? pnlUsdt / risk : null;
+}
+
+export function readTradeDetail(id: string, dataDir: string = defaultDataDir()): TradeDetail {
+  const db = openReadonly(dataDir);
+  if (db) {
+    try {
+      if (tableExists(db, 'bot_trades')) {
+        const r = db.prepare('SELECT * FROM bot_trades WHERE id = ?').get(id) as Record<string, unknown> | undefined;
+        if (r) {
+          const num = (k: string): number | null => (typeof r[k] === 'number' ? (r[k] as number) : null);
+          const str = (k: string): string | null => (typeof r[k] === 'string' ? (r[k] as string) : null);
+          const pnlUsdt = num('pnl_usdt');
+          const risk = num('risk_amount_usdt');
+          return {
+            found: true, id, sleeve: 'crypto',
+            symbol: str('symbol') ?? '', direction: str('direction') ?? '',
+            entryPrice: num('entry_price'), exitPrice: num('exit_price'),
+            entryTimestamp: num('entry_timestamp') ?? 0, exitTimestamp: num('exit_timestamp') ?? 0,
+            pnlPct: num('pnl_percent') ?? 0, pnlUsdt,
+            exitReason: str('exit_reason'), stopLoss: num('stop_loss'), takeProfit: num('take_profit'),
+            riskAmountUsdt: risk, positionSizeUsdt: num('position_size_usdt'),
+            regime: str('regime'), barsHeld: num('bars_held'),
+            confluenceScore: num('confluence_score'), factors: parseFactors(r['factor_breakdown']),
+            grossReturn: num('gross_return'), frictionReturn: num('friction_return'),
+            fundingReturn: num('funding_return'), netReturn: num('net_return'),
+            fundingPaidUsdt: num('funding_paid_usdt'),
+            rMultiple: rMultipleOf(pnlUsdt, risk),
+          };
+        }
+      }
+    } finally {
+      db.close();
+    }
+  }
+  // Thin JSON sleeves: match on the synthetic id produced by readRecentTrades.
+  const gold = readJson(path.join(dataDir, 'gold-bot-state.json')) as
+    | { trades?: Array<{ direction?: string; entryPrice?: number; exitPrice?: number; entryTime?: string; exitTime?: string; pnlPct?: number; pnlPercent?: number; exitReason?: string }> }
+    | null;
+  for (const t of gold?.trades ?? []) {
+    const tid = `gold:${t.exitTime ? Date.parse(t.exitTime) : 0}`;
+    if (tid === id) {
+      return {
+        ...NOT_FOUND, found: true, id: tid, sleeve: 'gold', symbol: 'XAUTUSDT',
+        direction: t.direction ?? '—', entryPrice: t.entryPrice ?? null, exitPrice: t.exitPrice ?? null,
+        entryTimestamp: t.entryTime ? Date.parse(t.entryTime) : 0,
+        exitTimestamp: t.exitTime ? Date.parse(t.exitTime) : 0,
+        pnlPct: t.pnlPct ?? t.pnlPercent ?? 0, exitReason: t.exitReason ?? null,
+      };
+    }
+  }
+  const metals = readJson(path.join(dataDir, 'metals-bot-state.json')) as
+    | { trades?: Array<{ leg?: string; side?: string; entryPrice?: number; exitPrice?: number; entryTime?: string; exitTime?: string; pnlPct?: number; stale?: boolean }> }
+    | null;
+  for (const t of metals?.trades ?? []) {
+    const tid = `metals:${t.leg ?? 'metals'}:${t.exitTime ? Date.parse(t.exitTime) : 0}`;
+    if (tid === id) {
+      return {
+        ...NOT_FOUND, found: true, id: tid, sleeve: 'metals', symbol: t.leg ?? 'metals',
+        direction: t.side ?? '—', entryPrice: t.entryPrice ?? null, exitPrice: t.exitPrice ?? null,
+        entryTimestamp: t.entryTime ? Date.parse(t.entryTime) : 0,
+        exitTimestamp: t.exitTime ? Date.parse(t.exitTime) : 0,
+        pnlPct: t.pnlPct ?? 0, exitReason: t.stale ? 'stale (downtime)' : null,
+      };
+    }
+  }
+  return NOT_FOUND;
+}
+
+/** Crypto rows only — the sole sleeve carrying the fields analytics needs. */
+export function readAllTradesForStats(dataDir: string = defaultDataDir()): AnalyticsTrade[] {
+  const db = openReadonly(dataDir);
+  if (!db) return [];
+  try {
+    if (!tableExists(db, 'bot_trades')) return [];
+    const rows = db.prepare(
+      'SELECT symbol, pnl_percent, pnl_usdt, risk_amount_usdt, exit_reason, regime, confluence_score FROM bot_trades',
+    ).all() as Array<{ symbol: string; pnl_percent: number; pnl_usdt: number | null; risk_amount_usdt: number | null; exit_reason: string | null; regime: string | null; confluence_score: number | null }>;
+    return rows.map((r) => ({
+      symbol: r.symbol,
+      pnlPct: r.pnl_percent,
+      pnlUsdt: r.pnl_usdt,
+      riskAmountUsdt: r.risk_amount_usdt,
+      exitReason: r.exit_reason,
+      regime: r.regime,
+      confluenceScore: r.confluence_score,
+    }));
+  } finally {
+    db.close();
+  }
+}
+
+export function readDrawdownCurve(dataDir: string = defaultDataDir()): EquityPoint[] {
+  const db = openReadonly(dataDir);
+  if (!db) return [];
+  try {
+    if (!tableExists(db, 'bot_equity_snapshots')) return [];
+    return db.prepare('SELECT timestamp, equity, drawdown FROM bot_equity_snapshots ORDER BY timestamp ASC').all() as EquityPoint[];
+  } finally {
+    db.close();
+  }
 }

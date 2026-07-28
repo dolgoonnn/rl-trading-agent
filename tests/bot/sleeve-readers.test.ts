@@ -13,6 +13,9 @@ import {
   readEquityCurve,
   readFreshness,
   readGovernance,
+  readTradeDetail,
+  readAllTradesForStats,
+  readDrawdownCurve,
 } from '../../src/lib/bot/sleeve-readers';
 
 let dir: string;
@@ -227,5 +230,79 @@ describe('trade ids', () => {
     expect(metals?.id).toBe(`metals:overnight_au:${Date.parse('2026-07-01T09:00:00Z')}`);
     // Stable across repeated reads.
     expect(readRecentTrades(10, dir).find((t) => t.sleeve === 'metals')?.id).toBe(metals?.id);
+  });
+});
+
+describe('detail readers', () => {
+  function seedRichTrade(d: string, factorJson: string) {
+    const db = new Database(path.join(d, 'ict-trading.db'));
+    db.exec(`
+      CREATE TABLE bot_trades (id TEXT PRIMARY KEY, symbol TEXT, direction TEXT,
+        entry_price REAL, exit_price REAL, entry_timestamp INTEGER, exit_timestamp INTEGER,
+        stop_loss REAL, take_profit REAL, position_size_usdt REAL, risk_amount_usdt REAL,
+        confluence_score REAL, factor_breakdown TEXT, regime TEXT, exit_reason TEXT,
+        bars_held INTEGER, pnl_percent REAL, pnl_usdt REAL,
+        gross_return REAL, friction_return REAL, funding_return REAL, net_return REAL, funding_paid_usdt REAL);
+    `);
+    db.prepare(`INSERT INTO bot_trades VALUES ('t1','BTCUSDT','short',63000,62000,1,500,64000,61000,258.2,6.0,4.31,?, 'ranging+low','take_profit',12,1.5,9.0,0.017,-0.0014,0.00002,0.0156,0.03)`).run(factorJson);
+    db.close();
+  }
+
+  it('returns a rich crypto trade with parsed factors and R multiple', () => {
+    seedRichTrade(dir, JSON.stringify({ obProximity: 1.4, killZoneActive: 1.27, rrRatio: 0.56 }));
+    const d = readTradeDetail('t1', dir);
+    expect(d.found).toBe(true);
+    expect(d.symbol).toBe('BTCUSDT');
+    expect(d.confluenceScore).toBeCloseTo(4.31);
+    expect(d.factors).toHaveLength(3);
+    expect(d.factors?.[0]?.name).toBe('obProximity'); // sorted by value desc
+    expect(d.rMultiple).toBeCloseTo(1.5);             // 9.0 / 6.0
+    expect(d.netReturn).toBeCloseTo(0.0156);
+  });
+
+  it('survives malformed factor_breakdown by returning null factors', () => {
+    seedRichTrade(dir, 'not-json{{');
+    const d = readTradeDetail('t1', dir);
+    expect(d.found).toBe(true);
+    expect(d.factors).toBeNull();
+  });
+
+  it('returns found:false for an unknown id and on a fresh volume', () => {
+    expect(readTradeDetail('nope', dir).found).toBe(false);
+    expect(readTradeDetail('gold:123', dir).found).toBe(false);
+  });
+
+  it('reads a thin metals trade with null rich fields', () => {
+    fs.writeFileSync(path.join(dir, 'metals-bot-state.json'), JSON.stringify({
+      trades: [{ leg: 'overnight_au', metal: 'au', side: 'long', entryPrice: 4000, exitPrice: 4040,
+        entryTime: '2026-07-01T00:00:00Z', exitTime: '2026-07-01T09:00:00Z', pnlPct: 1 }],
+    }));
+    const id = `metals:overnight_au:${Date.parse('2026-07-01T09:00:00Z')}`;
+    const d = readTradeDetail(id, dir);
+    expect(d.found).toBe(true);
+    expect(d.sleeve).toBe('metals');
+    expect(d.pnlPct).toBeCloseTo(1);
+    expect(d.factors).toBeNull();
+    expect(d.confluenceScore).toBeNull();
+  });
+
+  it('feeds analytics and the drawdown curve, empty on a fresh volume', () => {
+    expect(readAllTradesForStats(dir)).toEqual([]);
+    expect(readDrawdownCurve(dir)).toEqual([]);
+    const db = new Database(path.join(dir, 'ict-trading.db'));
+    db.exec(`
+      CREATE TABLE bot_trades (id TEXT PRIMARY KEY, symbol TEXT, pnl_percent REAL, pnl_usdt REAL,
+        risk_amount_usdt REAL, exit_reason TEXT, regime TEXT, confluence_score REAL);
+      INSERT INTO bot_trades VALUES ('a','BTCUSDT',1.5,9,6,'take_profit','ranging+low',4.31);
+      CREATE TABLE bot_equity_snapshots (id INTEGER PRIMARY KEY, timestamp INTEGER, equity REAL, drawdown REAL);
+      INSERT INTO bot_equity_snapshots (timestamp, equity, drawdown) VALUES (10, 10000, 0), (20, 9900, 0.01);
+    `);
+    db.close();
+    const rows = readAllTradesForStats(dir);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.confluenceScore).toBeCloseTo(4.31);
+    const curve = readDrawdownCurve(dir);
+    expect(curve).toHaveLength(2);
+    expect(curve[1]?.drawdown).toBeCloseTo(0.01);
   });
 });
