@@ -442,56 +442,12 @@ describe('RiskEngine.perSymbolEntryCap — max entries per symbol per 24h', () =
 // RiskEngine.getSharpeMultiplier — DEFLATED (RED→GREEN vs raw Sharpe)
 // ---------------------------------------------------------------------------
 
-describe('RiskEngine.getSharpeMultiplier — deflated, benchmarked vs c=0.5', () => {
-  it('0.3 rolling Sharpe @ 100 trials now REDUCES sizing where raw-Sharpe (>0) did not', async () => {
-    const { RiskEngine } = await import('@/lib/bot/risk-engine');
-    const engine = new RiskEngine();
-    // raw code: 0.3 >= 0 and >= ... actually raw returned 0.5 (0<0.3<0.5).
-    // deflated code: 0.3 with 100 trials, benchmarked vs c=0.5 → PSR/edge below
-    // threshold → multiplier reduced (<= 0.5, here 0 because deflated <= c).
-    const mult = engine.getSharpeMultiplier({
-      rollingSharpe: 0.3,
-      numTrades: 200,
-      trialCount: 100,
-      minAcceptableSharpe: 0.5,
-    });
-    expect(mult).toBeLessThanOrEqual(0.5);
-    // A genuinely strong, well-supported Sharpe keeps full size.
-    const strong = engine.getSharpeMultiplier({
-      rollingSharpe: 3.0,
-      numTrades: 500,
-      trialCount: 100,
-      minAcceptableSharpe: 0.5,
-    });
-    expect(strong).toBe(1.0);
-  });
+// NOTE: the `RiskEngine.getSharpeMultiplier` suite was removed with the sleeve-level
+// deflated-Sharpe sizing brake it covered. That brake fed an ANNUALIZED rolling
+// Sharpe into a PER-OBSERVATION deflation formula and failed OPEN; edge decay is
+// now governed at book level by the book-governance signal. See
+// tests/bot/sleeve-dsr-brake-removed.test.ts and sharpe-multiplier-coldstart.test.ts.
 
-  it('null rolling Sharpe (insufficient data) ⇒ full size 1.0 (do not punish cold start)', async () => {
-    const { RiskEngine } = await import('@/lib/bot/risk-engine');
-    const engine = new RiskEngine();
-    const mult = engine.getSharpeMultiplier({
-      rollingSharpe: null,
-      numTrades: 5,
-      trialCount: 100,
-      minAcceptableSharpe: 0.5,
-    });
-    expect(mult).toBe(1.0);
-  });
-
-  it('benchmark is c=0.5, NOT zero: a deflated Sharpe between 0 and 0.5 still de-risks', async () => {
-    const { RiskEngine } = await import('@/lib/bot/risk-engine');
-    const engine = new RiskEngine();
-    // Many trades so the haircut is tiny → deflated ≈ raw 0.35, which is > 0 but
-    // < c=0.5. Under a zero benchmark this would be "fine"; under c=0.5 it de-risks.
-    const mult = engine.getSharpeMultiplier({
-      rollingSharpe: 0.35,
-      numTrades: 5_000,
-      trialCount: 2,
-      minAcceptableSharpe: 0.5,
-    });
-    expect(mult).toBeLessThan(1.0);
-  });
-});
 
 // ---------------------------------------------------------------------------
 // RiskEngine.checkHeartbeat — latches a stale_feed HALT

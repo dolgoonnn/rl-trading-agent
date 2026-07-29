@@ -117,11 +117,36 @@ interface BotOptions {
   regimeFilter: RegimeFilterType;
 }
 
+/**
+ * Frozen standardisation constants for (delta - mu)/sigma.
+ *
+ * WHY FROZEN: the signal is standardised by these, and that z drives
+ * `pBull >= activationThreshold`. Estimating them live is a sim/live mismatch —
+ * Bybit only serves ~474 daily XAUTUSDT bars (the token listed 2025-04), so a
+ * live estimate is a short, recency-biased window: measured sigma 1.946e-3, i.e.
+ * ~47% above the validated 1.323e-3, which compresses z and shifts which days
+ * activate (0.38 mean z-shift, 135/1000 days flipping sign vs validation).
+ *
+ * WHY THESE VALUES: derived from the full XAUUSD **spot** daily history
+ * (2020-01..2026-06, 2002 bars). Spot is XAUT's underlying — over the same
+ * 474-day window spot and XAUT sigma agree to 1.05× — and a full-cycle spot
+ * window reproduces the validated GC_F constants closely (mu 5.462e-4 vs
+ * 5.229e-4; sigma 1.463e-3 vs 1.323e-3). GC_F's own constants are NOT used
+ * directly: over a matched window XAUT/GC_F mu differs ~3×, so futures stats
+ * would inject a larger error than they remove.
+ *
+ * Override with --train-stats only if re-derived from a comparably long series.
+ */
+const FROZEN_TRAIN_STATS: F2FTrainStats = { mu: 0.0005462, sigma: 0.001463 };
+
 function parseArgs(): BotOptions {
   const args = process.argv.slice(2);
   const opts: BotOptions = {
     capital: 10000,
     params: { lambda: 0.95, theta: 0.91 }, // Optimal from WF validation (zscore50 filter)
+    // Default to the frozen constants so a redeploy cannot silently fall back to
+    // a short live-estimated window; --train-stats still overrides.
+    trainStats: FROZEN_TRAIN_STATS,
     verbose: false,
     dryRun: false,
     friction: 0.0005,

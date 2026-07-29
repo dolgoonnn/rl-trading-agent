@@ -9,7 +9,6 @@
  * - Max concurrent positions
  * - Graduated drawdown tiers (reduce sizing as DD increases)
  * - Regime-aware position sizing
- * - Rolling Sharpe-based sizing adjustment
  *
  * Circuit breakers pause trading for a defined period when triggered.
  * Drawdown tiers and regime multipliers reduce position size gradually.
@@ -25,7 +24,6 @@ import type {
 import type { Candle } from '@/types/candle';
 import type { PositionTracker } from './position-tracker';
 import { DEFAULT_RISK_CONFIG } from './config';
-import { calculateDeflatedSharpe } from '@/lib/rl/utils/deflated-sharpe';
 import { cppiExposureMultiplier } from '@/lib/risk/sizing';
 import type { KillFlag } from './kill-switch';
 
@@ -58,36 +56,26 @@ const HOUR_MS = 3_600_000;
 const DAY_MS = 24 * HOUR_MS;
 const WEEK_MS = 7 * DAY_MS;
 
-/**
- * Minimum resolved trades before the deflated-Sharpe SIZING HALT may engage.
- * Below this, a rolling Sharpe is noise (and a flat, tradeless equity curve
- * yields exactly 0), so sizing stays at full — otherwise the halt zeroes size
- * before the first trade can ever book (chicken-and-egg).
- */
-const MIN_TRADES_FOR_SHARPE_GATE = 20;
 
 export class RiskEngine {
   private cbConfig: CircuitBreakerConfig;
   private drawdownTiers: DrawdownTier[];
   private maxPositions: number;
   private regimeSizeMultipliers: Record<string, number>;
-  /** Selection-bias trial count used to deflate the rolling Sharpe. */
-  private deflationTrialCount: number;
-  /** Deflated-Sharpe benchmark `c` for the sizing multiplier (NOT zero). */
-  private minAcceptableSharpe: number;
 
   constructor(
     riskConfig: RiskConfig = DEFAULT_RISK_CONFIG,
-    opts: { deflationTrialCount?: number; minAcceptableSharpe?: number } = {},
+    /**
+     * Retained for call-site compatibility but IGNORED: these only configured the
+     * retired sleeve-level deflated-Sharpe sizing brake. Edge decay is now governed
+     * at book level by the book-governance signal.
+     */
+    _opts: { deflationTrialCount?: number; minAcceptableSharpe?: number } = {},
   ) {
     this.cbConfig = riskConfig.circuitBreakers;
     this.drawdownTiers = riskConfig.drawdownTiers;
     this.maxPositions = riskConfig.maxPositions;
     this.regimeSizeMultipliers = riskConfig.regimeSizeMultipliers;
-    // 236 independent trials counted in DSR validation (see MEMORY.md). The c=0.5
-    // benchmark comes from RETIREMENT_CONFIG; both are injectable for tests.
-    this.deflationTrialCount = opts.deflationTrialCount ?? 236;
-    this.minAcceptableSharpe = opts.minAcceptableSharpe ?? 0.5;
   }
 
   /**
@@ -237,19 +225,21 @@ export class RiskEngine {
     // 2. Regime multiplier (default 1.0 for unknown regimes)
     const regimeMult = this.regimeSizeMultipliers[regime] ?? 1.0;
 
-    // 3. Rolling DEFLATED-Sharpe multiplier (selection-bias corrected).
-    const sharpeMult = this.getSharpeMultiplier({
-      rollingSharpe: tracker.getRollingSharpe(),
-      numTrades: tracker.getTotalTrades(),
-      trialCount: this.deflationTrialCount,
-      minAcceptableSharpe: this.minAcceptableSharpe,
-    });
-
-    const multiplier = drawdownMult * regimeMult * sharpeMult;
+    // 3. Sleeve-level deflated-Sharpe sizing brake: RETIRED — see
+    //    tests/bot/sleeve-dsr-brake-removed.test.ts. It fed an ANNUALIZED rolling
+    //    Sharpe into a PER-OBSERVATION deflation formula (with T = trade count
+    //    rather than the daily observations the Sharpe came from), which failed
+    //    OPEN: at 238 trials/30 trades an annualized Sharpe of 2.0 sized FULL where
+    //    honest units say halt. Correcting the units alone is not viable either —
+    //    honestly deflated, a single config at that trial count is negative for any
+    //    realistic Sharpe, so the brake would be stuck permanently ON.
+    //    Edge decay is governed at BOOK level by the book-governance signal
+    //    (dsrBreachK = 0), which the session/metals bot already honours.
+    const multiplier = drawdownMult * regimeMult;
 
     return {
       multiplier,
-      breakdown: { drawdown: drawdownMult, regime: regimeMult, sharpe: sharpeMult },
+      breakdown: { drawdown: drawdownMult, regime: regimeMult, sharpe: 1.0 },
     };
   }
 
@@ -498,47 +488,4 @@ export class RiskEngine {
     return (n * sumXY - sumX * sumY) / denom;
   }
 
-  /**
-   * DEFLATED-Sharpe sizing multiplier.
-   *
-   * Replaces the old raw-Sharpe rule. We deflate the rolling Sharpe for
-   * selection bias (trial count) via `calculateDeflatedSharpe`, then benchmark
-   * the deflated Sharpe against `minAcceptableSharpe` (c = 0.5, NOT zero):
-   *   - deflated >= c            → full size (1.0)
-   *   - 0 <  deflated <  c       → de-risk (0.5)
-   *   - deflated <= 0            → halt sizing (0)
-   *   - rolling Sharpe null      → full size (1.0; do not punish a cold start)
-   *
-   * Consequence (the RED→GREEN case): a 0.3 rolling Sharpe at 100 trials now
-   * reduces sizing — the deflation haircut from 100 trials drags it to ~0, where
-   * the old raw rule kept it at 0.5 (and never deflated at all).
-   */
-  getSharpeMultiplier(args: {
-    rollingSharpe: number | null;
-    numTrades: number;
-    trialCount: number;
-    minAcceptableSharpe: number;
-  }): number {
-    const { rollingSharpe, numTrades, trialCount, minAcceptableSharpe } = args;
-    if (rollingSharpe === null) return 1.0; // Not enough data yet — cold start
-
-    // COLD-START GUARD (regression fix): the deflated-Sharpe SIZING HALT must not
-    // engage before there is a meaningful trade sample. Otherwise a flat equity
-    // curve (no trades) yields rollingSharpe 0, which deflates ≤ 0 and returns 0 —
-    // zeroing position size so the bot can NEVER open its first trade
-    // (chicken-and-egg). A rolling Sharpe over a handful of trades is noise, not an
-    // edge-decay signal, so full-size until the sample is real.
-    if (numTrades < MIN_TRADES_FOR_SHARPE_GATE) return 1.0;
-
-    const dsr = calculateDeflatedSharpe(
-      rollingSharpe,
-      Math.max(1, numTrades),
-      Math.max(1, trialCount),
-    );
-    const deflated = dsr.deflatedSharpe;
-
-    if (deflated <= 0) return 0; // Halt sizing
-    if (deflated < minAcceptableSharpe) return 0.5; // De-risk: positive but below the c=0.5 floor
-    return 1.0;
-  }
 }
