@@ -69,7 +69,8 @@ interface TradeLog {
   exitPrice: number;
   entryTime: string;
   exitTime: string;
-  pnlPct: number; // net of paper friction
+  pnlPct: number; // net of paper friction AND risk weight (see legWeight)
+  weight?: number; // risk weight applied; absent on pre-weighting trades (treat as 1)
   stale?: boolean; // held beyond leg cap (downtime-stranded) → exclude from strategy attribution
 }
 
@@ -152,11 +153,40 @@ function openPosition(state: BotState, p: Position): void {
   log(`OPEN ${p.leg} ${p.side} ${p.metal} @ ${p.entryPrice.toFixed(3)}`);
 }
 
+/**
+ * Each side of a correlated pair carries half a unit of risk, so the PAIR is one
+ * bet rather than two.
+ *
+ * WHY: the gold and silver `overnight` legs enter within seconds of each other
+ * and exit on the SAME timestamp every night — they are one directional metals
+ * bet booked at double size. Live evidence (2026-07-30, 21 closed trades): the
+ * pair alone was -2.454% while every other leg combined was +0.511%, dragging the
+ * book to -1.943%. The three pair-nights were -2.782%, +1.792%, -1.464% — gold and
+ * silver moved the same way every time, so the second leg adds size, not
+ * diversification.
+ *
+ * This is a SIZING change only: it does not alter which trades are taken or when
+ * they exit, so the underlying session edge needs no re-validation.
+ */
+export const CORRELATED_PAIR_WEIGHT = 0.5;
+
+/** Legs that run gold AND silver simultaneously as a single correlated bet. */
+const CORRELATED_PAIR_LEGS = new Set(['overnight', 'weekend']);
+
+/** Risk weight for a leg/instrument. 1 = one full unit of risk. */
+export function legWeight(leg: string, metal: string): number {
+  if (CORRELATED_PAIR_LEGS.has(leg) && (metal === 'gold' || metal === 'silver')) {
+    return CORRELATED_PAIR_WEIGHT;
+  }
+  return 1;
+}
+
 function closePosition(state: BotState, pos: Position, exitPrice: number, stale = false): void {
   const raw = pos.side === 'long'
     ? Math.log(exitPrice / pos.entryPrice)
     : Math.log(pos.entryPrice / exitPrice);
-  const pnl = raw - 2 * frictionFor(pos.leg, pos.metal);
+  const weight = legWeight(pos.leg, pos.metal);
+  const pnl = (raw - 2 * frictionFor(pos.leg, pos.metal)) * weight;
   state.trades.push({
     leg: pos.leg,
     metal: pos.metal,
@@ -166,6 +196,9 @@ function closePosition(state: BotState, pos: Position, exitPrice: number, stale 
     entryTime: new Date(pos.entryTime).toISOString(),
     exitTime: new Date().toISOString(),
     pnlPct: Math.round(pnl * 1e6) / 1e4,
+    // Risk weight applied to this fill. Absent on trades booked before
+    // correlated-pair sizing existed — treat a missing value as 1.
+    weight,
     ...(stale ? { stale: true } : {}),
   });
   state.totalPnlPct = Math.round((state.totalPnlPct + pnl * 100) * 1e4) / 1e4;
