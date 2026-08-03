@@ -35,6 +35,64 @@ function WaterfallBar({ label, value }: { label: string; value: number }) {
   );
 }
 
+type DetailLike = {
+  sleeve: string;
+  symbol: string;
+  exitReason: string | null;
+  confluenceScore: number | null;
+  regime: string | null;
+};
+
+/**
+ * Plain-language reason the position was opened.
+ *
+ * The session legs are the non-obvious case: their edge IS the clock window
+ * (research found gold's intraday return concentrates 22:00-07:00 UTC while the
+ * US session is a net drag), so "why did it enter at 22:00?" has a real answer
+ * that the numbers alone never conveyed.
+ */
+function explainEntry(d: DetailLike): string {
+  if (d.sleeve === 'crypto') {
+    const score = d.confluenceScore !== null ? `confluence ${d.confluenceScore.toFixed(2)}` : 'confluence signal';
+    const regime = d.regime ? ` in ${d.regime}` : '';
+    return `An order block cleared the ${score} threshold${regime}. Factor detail is below.`;
+  }
+  if (d.sleeve === 'gold') {
+    return 'The daily F2F momentum signal crossed its activation threshold and the regime filter allowed entry.';
+  }
+  const leg = d.symbol;
+  if (leg.startsWith('overnight')) return 'Overnight session leg: gold drifts up between 22:00 and 07:00 UTC, which is where its intraday return concentrates.';
+  if (leg.startsWith('weekend')) return 'Weekend leg: enters Friday evening to capture the weekend gap, exits Monday morning.';
+  if (leg.startsWith('fix-short')) return 'London PM fix leg: shorts into the 15:00 London fix window.';
+  if (leg.startsWith('agfix')) return 'Silver own-fix leg: shorts into silver’s noon London fix.';
+  if (leg.startsWith('amfix')) return 'AM fix bounce leg: long into the 11:30 London morning fix.';
+  if (leg.startsWith('eur-morning')) return 'EUR morning leg: shorts the European morning window, closing at 12:00 UTC.';
+  if (leg.startsWith('eur-h22')) return 'EUR late leg: long into the 23:00 UTC close.';
+  if (leg.startsWith('us500')) return 'US500 overnight leg: holds the index gap into the NY cash open.';
+  return 'Scheduled session leg — the entry time itself is the signal.';
+}
+
+/** Plain-language reason the position closed. */
+function explainExit(d: DetailLike): string {
+  const r = d.exitReason ?? '';
+  if (r === 'take_profit') return 'Price reached the take-profit level.';
+  if (r === 'stop_loss') return 'Price hit the stop loss.';
+  if (r === 'shutdown') return 'Force-closed when the bot restarted — not a strategy exit.';
+  if (r.startsWith('stale')) return 'Held past its normal window while the bot was down, then flattened. Flagged as drift, not strategy.';
+  if (r === 'timeout' || r === 'max_bars') return 'Hit the maximum holding period without reaching either target.';
+  if (d.sleeve === 'metals') {
+    return 'The session window ended. These legs exit on the clock regardless of profit — holding past the window was tested and performs worse.';
+  }
+  if (d.sleeve === 'gold') return 'The daily signal flipped or the regime filter turned the position off.';
+  return r ? `Exit reason: ${r}.` : 'Closed on its scheduled exit condition.';
+}
+
+function formatHold(ms: number): string {
+  if (!Number.isFinite(ms) || ms <= 0) return '—';
+  const h = ms / 3_600_000;
+  return h < 1 ? `${Math.round(h * 60)} min` : `${h.toFixed(1)} h`;
+}
+
 export function TradeDetailDrawer({ tradeId, onClose }: { tradeId: string | null; onClose: () => void }) {
   const q = trpc.dashboard.book.tradeDetail.useQuery({ id: tradeId ?? '' }, { enabled: tradeId !== null });
 
@@ -108,6 +166,29 @@ export function TradeDetailDrawer({ tradeId, onClose }: { tradeId: string | null
               {data.pnlUsdt !== null ? (
                 <p className="mt-0.5 text-xs text-zinc-500">{formatUsd(data.pnlUsdt)}</p>
               ) : null}
+            </section>
+
+            {/* Why this trade happened, and why it ended — the two questions a
+                detail view exists to answer. Both are derivable from the leg and
+                the exit reason; neither was shown before. */}
+            <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
+              <h3 className="mb-2 text-xs uppercase tracking-wider text-zinc-400">Why</h3>
+              <dl className="space-y-2 text-xs">
+                <div>
+                  <dt className="text-zinc-500">Entered because</dt>
+                  <dd className="mt-0.5 leading-snug text-zinc-300">{explainEntry(data)}</dd>
+                </div>
+                <div>
+                  <dt className="text-zinc-500">Closed because</dt>
+                  <dd className="mt-0.5 leading-snug text-zinc-300">{explainExit(data)}</dd>
+                </div>
+                <div>
+                  <dt className="text-zinc-500">Held</dt>
+                  <dd className="mt-0.5 font-mono text-zinc-300">
+                    {formatHold(data.exitTimestamp - data.entryTimestamp)}
+                  </dd>
+                </div>
+              </dl>
             </section>
 
             {/* Levels & risk */}

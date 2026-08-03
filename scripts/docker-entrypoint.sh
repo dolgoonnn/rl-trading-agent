@@ -40,14 +40,19 @@ FLOW_PID=$!
 npx next start -p "${PORT:-3000}" &
 UI_PID=$!
 
-echo "  crypto=$CRYPTO_PID gold=$GOLD_PID metals=$METALS_PID governor=$GOV_PID orderflow=$FLOW_PID ui=$UI_PID"
+# 7. LETF close-flow paper bot (EXPERIMENTAL sleeve, non-fatal: separate state,
+#    separate attribution, regime kill-switch — experiments/letf-close-flow.md)
+npx tsx scripts/run-letf-bot.ts --verbose &
+LETF_PID=$!
+
+echo "  crypto=$CRYPTO_PID gold=$GOLD_PID metals=$METALS_PID governor=$GOV_PID orderflow=$FLOW_PID ui=$UI_PID letf=$LETF_PID"
 
 # Core processes whose death should restart the whole container.
 CORE_PIDS="$CRYPTO_PID $GOLD_PID $METALS_PID $GOV_PID"
 
 cleanup() {
   echo "Received shutdown signal, stopping fleet..."
-  kill "$CRYPTO_PID" "$GOLD_PID" "$METALS_PID" "$GOV_PID" "$FLOW_PID" "$UI_PID" 2>/dev/null || true
+  kill "$CRYPTO_PID" "$GOLD_PID" "$METALS_PID" "$GOV_PID" "$FLOW_PID" "$UI_PID" "$LETF_PID" 2>/dev/null || true
   wait 2>/dev/null || true
   echo "Fleet stopped."
   exit 0
@@ -59,11 +64,12 @@ trap cleanup TERM INT
 # trading.
 FLOW_WARNED=0
 UI_WARNED=0
+LETF_WARNED=0
 while true; do
   for pid in $CORE_PIDS; do
     if ! kill -0 "$pid" 2>/dev/null; then
       echo "CORE process $pid exited — restarting container to recover clean fleet."
-      kill "$CRYPTO_PID" "$GOLD_PID" "$METALS_PID" "$GOV_PID" "$FLOW_PID" "$UI_PID" 2>/dev/null || true
+      kill "$CRYPTO_PID" "$GOLD_PID" "$METALS_PID" "$GOV_PID" "$FLOW_PID" "$UI_PID" "$LETF_PID" 2>/dev/null || true
       wait 2>/dev/null || true
       exit 1
     fi
@@ -75,6 +81,10 @@ while true; do
   if [ "$UI_WARNED" -eq 0 ] && ! kill -0 "$UI_PID" 2>/dev/null; then
     echo "WARN: web dashboard ($UI_PID) exited (non-fatal); trading continues."
     UI_WARNED=1
+  fi
+  if [ "$LETF_WARNED" -eq 0 ] && ! kill -0 "$LETF_PID" 2>/dev/null; then
+    echo "WARN: LETF close-flow bot ($LETF_PID) exited (non-fatal, experimental); trading continues."
+    LETF_WARNED=1
   fi
   sleep 15
 done
