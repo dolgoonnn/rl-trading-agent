@@ -96,6 +96,58 @@ export interface OpenPosition {
   sizeUsdt: number | null;
   entryTimestamp: number;
   strategy: string | null;
+  /** Risk rails. Null for session legs, which carry no stop or target. */
+  stopLoss: number | null;
+  takeProfit: number | null;
+  /** Latest known mark. Null when no price history is stored for the sleeve. */
+  currentPrice: number | null;
+  /** Unrealised return as a FRACTION, direction-aware. Null without a mark. */
+  unrealizedPct: number | null;
+  /**
+   * 0..1 progress. `price` = entry->target for positions with a target;
+   * `time` = elapsed/window for session legs, which exit on a clock not a target.
+   */
+  progress: number | null;
+  progressKind: 'price' | 'time' | null;
+  /** Designed window for a session leg, so the UI can show time remaining. */
+  expectedHoldMs: number | null;
+}
+
+/**
+ * Designed hold window per session leg, from the entry/exit clock rules in
+ * run-metals-bot.ts. These legs have no stop or target — the window IS the
+ * strategy — so elapsed-vs-window is the only meaningful "progress" for them.
+ */
+const LEG_WINDOW_HOURS: Record<string, number> = {
+  overnight: 9,      // 22:00 -> 07:01 UTC
+  weekend: 59,       // Fri 20:00 -> Mon 07:00
+  'fix-short': 1,    // into the 15:00 London fix
+  'agfix-short': 1,  // into silver's noon London fix
+  'amfix-long': 1.5, // -> 11:30 London
+  'eur-morning-short': 3,
+  'eur-h22-long': 3,
+  'us500-overnight': 13.5, // -> NY 09:31
+};
+
+/** Designed hold for a session leg, or null if the leg is unknown. */
+export function expectedHoldMsFor(leg: string): number | null {
+  const h = LEG_WINDOW_HOURS[leg];
+  return h === undefined ? null : h * 3_600_000;
+}
+
+/** Latest stored close per symbol, or null when no candle history exists. */
+function latestCloses(db: Database.Database): Map<string, number> {
+  const out = new Map<string, number>();
+  if (!tableExists(db, 'bot_candles')) return out;
+  const rows = db.prepare(
+    'SELECT symbol, close FROM bot_candles WHERE (symbol, timestamp) IN (SELECT symbol, MAX(timestamp) FROM bot_candles GROUP BY symbol)',
+  ).all() as Array<{ symbol: string; close: number }>;
+  for (const r of rows) out.set(r.symbol, r.close);
+  return out;
+}
+
+function clamp01(x: number): number {
+  return Math.max(0, Math.min(1, x));
 }
 
 export function readOpenPositions(dataDir: string = defaultDataDir()): OpenPosition[] {
@@ -104,11 +156,44 @@ export function readOpenPositions(dataDir: string = defaultDataDir()): OpenPosit
   if (db) {
     try {
       if (tableExists(db, 'bot_positions')) {
+        // SELECT * and read defensively: older/partial schemas may lack the risk
+        // rail columns, and a hard column list would throw instead of degrading.
         const rows = db.prepare(
-          "SELECT symbol, direction, entry_price, entry_timestamp, position_size_usdt, strategy FROM bot_positions WHERE status = 'open'",
-        ).all() as Array<{ symbol: string; direction: string; entry_price: number; entry_timestamp: number; position_size_usdt: number; strategy: string }>;
-        for (const r of rows) {
-          out.push({ sleeve: 'crypto', symbol: r.symbol, direction: r.direction, entryPrice: r.entry_price, sizeUsdt: r.position_size_usdt, entryTimestamp: r.entry_timestamp, strategy: r.strategy });
+          "SELECT * FROM bot_positions WHERE status = 'open'",
+        ).all() as Array<Record<string, unknown>>;
+        const marks = latestCloses(db);
+        for (const raw of rows) {
+          const num = (k: string): number | null => (typeof raw[k] === 'number' ? (raw[k] as number) : null);
+          const str = (k: string): string => (typeof raw[k] === 'string' ? (raw[k] as string) : '');
+          const r = {
+            symbol: str('symbol'),
+            direction: str('direction'),
+            entry_price: num('entry_price') ?? 0,
+            entry_timestamp: num('entry_timestamp') ?? 0,
+            position_size_usdt: num('position_size_usdt'),
+            strategy: str('strategy') || null,
+            stop_loss: num('stop_loss'),
+            take_profit: num('take_profit'),
+            current_sl: num('current_sl'),
+          };
+          const mark = marks.get(r.symbol) ?? null;
+          const long = r.direction === 'long';
+          const unreal = mark === null || r.entry_price === 0
+            ? null
+            : (long ? mark - r.entry_price : r.entry_price - mark) / r.entry_price;
+          // Progress toward the target along the entry->TP leg.
+          const tp = r.take_profit;
+          const span = tp === null ? 0 : Math.abs(tp - r.entry_price);
+          const moved = mark === null ? 0 : (long ? mark - r.entry_price : r.entry_price - mark);
+          const progress = mark === null || span === 0 ? null : clamp01(moved / span);
+          out.push({
+            sleeve: 'crypto', symbol: r.symbol, direction: r.direction, entryPrice: r.entry_price,
+            sizeUsdt: r.position_size_usdt, entryTimestamp: r.entry_timestamp, strategy: r.strategy,
+            stopLoss: r.current_sl ?? r.stop_loss, takeProfit: r.take_profit,
+            currentPrice: mark, unrealizedPct: unreal,
+            progress, progressKind: progress === null ? null : 'price',
+            expectedHoldMs: null,
+          });
         }
       }
     } finally {
@@ -118,12 +203,31 @@ export function readOpenPositions(dataDir: string = defaultDataDir()): OpenPosit
   // Gold: single open position flag in JSON (no rich fields) — surface as a marker.
   const gold = readJson(path.join(dataDir, 'gold-bot-state.json')) as { position?: { direction?: string; entryPrice?: number; entryTime?: number } } | null;
   if (gold?.position) {
-    out.push({ sleeve: 'gold', symbol: 'XAUTUSDT', direction: gold.position.direction ?? '—', entryPrice: gold.position.entryPrice ?? 0, sizeUsdt: null, entryTimestamp: gold.position.entryTime ?? 0, strategy: 'f2f_gold' });
+    out.push({
+      sleeve: 'gold', symbol: 'XAUTUSDT', direction: gold.position.direction ?? '—',
+      entryPrice: gold.position.entryPrice ?? 0, sizeUsdt: null,
+      entryTimestamp: gold.position.entryTime ?? 0, strategy: 'f2f_gold',
+      stopLoss: null, takeProfit: null, currentPrice: null, unrealizedPct: null,
+      progress: null, progressKind: null, expectedHoldMs: null,
+    });
   }
   // Metals: open legs in JSON.
   const metals = readJson(path.join(dataDir, 'metals-bot-state.json')) as { positions?: Array<{ leg?: string; direction?: string; entryPrice?: number; entryTime?: number }> } | null;
   for (const p of metals?.positions ?? []) {
-    out.push({ sleeve: 'metals', symbol: p.leg ?? 'metals', direction: p.direction ?? '—', entryPrice: p.entryPrice ?? 0, sizeUsdt: null, entryTimestamp: p.entryTime ?? 0, strategy: 'session' });
+    const leg = p.leg ?? 'metals';
+    const entryTs = p.entryTime ?? 0;
+    const window = expectedHoldMsFor(leg);
+    // Session legs exit on a clock, so progress is elapsed-vs-window. No market
+    // price is stored for them, so unrealised P&L stays null rather than invented.
+    const progress = window !== null && entryTs > 0
+      ? clamp01((Date.now() - entryTs) / window)
+      : null;
+    out.push({
+      sleeve: 'metals', symbol: leg, direction: p.direction ?? '—',
+      entryPrice: p.entryPrice ?? 0, sizeUsdt: null, entryTimestamp: entryTs, strategy: 'session',
+      stopLoss: null, takeProfit: null, currentPrice: null, unrealizedPct: null,
+      progress, progressKind: progress === null ? null : 'time', expectedHoldMs: window,
+    });
   }
   return out;
 }
