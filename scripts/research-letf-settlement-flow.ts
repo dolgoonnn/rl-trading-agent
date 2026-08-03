@@ -135,6 +135,10 @@ function buildCloseEvents(marks: Map<string, DayMarks>): CloseEventRow[] {
     const cur = marks.get(days[i]!)!;
     const next = i + 1 < days.length ? marks.get(days[i + 1]!)! : undefined;
     if (!prev.m1600 || !cur.m1500 || !cur.m1530 || !cur.m1600) continue;
+    // LETF flow exists only on US trading days — drop weekend "events" on
+    // 24/7 instruments (no-op for metals/index data with no weekend bars).
+    const dow = new Date(`${days[i]!}T12:00:00Z`).getUTCDay();
+    if (dow === 0 || dow === 6) continue;
     const sig = Math.log(cur.m1500 / prev.m1600);
     if (!isFinite(sig) || sig === 0) continue;
     const s = Math.sign(sig);
@@ -200,10 +204,19 @@ async function main(): Promise<void> {
     return out.sort((a, b) => a.timestamp - b.timestamp);
   };
 
-  for (const metal of [
+  const universe = [
     { name: 'SILVER (XAGUSD — AGQ/ZSL flow, largest LETF share)', files: ['XAGUSD_1m_holdout.json', 'XAGUSD_1m.json'] },
     { name: 'GOLD (XAUUSD — UGL/GLL flow)', files: ['XAUUSD_1m_holdout.json', 'XAUUSD_1m.json'] },
-  ]) {
+    // US500: TQQQ/SQQQ/SPXL/SPXU etc — the largest LETF complex in the world.
+    // Same 16:00 ET NAV-strike mechanism; heavily studied/arbed, so expect a
+    // smaller per-event edge but far more qualifying events.
+    { name: 'US500 (SPXL/SPXU/UPRO complex)', files: ['US500_1m.json'] },
+    // BTC: BITX/BTCL 2x complexes (NAV strike 16:00 ET, hedged via CME/spot).
+    // Bybit perp is the user's native venue — real 1bp maker costs.
+    { name: 'BTC (BITX 2x complex, Bybit perp venue)', files: ['BTCUSDT_1m.json'] },
+  ].filter((m) => m.files.every((f) => fs.existsSync(path.resolve(__dirname, '..', 'data', f))));
+
+  for (const metal of universe) {
     console.log(`\n==================== ${metal.name} ====================`);
     const candles = load(metal.files);
     const marks = extractMarks(candles);

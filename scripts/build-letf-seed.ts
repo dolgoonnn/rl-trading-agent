@@ -1,9 +1,9 @@
 #!/usr/bin/env tsx
 /**
  * Seed the LETF close-flow bot's rolling threshold history from historical
- * silver 1m data. Writes data/letf-seed.json: the last 250 daily |sig| values
- * (sig = log(P15:00ET / prev P16:00ET)) so run-letf-bot.ts has a full
- * lookback window from day one.
+ * 1m data (silver + gold). Writes scripts/letf-seed.json: per instrument, the
+ * last 250 daily |sig| values (sig = log(P15:00ET / prev P16:00ET)) so
+ * run-letf-bot.ts has a full lookback window from day one.
  *
  * Usage: NODE_OPTIONS=--max-old-space-size=8192 npx tsx scripts/build-letf-seed.ts
  */
@@ -23,10 +23,8 @@ function nyOffsetHours(ts: number): number {
   return ts >= start && ts < end ? -4 : -5;
 }
 
-function main(): void {
-  const candles = JSON.parse(
-    fs.readFileSync(path.resolve(__dirname, '..', 'data', 'XAGUSD_1m.json'), 'utf-8'),
-  ) as Candle[];
+function buildHistory(file: string): { hist: { day: string; absSig: number }[]; lastDay: string } {
+  const candles = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'data', file), 'utf-8')) as Candle[];
   candles.sort((a, b) => a.timestamp - b.timestamp);
 
   const byDay = new Map<string, { m1500?: number; m1600?: number }>();
@@ -44,27 +42,33 @@ function main(): void {
   const days = [...byDay.keys()].sort();
   const hist: { day: string; absSig: number }[] = [];
   let prev1600: number | undefined;
-  let prev1600Day = '';
+  let lastDay = '';
   for (const day of days) {
     const rec = byDay.get(day)!;
     if (prev1600 && rec.m1500) {
       const sig = Math.log(rec.m1500 / prev1600);
       if (isFinite(sig) && sig !== 0) hist.push({ day, absSig: Math.abs(sig) });
     }
-    if (rec.m1600) { prev1600 = rec.m1600; prev1600Day = day; }
+    if (rec.m1600) { prev1600 = rec.m1600; lastDay = day; }
   }
+  return { hist: hist.slice(-250), lastDay };
+}
 
+function main(): void {
+  const silver = buildHistory('XAGUSD_1m.json');
+  const gold = buildHistory('XAUUSD_1m.json');
   const seed = {
     generatedAt: new Date().toISOString(),
-    instrument: 'silver',
-    note: 'daily |log(P15:00ET / prev P16:00ET)| history for the rolling p95 threshold of run-letf-bot.ts',
-    lastDay: prev1600Day,
-    absSigHistory: hist.slice(-250),
+    note: 'per-instrument daily |log(P15:00ET / prev P16:00ET)| history for the rolling p95 threshold of run-letf-bot.ts',
+    instruments: {
+      silver: { lastDay: silver.lastDay, absSigHistory: silver.hist },
+      gold: { lastDay: gold.lastDay, absSigHistory: gold.hist },
+    },
   };
   // Lives under scripts/ (not data/) so it ships in the Docker image — the
   // Railway volume mount shadows /app/data, and .railwayignore drops experiments/.
   fs.writeFileSync(path.resolve(__dirname, 'letf-seed.json'), JSON.stringify(seed, null, 2));
-  console.log(`Seed written: ${seed.absSigHistory.length} days ending ${hist.at(-1)?.day} (data through ${prev1600Day})`);
+  console.log(`Seed written: silver ${silver.hist.length}d through ${silver.lastDay}, gold ${gold.hist.length}d through ${gold.lastDay}`);
 }
 
 main();

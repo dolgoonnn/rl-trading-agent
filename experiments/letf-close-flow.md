@@ -59,6 +59,24 @@ trailing-20 mean net <= 0** (regime-dependence is the design assumption).
 Wired into `docker-entrypoint.sh` as a NON-FATAL 7th process with separate
 state (`data/letf-bot-state.json`) — zero impact on session-book attribution.
 
+## Instrument breadth scan (2026-08-03 morning — the "more volume" question)
+
+Volume scales horizontally (more instruments at the tail threshold), never by
+lowering the threshold (p90 already dilutes to ~cost; daily trading is
+negative). Scan results, same close-anchored event study:
+
+| Instrument | LETF complex | Top-decile V1+V2 | Verdict |
+|---|---|---|---|
+| Silver | AGQ/ZSL | +15bp t=2.9 (2020+), +42bp t=3.1 (2025+) | **DEPLOYED, full weight** |
+| Gold | UGL/GLL | +8.8bp t=3.6 (2020+); strategy +10.1bp t=1.7 | **DEPLOYED, half weight** |
+| US500 | SPXL/UPRO/TQQQ-class | +18.9bp t=1.8 (2025+) but top-5 events = 167% of P&L, 55% hit, holdout 0 | NO — too concentrated under \|move\| proxy; revisit with real AUM flow |
+| BTC | BITX 2x | −20bp (negative), noise | **DEAD — flow tiny vs $30B/day depth** |
+
+Pattern confirms the mechanism's selection rule: edge ∝ LETF-AUM / market
+depth. Silver #1 (why the BIS wrote about it), gold half, index arbed away,
+BTC negligible. Next breadth candidates by flow/depth ratio: natgas (BOIL/KOLD)
+and oil (UCO/SCO) — need ~$20-30 of NG/CL 1m history to test.
+
 ## Next steps (owner decisions)
 
 1. Review + `deploy` the branch to put the paper leg on Railway.
