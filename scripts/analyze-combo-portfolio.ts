@@ -61,13 +61,13 @@ function nyOffsetHours(ts: number): number {
   const end = nthSundayUTC(y, 10, 1) + 6 * 3_600_000;
   return ts >= start && ts < end ? -4 : -5;
 }
-function firstFriday(year: number, month: number): string {
+export function firstFriday(year: number, month: number): string {
   const dow = new Date(Date.UTC(year, month, 1)).getUTCDay();
   return new Date(Date.UTC(year, month, 1 + ((5 - dow + 7) % 7))).toISOString().slice(0, 10);
 }
 
 /** Window return per local day on a given clock; sign +1 long / −1 short. */
-function clockWindowDaily(
+export function clockWindowDaily(
   candles: Candle[],
   clock: 'london' | 'ny' | 'utc',
   fromMin: number,
