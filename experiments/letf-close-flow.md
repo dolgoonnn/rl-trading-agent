@@ -74,8 +74,20 @@ negative). Scan results, same close-anchored event study:
 
 Pattern confirms the mechanism's selection rule: edge ∝ LETF-AUM / market
 depth. Silver #1 (why the BIS wrote about it), gold half, index arbed away,
-BTC negligible. Next breadth candidates by flow/depth ratio: natgas (BOIL/KOLD)
-and oil (UCO/SCO) — need ~$20-30 of NG/CL 1m history to test.
+BTC negligible.
+
+**Oil/natgas scan (2026-08-03, Dukascopy CFD 1m 2022+, $0):**
+
+| Instrument | Complex | Top-decile V1+V2 | Verdict |
+|---|---|---|---|
+| NATGAS | BOIL/KOLD | +18.5bp t=2.0 (2024+), **+33.1bp t=3.3 (2025+)**; 2025 alone +29.8bp t=3.2, 83% hit | **CONFIRMED #2 — but venue-blocked** (no Bybit perp; needs NG/QG futures access) |
+| WTI | UCO/SCO | −11..−17bp, 31% hit, 15:00-15:30 leg t=−2.3 | NO — REVERTS (CL settles 14:30 ET; 16:00-strike mechanism doesn't map). Fade signature noted, not pursued (sign-flip fishing risk) |
+
+Cross-instrument confirmation is the headline: natgas's strong year is 2025,
+silver's is 2026 — each matching its OWN complex's AUM boom, not one shared
+lucky window. The mechanism generalizes; the venue list is the constraint.
+Natgas joins the futures-access decision (same door as MGC/prop), not the
+Bybit bot.
 
 ## Next steps (owner decisions)
 
