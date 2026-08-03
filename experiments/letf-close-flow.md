@@ -89,6 +89,31 @@ lucky window. The mechanism generalizes; the venue list is the constraint.
 Natgas joins the futures-access decision (same door as MGC/prop), not the
 Bybit bot.
 
+## Pass 2 — real AUM flow ranking (2026-08-03, ProShares official CSVs, $0)
+
+Daily NAV/SO/AUM back to 2008-12 for AGQ/ZSL/UGL/GLL from
+accounts.profunds.com (data/proshares/). Signal: lagged-AUM x (L^2-L) x sig,
+with (L^2-L)=2 for 2x and 6 for -2x (inverse funds rebalance 3x harder per
+dollar). Script: research-letf-aum-flow.ts.
+
+- **Mechanism CONFIRMED a third way:** the dollar-flow threshold finds the
+  SAME profitable episodes across eras — silver >=$50M flow days in the
+  pre-boom years (2020-23) were +11.6bp/trade (n=42) in exactly the years
+  where the |sig|-only rule bled (2022: -0.4bp, 2023: -8.7bp under p95).
+  Conditioning on the causal variable fixes year-consistency.
+- **But as a live rule upgrade: NO WIN in 2024+.** Flow-ranked and
+  sig-ranked top deciles coincide (silver +19.8 vs +20.5bp; gold flow-rank
+  is WORSE, +10.0 vs +14.5bp t=3.3) because AUM is now uniformly high — the
+  rankings only diverge when AUM varies, i.e., across eras, not within the
+  current one. Deployed p95-|sig| rule STANDS (silver 2024+: n=53, +15.9bp,
+  t=2.0 — the no-lookahead benchmark).
+- **Actionable residue:** an AUM floor (e.g., silver complex 2xAUM_AGQ +
+  6xAUM_ZSL < ~$1B for N weeks) is a LEADING regime-exit indicator — the
+  P&L kill-switch is lagging; the AUM print is the mechanism's fuel gauge.
+  Future bot enhancement: weekly poll of the ProShares CSV as a
+  regime-health check. US500 rescue via SPXL/UPRO/TQQQ-complex AUM remains
+  untested (many funds; only worth it if metals forward record confirms).
+
 ## Next steps (owner decisions)
 
 1. Review + `deploy` the branch to put the paper leg on Railway.
