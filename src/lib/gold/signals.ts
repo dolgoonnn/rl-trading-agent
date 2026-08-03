@@ -46,6 +46,15 @@ export function generateSignals(
   signalStart: number,
   signalEnd?: number,
   regimeFilter: RegimeFilterType = 'none',
+  /**
+   * Frozen standardisation constants. When supplied these REPLACE the stats that
+   * would otherwise be estimated from [trainStart, trainEnd).
+   *
+   * The live gold bot must pass these: Bybit serves only ~480 daily XAUTUSDT bars,
+   * so a self-estimated sigma runs ~32% above the validated calibration and
+   * compresses every z-score by ~25%, materially changing which days activate.
+   */
+  trainStatsOverride?: F2FTrainStats,
 ): F2FSignal[] {
   const end = signalEnd ?? candles.length;
   const fp = F2F_FIXED_PARAMS;
@@ -53,7 +62,7 @@ export function generateSignals(
   // Pre-compute indicator arrays over full candle range
   const smoothed = computeSmoothedLogPrices(candles, params.lambda);
   const deltaSmoothed = computeDeltaSmoothed(smoothed);
-  const trainStats = computeTrainStats(deltaSmoothed, trainStart, trainEnd);
+  const trainStats = trainStatsOverride ?? computeTrainStats(deltaSmoothed, trainStart, trainEnd);
   const zScores = computeZScores(deltaSmoothed, trainStats, fp.zScoreClipMin, fp.zScoreClipMax);
   const ewmaVol = computeEWMAVol(candles, params.theta);
   const atr = computeATR(candles, fp.atrPeriod);

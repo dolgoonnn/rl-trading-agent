@@ -370,6 +370,10 @@ function processTick(
     candles.length - 1,
     candles.length,
     opts.regimeFilter,
+    // Pass the FROZEN constants through. Without this the strategy silently
+    // self-estimates from ~480 XAUT bars (sigma ~32% high, z compressed ~25%),
+    // which is the calibration drift the frozen values exist to prevent.
+    opts.trainStats,
   );
 
   if (signals.length === 0) {
