@@ -84,8 +84,20 @@ export function readGoldSleeve(dataDir: string = defaultDataDir()): SleeveSummar
   return summarizeSleeve('gold F2F', pnls, d?.position ? 1 : 0, d?.equity ?? SLEEVE_STARTING_EQUITY);
 }
 
+export function readLetfSleeve(dataDir: string = defaultDataDir()): SleeveSummary {
+  const d = readJson(path.join(dataDir, 'letf-bot-state.json')) as
+    | { trades?: Array<{ pnlPct: number }>; instruments?: Record<string, { position?: unknown }> }
+    | null;
+  const trades = d?.trades ?? [];
+  // LETF state stores PERCENT (metals convention, see run-letf-bot.ts); normalize to FRACTION.
+  const pnls = trades.map((t) => t.pnlPct / 100);
+  const open = d?.instruments ? Object.values(d.instruments).filter((i) => i.position).length : 0;
+  const equity = SLEEVE_STARTING_EQUITY * (1 + pnls.reduce((a, p) => a + p, 0));
+  return summarizeSleeve('LETF close-flow', pnls, open, equity);
+}
+
 export function readAllSleeves(dataDir: string = defaultDataDir()): SleeveSummary[] {
-  return [readCryptoSleeve(dataDir), readMetalsSleeve(dataDir), readGoldSleeve(dataDir)];
+  return [readCryptoSleeve(dataDir), readMetalsSleeve(dataDir), readGoldSleeve(dataDir), readLetfSleeve(dataDir)];
 }
 
 export interface OpenPosition {
@@ -229,6 +241,24 @@ export function readOpenPositions(dataDir: string = defaultDataDir()): OpenPosit
       progress, progressKind: progress === null ? null : 'time', expectedHoldMs: window,
     });
   }
+  // LETF close-flow: per-instrument open position in JSON (exits at the 16:00 ET
+  // mark, ~1h max hold, so progress is elapsed-vs-window like session legs).
+  const letf = readJson(path.join(dataDir, 'letf-bot-state.json')) as
+    | { instruments?: Record<string, { position?: { side?: string; entryPrice?: number; entryTime?: number } | null }> }
+    | null;
+  for (const [instrument, inst] of Object.entries(letf?.instruments ?? {})) {
+    const p = inst.position;
+    if (!p) continue;
+    const entryTs = p.entryTime ?? 0;
+    const window = 3_600_000; // enter 15:00-15:30 ET, exit 16:00 ET
+    const progress = entryTs > 0 ? clamp01((Date.now() - entryTs) / window) : null;
+    out.push({
+      sleeve: 'letf', symbol: `close-flow ${instrument}`, direction: p.side ?? '—',
+      entryPrice: p.entryPrice ?? 0, sizeUsdt: null, entryTimestamp: entryTs, strategy: 'letf_close_flow',
+      stopLoss: null, takeProfit: null, currentPrice: null, unrealizedPct: null,
+      progress, progressKind: progress === null ? null : 'time', expectedHoldMs: window,
+    });
+  }
   return out;
 }
 
@@ -284,7 +314,17 @@ export function readRecentTrades(limit: number, dataDir: string = defaultDataDir
     // Metals state stores PERCENT (see run-metals-bot.ts); readers normalize to FRACTION.
     out.push({ id: metalsTradeId(t), sleeve: 'metals', symbol: t.leg ?? 'metals', direction: t.side ?? '—', entryTimestamp: t.entryTime ? Date.parse(t.entryTime) : 0, exitTimestamp: t.exitTime ? Date.parse(t.exitTime) : 0, pnlPct: (t.pnlPct ?? 0) / 100, pnlUsdt: null, exitReason: t.stale ? 'stale (downtime)' : null });
   }
+  const letf = readJson(path.join(dataDir, 'letf-bot-state.json')) as { trades?: Array<{ instrument?: string; side?: string; entryTime?: string; exitTime?: string; pnlPct?: number }> } | null;
+  for (const t of letf?.trades ?? []) {
+    // LETF state stores PERCENT (metals convention); readers normalize to FRACTION.
+    out.push({ id: letfTradeId(t), sleeve: 'letf', symbol: `close-flow ${t.instrument ?? '?'}`, direction: t.side ?? '—', entryTimestamp: t.entryTime ? Date.parse(t.entryTime) : 0, exitTimestamp: t.exitTime ? Date.parse(t.exitTime) : 0, pnlPct: (t.pnlPct ?? 0) / 100, pnlUsdt: null, exitReason: null });
+  }
   return out.sort((a, b) => b.exitTimestamp - a.exitTimestamp).slice(0, limit);
+}
+
+/** Stable synthetic id for an LETF trade (instrument + exit time is unique: max 1 trade/day/instrument). */
+function letfTradeId(t: { instrument?: string; exitTime?: string }): string {
+  return `letf:${t.instrument ?? 'na'}:${t.exitTime ? Date.parse(t.exitTime) : 0}`;
 }
 
 export interface EquityPoint { timestamp: number; equity: number; drawdown: number }
@@ -654,4 +694,61 @@ export function summariseAttribution(legs: LegAttribution[]): AttributionSummary
     && Math.abs(topDetractor.netPnlPct) > Math.abs(restNetPnlPct)
     && Math.abs(topDetractor.netPnlPct) > Math.abs(secondWorst) * 1.5;
   return { total, topDetractor, topContributor, restNetPnlPct, dominatedByOneLeg };
+}
+
+/**
+ * Book-level equity curve, reconstructed from the closed trades of ALL sleeves.
+ *
+ * Equity SNAPSHOTS only exist for crypto, so plotting them showed a flat line at
+ * the crypto notional while the book was down several percent from metals — a
+ * chart that contradicted its own headline. Each sleeve runs the same starting
+ * notional, so the book is the sum of the three sleeve equities through time:
+ * every trade moves the book by its own pnl fraction divided by the sleeve count.
+ *
+ * Downtime-stranded trades are EXCLUDED: they are unmanaged drift booked while
+ * the bot was down, not strategy equity.
+ */
+export function readBookEquityCurve(dataDir: string = defaultDataDir()): EquityPoint[] {
+  const events: Array<{ t: number; pnl: number }> = [];
+
+  const db = openReadonly(dataDir);
+  if (db) {
+    try {
+      if (tableExists(db, 'bot_trades')) {
+        const rows = db.prepare('SELECT exit_timestamp, pnl_percent FROM bot_trades').all() as Array<{ exit_timestamp: number; pnl_percent: number }>;
+        for (const r of rows) events.push({ t: r.exit_timestamp, pnl: r.pnl_percent });
+      }
+    } finally {
+      db.close();
+    }
+  }
+
+  const gold = readJson(path.join(dataDir, 'gold-bot-state.json')) as
+    | { trades?: Array<{ exitTime?: string; pnlPct?: number; pnlPercent?: number }> } | null;
+  for (const t of gold?.trades ?? []) {
+    events.push({ t: t.exitTime ? Date.parse(t.exitTime) : 0, pnl: t.pnlPct ?? t.pnlPercent ?? 0 });
+  }
+
+  const metals = readJson(path.join(dataDir, 'metals-bot-state.json')) as
+    | { trades?: Array<{ exitTime?: string; pnlPct?: number; stale?: boolean }> } | null;
+  for (const t of metals?.trades ?? []) {
+    if (t.stale === true) continue; // drift, not strategy
+    events.push({ t: t.exitTime ? Date.parse(t.exitTime) : 0, pnl: (t.pnlPct ?? 0) / 100 });
+  }
+
+  if (events.length === 0) return [];
+  events.sort((a, b) => a.t - b.t);
+
+  const SLEEVES = 3;
+  const start = SLEEVE_STARTING_EQUITY * SLEEVES;
+  let cum = 0;
+  let peak = start;
+  const out: EquityPoint[] = [];
+  for (const e of events) {
+    cum += e.pnl / SLEEVES; // each sleeve carries an equal share of the book
+    const equity = start * (1 + cum);
+    if (equity > peak) peak = equity;
+    out.push({ timestamp: e.t, equity, drawdown: peak > 0 ? (peak - equity) / peak : 0 });
+  }
+  return out;
 }

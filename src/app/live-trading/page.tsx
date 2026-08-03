@@ -18,8 +18,9 @@ import { CostPanel } from '@/components/live-trading/CostPanel';
  * they stop occupying the top-left attention zone while they are still noise.
  */
 export default function LiveTradingPage() {
-  const curve = trpc.dashboard.book.equityCurve.useQuery(undefined, { refetchInterval: 30_000 });
-  const dd = trpc.dashboard.book.drawdownCurve.useQuery(undefined, { refetchInterval: 30_000 });
+  // Plot the BOOK, not the crypto sleeve — the sleeve series sits flat at its
+  // notional while other sleeves move, which made the chart contradict the headline.
+  const curve = trpc.dashboard.book.bookEquityCurve.useQuery(undefined, { refetchInterval: 30_000 });
   const stats = trpc.dashboard.book.stats.useQuery(undefined, { refetchInterval: 30_000 });
   const [showAnalytics, setShowAnalytics] = useState(false);
 
@@ -42,8 +43,11 @@ export default function LiveTradingPage() {
       <OpenPositionsTable />
 
       <section className="rounded-lg border border-gray-800 p-4">
-        <h2 className="mb-2 text-lg font-semibold">Equity &amp; drawdown</h2>
-        <EquityCurveChart points={curve.data?.crypto ?? []} drawdown={dd.data ?? []} />
+        <h2 className="mb-2 text-lg font-semibold">Book equity &amp; drawdown</h2>
+        <p className="mb-3 text-xs text-zinc-500">
+          All sleeves combined, rebuilt from closed trades. Downtime-stranded fills are excluded.
+        </p>
+        <EquityCurveChart points={curve.data ?? []} drawdown={curve.data ?? []} />
       </section>
 
       {/* 4. Detail — click any row for why the trade opened and closed. */}

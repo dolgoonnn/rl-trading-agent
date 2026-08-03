@@ -5,7 +5,7 @@ import {
   readAllSleeves, readOpenPositions, readRecentTrades, readEquityCurve,
   readFreshness, readGovernance,
   readTradeDetail, readAllTradesForStats, readDrawdownCurve, readCosts,
-  readLegAttribution, summariseAttribution,
+  readLegAttribution, summariseAttribution, readBookEquityCurve,
 } from '../../../bot/sleeve-readers';
 import { combineSleeves } from '../../../bot/track-record';
 import { computePerfStats, groupBy, confluenceBucket, MIN_TRADES_FOR_STATS } from '../../../bot/trade-analytics';
@@ -80,6 +80,13 @@ export const bookRouter = router({
     const legs = readLegAttribution(dataDir());
     return { legs, summary: summariseAttribution(legs) };
   }),
+
+  /**
+   * Book-level equity through time, rebuilt from every sleeve's closed trades.
+   * `equityCurve` remains the crypto-snapshot series for the sleeve view; this is
+   * what the headline chart plots, so the chart and the headline agree.
+   */
+  bookEquityCurve: publicProcedure.query(() => readBookEquityCurve(dataDir())),
 
   drawdownCurve: publicProcedure.query(() => readDrawdownCurve(dataDir())),
 });
