@@ -109,3 +109,45 @@ describe('open position live progress', () => {
     expect(p?.unrealizedPct).toBeNull();
   });
 });
+
+describe('session legs with a live mark', () => {
+  it('computes unrealised P&L once the bot persists a quote', () => {
+    const entry = Date.now() - 2 * 3_600_000;
+    fs.writeFileSync(path.join(dir, 'metals-bot-state.json'), JSON.stringify({
+      trades: [],
+      positions: [{
+        leg: 'overnight', metal: 'gold', side: 'long',
+        entryPrice: 4000, entryTime: entry,
+        lastPrice: 4040, lastPriceTime: Date.now(),
+      }],
+    }));
+    const p = readOpenPositions(dir).find((x) => x.sleeve === 'metals');
+    expect(p?.currentPrice).toBe(4040);
+    expect(p?.unrealizedPct).toBeCloseTo(0.01); // long, +1%
+    // Progress stays TIME-based — these legs still exit on the clock.
+    expect(p?.progressKind).toBe('time');
+  });
+
+  it('is direction-aware for a short leg', () => {
+    fs.writeFileSync(path.join(dir, 'metals-bot-state.json'), JSON.stringify({
+      trades: [],
+      positions: [{
+        leg: 'fix-short', metal: 'gold', side: 'short',
+        entryPrice: 4000, entryTime: Date.now() - 1800_000,
+        lastPrice: 3960, lastPriceTime: Date.now(),
+      }],
+    }));
+    const p = readOpenPositions(dir).find((x) => x.sleeve === 'metals');
+    expect(p?.unrealizedPct).toBeCloseTo(0.01); // short profits when price falls
+  });
+
+  it('still reports null when no quote has been persisted yet', () => {
+    fs.writeFileSync(path.join(dir, 'metals-bot-state.json'), JSON.stringify({
+      trades: [],
+      positions: [{ leg: 'overnight', metal: 'gold', side: 'long', entryPrice: 4000, entryTime: Date.now() }],
+    }));
+    const p = readOpenPositions(dir).find((x) => x.sleeve === 'metals');
+    expect(p?.currentPrice).toBeNull();
+    expect(p?.unrealizedPct).toBeNull();
+  });
+});

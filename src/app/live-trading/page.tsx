@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { trpc } from '@/lib/trpc/client';
 import { BookStory } from '@/components/live-trading/BookStory';
-import { BookHeader } from '@/components/live-trading/BookHeader';
+import { HealthStrip } from '@/components/live-trading/HealthStrip';
 import { EquityCurveChart } from '@/components/live-trading/EquityCurveChart';
 import { OpenPositionsTable } from '@/components/live-trading/OpenPositionsTable';
 import { RecentTradesTable } from '@/components/live-trading/RecentTradesTable';
@@ -35,8 +35,8 @@ export default function LiveTradingPage() {
       {/* 1. The story: what the book did, and which leg drove it. */}
       <BookStory />
 
-      {/* 2. Is anything actually wrong? Freshness, governance, halts. */}
-      <BookHeader />
+      {/* 2. Is anything actually wrong? Governance, feed freshness, "as of". */}
+      <HealthStrip />
 
       {/* 3. Live state. */}
       <SleeveCards />
