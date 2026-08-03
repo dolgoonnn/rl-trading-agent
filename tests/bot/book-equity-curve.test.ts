@@ -16,13 +16,15 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import Database from 'better-sqlite3';
-import { readBookEquityCurve, SLEEVE_STARTING_EQUITY } from '../../src/lib/bot/sleeve-readers';
+import { readBookEquityCurve, readAllSleeves, SLEEVE_STARTING_EQUITY } from '../../src/lib/bot/sleeve-readers';
 
 let dir: string;
 beforeEach(() => { dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bookeq-')); });
 afterEach(() => { fs.rmSync(dir, { recursive: true, force: true }); });
 
-const BOOK_START = SLEEVE_STARTING_EQUITY * 3;
+/** Sleeve count is derived, not fixed — sleeves get added over time. */
+function bookStart(d: string): number { return SLEEVE_STARTING_EQUITY * readAllSleeves(d).length; }
+function sleeves(d: string): number { return readAllSleeves(d).length; }
 
 function seedMetals(trades: Array<{ pnlPct: number; exit: string }>): void {
   fs.writeFileSync(path.join(dir, 'metals-bot-state.json'), JSON.stringify({
@@ -43,8 +45,8 @@ describe('readBookEquityCurve', () => {
     ]);
     const pts = readBookEquityCurve(dir);
     expect(pts).toHaveLength(2);
-    expect(pts[0]?.equity).toBeCloseTo(BOOK_START * (1 - 0.01 / 3), 2);
-    expect(pts[1]?.equity).toBeCloseTo(BOOK_START * (1 + (-0.01 + 0.005) / 3), 2);
+    expect(pts[0]?.equity).toBeCloseTo(bookStart(dir) * (1 - 0.01 / sleeves(dir)), 2);
+    expect(pts[1]?.equity).toBeCloseTo(bookStart(dir) * (1 + (-0.01 + 0.005) / sleeves(dir)), 2);
   });
 
   it('is chronological even when sleeves are read out of order', () => {
@@ -80,7 +82,7 @@ describe('readBookEquityCurve', () => {
     }));
     const pts = readBookEquityCurve(dir);
     expect(pts).toHaveLength(1); // the stale one is skipped entirely
-    expect(pts[0]?.equity).toBeCloseTo(BOOK_START * (1 + 0.01 / 3), 2);
+    expect(pts[0]?.equity).toBeCloseTo(bookStart(dir) * (1 + 0.01 / sleeves(dir)), 2);
   });
 
   it('returns an empty series on a fresh volume', () => {

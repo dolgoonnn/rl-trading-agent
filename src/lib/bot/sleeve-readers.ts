@@ -758,7 +758,9 @@ export function readBookEquityCurve(dataDir: string = defaultDataDir()): EquityP
   if (events.length === 0) return [];
   events.sort((a, b) => a.t - b.t);
 
-  const SLEEVES = 3;
+  // Derive the sleeve count — do NOT hardcode. Sleeves get added (letf was the
+  // fourth), and a stale constant would silently mis-scale the whole curve.
+  const SLEEVES = Math.max(1, readAllSleeves(dataDir).length);
   const start = SLEEVE_STARTING_EQUITY * SLEEVES;
   let cum = 0;
   let peak = start;
