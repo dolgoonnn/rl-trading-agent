@@ -59,6 +59,15 @@ interface Position {
   side: 'long' | 'short';
   entryPrice: number;
   entryTime: number;
+  /**
+   * Last observed market price for this instrument, refreshed every tick.
+   * The bot already fetches these quotes to decide exits; persisting the latest
+   * one is what lets the dashboard show unrealised P&L on an open session leg
+   * instead of "no live mark for this sleeve". Read-only for the strategy —
+   * nothing here influences entries or exits.
+   */
+  lastPrice?: number;
+  lastPriceTime?: number;
 }
 
 interface TradeLog {
@@ -232,6 +241,16 @@ async function tick(state: BotState): Promise<void> {
     const q = await fetchQuote(metal);
     if (q && now - q.ts <= QUOTE_STALE_MS) quotes[metal] = q;
     else vlog(`${metal}: quote stale/unavailable (market closed?)`);
+  }
+
+  // Refresh the live mark on every open position so the dashboard can show
+  // unrealised P&L. Purely observational — exits are still decided by the clock.
+  for (const pos of state.positions) {
+    const q = quotes[pos.metal];
+    if (q) {
+      pos.lastPrice = q.price;
+      pos.lastPriceTime = q.ts;
+    }
   }
 
   const overnightOpen = (metal: 'gold' | 'silver') =>

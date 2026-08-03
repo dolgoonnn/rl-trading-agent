@@ -224,7 +224,12 @@ export function readOpenPositions(dataDir: string = defaultDataDir()): OpenPosit
     });
   }
   // Metals: open legs in JSON.
-  const metals = readJson(path.join(dataDir, 'metals-bot-state.json')) as { positions?: Array<{ leg?: string; direction?: string; entryPrice?: number; entryTime?: number }> } | null;
+  const metals = readJson(path.join(dataDir, 'metals-bot-state.json')) as {
+    positions?: Array<{
+      leg?: string; direction?: string; side?: string; entryPrice?: number; entryTime?: number;
+      lastPrice?: number; lastPriceTime?: number;
+    }>;
+  } | null;
   for (const p of metals?.positions ?? []) {
     const leg = p.leg ?? 'metals';
     const entryTs = p.entryTime ?? 0;
@@ -234,10 +239,19 @@ export function readOpenPositions(dataDir: string = defaultDataDir()): OpenPosit
     const progress = window !== null && entryTs > 0
       ? clamp01((Date.now() - entryTs) / window)
       : null;
+    // The metals bot persists the latest quote on each open leg, so unrealised
+    // P&L is available even though these legs carry no stop or target.
+    const dir0 = p.direction ?? p.side ?? '—';
+    const entryPx = p.entryPrice ?? 0;
+    const mark = typeof p.lastPrice === 'number' ? p.lastPrice : null;
+    const unreal = mark === null || entryPx === 0
+      ? null
+      : (dir0 === 'short' ? entryPx - mark : mark - entryPx) / entryPx;
     out.push({
-      sleeve: 'metals', symbol: leg, direction: p.direction ?? '—',
-      entryPrice: p.entryPrice ?? 0, sizeUsdt: null, entryTimestamp: entryTs, strategy: 'session',
-      stopLoss: null, takeProfit: null, currentPrice: null, unrealizedPct: null,
+      sleeve: 'metals', symbol: leg, direction: dir0,
+      entryPrice: entryPx, sizeUsdt: null, entryTimestamp: entryTs, strategy: 'session',
+      stopLoss: null, takeProfit: null, currentPrice: mark, unrealizedPct: unreal,
+      // Progress stays TIME-based: these legs exit on the clock, not on a target.
       progress, progressKind: progress === null ? null : 'time', expectedHoldMs: window,
     });
   }
