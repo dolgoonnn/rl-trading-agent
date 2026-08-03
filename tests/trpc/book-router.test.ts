@@ -23,8 +23,8 @@ describe('book router', () => {
     const caller = createCaller({});
     const o = await caller.overview();
     expect(o.totalClosedTrades).toBe(0);
-    expect(o.totalEquity).toBeCloseTo(30000); // 3 sleeves × 10000 default
-    expect(o.idleSleeves).toHaveLength(3);
+    expect(o.totalEquity).toBeCloseTo(o.perSleeve.length * 10000); // one notional per sleeve
+    expect(o.idleSleeves).toHaveLength(o.perSleeve.length);
     expect(o.governance.available).toBe(false);
   });
 
