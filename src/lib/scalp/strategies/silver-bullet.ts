@@ -27,9 +27,24 @@ import type { ScalpStrategy, ScalpStrategySignal } from './types';
 const LOOKBACK_5M = 100;
 const LOOKBACK_1H = 100;
 
-/** Silver Bullet window: 15:00-16:00 UTC (10:00-11:00 AM EST) */
-const SB_HOUR_START = 15;
-const SB_HOUR_END = 16;
+/**
+ * Silver Bullet window: 10:00-11:00 AM NEW YORK time. The window is defined
+ * on the NY clock, so the UTC hour shifts with DST — the old fixed 15:00 UTC
+ * check was an hour late half the year.
+ */
+const SB_NY_HOUR = 10;
+
+/** NY UTC-offset hours (DST-aware), canonical form from analyze-combo-portfolio.ts */
+function nyOffsetHoursSB(ts: number): number {
+  const y = new Date(ts).getUTCFullYear();
+  const nth = (mo: number, n: number): number => {
+    const dow = new Date(Date.UTC(y, mo, 1)).getUTCDay();
+    return Date.UTC(y, mo, 1 + ((7 - dow) % 7) + (n - 1) * 7);
+  };
+  const start = nth(2, 2) + 7 * 3_600_000;
+  const end = nth(10, 1) + 6 * 3_600_000;
+  return ts >= start && ts < end ? -4 : -5;
+}
 
 export class SilverBulletStrategy implements ScalpStrategy {
   name = 'silver_bullet' as const;
@@ -54,8 +69,8 @@ export class SilverBulletStrategy implements ScalpStrategy {
     if (!current) return null;
 
     // 1. Time window filter: 15:00-16:00 UTC only
-    const hour = new Date(current.timestamp).getUTCHours();
-    if (hour < SB_HOUR_START || hour >= SB_HOUR_END) return null;
+    const nyHour = new Date(current.timestamp + nyOffsetHoursSB(current.timestamp) * 3_600_000).getUTCHours();
+    if (nyHour !== SB_NY_HOUR) return null;
 
     // 2. 1H bias
     const htfBias = this.getHTFBias(candles1h, htfIndex);
@@ -141,7 +156,7 @@ export class SilverBulletStrategy implements ScalpStrategy {
       confidence: score / 10,
       strategy: 'order_block',
       reasoning: [
-        `Silver Bullet window (${SB_HOUR_START}:00-${SB_HOUR_END}:00 UTC)`,
+        `Silver Bullet window (${SB_NY_HOUR}:00-${SB_NY_HOUR + 1}:00 NY)`,
         `FVG CE distance: ${(bestDist * 100).toFixed(2)}%`,
         `FVG size: ${((fvgSize / price) * 100).toFixed(2)}%`,
       ],
