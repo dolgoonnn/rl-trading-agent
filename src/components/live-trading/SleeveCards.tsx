@@ -29,6 +29,12 @@ function explainSleeve(s: { label: string; closedTrades: number; openPositions: 
     return 'Flat until the next daily signal.';
   }
 
+  if (s.label.startsWith('LETF')) {
+    if (s.openPositions > 0) return 'In the close window — exits at the 16:00 ET mark.';
+    if (s.closedTrades === 0) return 'Flat. Fires only on top-5% move days into the NY close (~2-4 trades/month across silver + gold), so long quiet stretches are the design.';
+    return 'Flat — waiting for the next tail-day close window.';
+  }
+
   // session/metals
   if (s.openPositions > 0) {
     return isWeekend

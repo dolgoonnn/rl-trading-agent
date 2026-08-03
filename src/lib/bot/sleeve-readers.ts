@@ -526,6 +526,25 @@ export function readTradeDetail(id: string, dataDir: string = defaultDataDir()):
       };
     }
   }
+  const letfState = readJson(path.join(dataDir, 'letf-bot-state.json')) as
+    | { trades?: Array<{ instrument?: string; side?: string; sig?: number; threshold?: number; entryPrice?: number; exitPrice?: number; entryTime?: string; exitTime?: string; pnlPct?: number }> }
+    | null;
+  for (const t of letfState?.trades ?? []) {
+    const tid = letfTradeId(t);
+    if (tid === id) {
+      // LETF state stores PERCENT (metals convention); readers normalize to FRACTION.
+      return {
+        ...NOT_FOUND, found: true, id: tid, sleeve: 'letf', symbol: `close-flow ${t.instrument ?? '?'}`,
+        direction: t.side ?? '—', entryPrice: t.entryPrice ?? null, exitPrice: t.exitPrice ?? null,
+        entryTimestamp: t.entryTime ? Date.parse(t.entryTime) : 0,
+        exitTimestamp: t.exitTime ? Date.parse(t.exitTime) : 0,
+        pnlPct: (t.pnlPct ?? 0) / 100,
+        exitReason: t.sig !== undefined && t.threshold !== undefined
+          ? `sig ${(t.sig * 1e4).toFixed(0)}bp vs thr ${(t.threshold * 1e4).toFixed(0)}bp`
+          : null,
+      };
+    }
+  }
   return NOT_FOUND;
 }
 
