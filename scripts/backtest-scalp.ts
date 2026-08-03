@@ -33,6 +33,7 @@ import { ATRBreakoutStrategy } from '../src/lib/scalp/strategies/atr-breakout';
 import { SilverBulletStrategy } from '../src/lib/scalp/strategies/silver-bullet';
 import { SessionRangeStrategy } from '../src/lib/scalp/strategies/session-range';
 import { SweepChochStrategy } from '../src/lib/scalp/strategies/sweep-choch';
+import { SweepDisplacementFVGStrategy } from '../src/lib/scalp/strategies/sweep-displacement-fvg';
 import type { ScalpStrategy, ScalpStrategyName, KillZoneMode, ICT5mConfig, SweepChochConfig } from '../src/lib/scalp/strategies/types';
 import { DEFAULT_SCALP_CONFIG, DEFAULT_ICT5M_CONFIG, DEFAULT_SWEEP_CHOCH_CONFIG } from '../src/lib/scalp/strategies/types';
 import { detectRegime, regimeLabel } from '../src/lib/ict/regime-detector';
@@ -134,8 +135,15 @@ function createStrategy(
       return new SessionRangeStrategy();
     case 'sweep_choch':
       return new SweepChochStrategy(sweepChochConfig);
+    case 'sweep_disp_fvg':
+      return new SweepDisplacementFVGStrategy({
+        ...(sweepChochConfig?.swingLookback !== undefined && { swingLookback: sweepChochConfig.swingLookback }),
+        ...(sweepChochConfig?.slAtrBuffer !== undefined && { slAtrBuffer: sweepChochConfig.slAtrBuffer }),
+        ...(sweepChochConfig?.targetR !== undefined && { targetR: sweepChochConfig.targetR }),
+        ...(getArg('sdf-mode') && { mode: getArg('sdf-mode') as 'reversal' | 'continuation' }),
+      });
     default:
-      throw new Error(`Unknown scalp strategy: ${name}. Available: ict_5m, mean_reversion, bb_squeeze, atr_breakout, silver_bullet, session_range, sweep_choch`);
+      throw new Error(`Unknown scalp strategy: ${name}. Available: ict_5m, mean_reversion, bb_squeeze, atr_breakout, silver_bullet, session_range, sweep_choch, sweep_disp_fvg`);
   }
 }
 

@@ -15,7 +15,8 @@ export type ScalpStrategyName =
   | 'atr_breakout'
   | 'silver_bullet'
   | 'session_range'
-  | 'sweep_choch';
+  | 'sweep_choch'
+  | 'sweep_disp_fvg';
 
 /** Kill zone mode for crypto-specific session tuning */
 export type KillZoneMode =
