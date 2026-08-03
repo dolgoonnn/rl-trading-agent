@@ -453,3 +453,101 @@ export function readCosts(dataDir: string = defaultDataDir()): CostSummary {
     db.close();
   }
 }
+
+// ============================================================================
+// Book attribution — "what moved the number"
+// ============================================================================
+
+/** One leg's contribution to the book. */
+export interface LegAttribution {
+  leg: string;
+  sleeve: string;
+  n: number;
+  /** Net contribution as a FRACTION (0.015 = +1.5%). */
+  netPnlPct: number;
+  winRate: number;
+  /** Trades flagged downtime-stranded — drift, not strategy. */
+  staleCount: number;
+}
+
+/**
+ * Per-leg P&L decomposition, biggest absolute impact first.
+ *
+ * The dashboard headline needs to state WHICH leg moved the book, not just the
+ * total — a bare figure with no decomposition is what forced every "why did it
+ * go negative?" question to be answered by hand.
+ */
+export function readLegAttribution(dataDir: string = defaultDataDir()): LegAttribution[] {
+  const acc = new Map<string, LegAttribution>();
+  const add = (leg: string, sleeve: string, pnlFraction: number, stale: boolean): void => {
+    const key = `${sleeve}:${leg}`;
+    const cur = acc.get(key) ?? { leg, sleeve, n: 0, netPnlPct: 0, winRate: 0, staleCount: 0 };
+    cur.n += 1;
+    cur.netPnlPct += pnlFraction;
+    if (pnlFraction > 0) cur.winRate += 1; // running win count; normalised below
+    if (stale) cur.staleCount += 1;
+    acc.set(key, cur);
+  };
+
+  // Crypto: bot_trades, grouped by strategy (its "leg").
+  const db = openReadonly(dataDir);
+  if (db) {
+    try {
+      if (tableExists(db, 'bot_trades')) {
+        const rows = db.prepare('SELECT strategy, pnl_percent FROM bot_trades').all() as Array<{ strategy: string; pnl_percent: number }>;
+        for (const r of rows) add(r.strategy, 'crypto', r.pnl_percent, false);
+      }
+    } finally {
+      db.close();
+    }
+  }
+
+  // Gold: JSON state (already fraction-scale).
+  const gold = readJson(path.join(dataDir, 'gold-bot-state.json')) as
+    | { trades?: Array<{ pnlPct?: number; pnlPercent?: number }> } | null;
+  for (const t of gold?.trades ?? []) add('f2f_gold', 'gold', t.pnlPct ?? t.pnlPercent ?? 0, false);
+
+  // Metals: JSON state stores PERCENT — normalise to fraction (see legWeight note).
+  const metals = readJson(path.join(dataDir, 'metals-bot-state.json')) as
+    | { trades?: Array<{ leg?: string; pnlPct?: number; stale?: boolean }> } | null;
+  for (const t of metals?.trades ?? []) {
+    add(t.leg ?? 'metals', 'metals', (t.pnlPct ?? 0) / 100, t.stale === true);
+  }
+
+  return [...acc.values()]
+    .map((l) => ({ ...l, winRate: l.n > 0 ? l.winRate / l.n : 0 }))
+    .sort((a, b) => Math.abs(b.netPnlPct) - Math.abs(a.netPnlPct));
+}
+
+/** The headline story: which leg dominates, and what the rest did. */
+export interface AttributionSummary {
+  total: number;
+  topDetractor: LegAttribution | null;
+  topContributor: LegAttribution | null;
+  /** Net of everything EXCEPT the top detractor. */
+  restNetPnlPct: number;
+  /**
+   * True when a single losing leg outweighs everything else combined — the case
+   * where "one leg did this" is an honest headline rather than a cherry-pick.
+   */
+  dominatedByOneLeg: boolean;
+}
+
+export function summariseAttribution(legs: LegAttribution[]): AttributionSummary {
+  const total = legs.reduce((a, l) => a + l.netPnlPct, 0);
+  if (legs.length === 0) {
+    return { total: 0, topDetractor: null, topContributor: null, restNetPnlPct: 0, dominatedByOneLeg: false };
+  }
+  const losers = legs.filter((l) => l.netPnlPct < 0).sort((a, b) => a.netPnlPct - b.netPnlPct);
+  const winners = legs.filter((l) => l.netPnlPct > 0).sort((a, b) => b.netPnlPct - a.netPnlPct);
+  const topDetractor = losers[0] ?? null;
+  const topContributor = winners[0] ?? null;
+  const restNetPnlPct = topDetractor ? total - topDetractor.netPnlPct : total;
+  // Dominated when the worst leg is more negative than everything else is positive,
+  // AND it is materially worse than the next-worst (not just first alphabetically).
+  const secondWorst = losers[1]?.netPnlPct ?? 0;
+  const dominatedByOneLeg = topDetractor !== null
+    && Math.abs(topDetractor.netPnlPct) > Math.abs(restNetPnlPct)
+    && Math.abs(topDetractor.netPnlPct) > Math.abs(secondWorst) * 1.5;
+  return { total, topDetractor, topContributor, restNetPnlPct, dominatedByOneLeg };
+}

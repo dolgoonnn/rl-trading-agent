@@ -5,6 +5,7 @@ import {
   readAllSleeves, readOpenPositions, readRecentTrades, readEquityCurve,
   readFreshness, readGovernance,
   readTradeDetail, readAllTradesForStats, readDrawdownCurve, readCosts,
+  readLegAttribution, summariseAttribution,
 } from '../../../bot/sleeve-readers';
 import { combineSleeves } from '../../../bot/track-record';
 import { computePerfStats, groupBy, confluenceBucket, MIN_TRADES_FOR_STATS } from '../../../bot/trade-analytics';
@@ -70,6 +71,15 @@ export const bookRouter = router({
   }),
 
   costs: publicProcedure.query(() => readCosts(dataDir())),
+
+  /**
+   * "What moved the number" — per-leg decomposition plus the headline story.
+   * The page states the story; the tables below it carry the detail.
+   */
+  attribution: publicProcedure.query(() => {
+    const legs = readLegAttribution(dataDir());
+    return { legs, summary: summariseAttribution(legs) };
+  }),
 
   drawdownCurve: publicProcedure.query(() => readDrawdownCurve(dataDir())),
 });

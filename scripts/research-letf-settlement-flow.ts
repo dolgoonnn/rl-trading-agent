@@ -214,6 +214,10 @@ async function main(): Promise<void> {
     // BTC: BITX/BTCL 2x complexes (NAV strike 16:00 ET, hedged via CME/spot).
     // Bybit perp is the user's native venue — real 1bp maker costs.
     { name: 'BTC (BITX 2x complex, Bybit perp venue)', files: ['BTCUSDT_1m.json'] },
+    // Oil/natgas: UCO/SCO and BOIL/KOLD — the best LETF flow/depth ratios
+    // after silver. Dukascopy CFD 1m (2022+), free.
+    { name: 'WTI (UCO/SCO 2x oil complex)', files: ['WTI_1m.json'] },
+    { name: 'NATGAS (BOIL/KOLD 2x natgas complex)', files: ['NATGAS_1m.json'] },
   ].filter((m) => m.files.every((f) => fs.existsSync(path.resolve(__dirname, '..', 'data', f))));
 
   for (const metal of universe) {
