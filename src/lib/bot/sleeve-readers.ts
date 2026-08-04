@@ -787,3 +787,90 @@ export function readBookEquityCurve(dataDir: string = defaultDataDir()): EquityP
   }
   return out;
 }
+
+// ============================================================================
+// Trade chart — see the market, not just the number
+// ============================================================================
+
+export interface ChartCandle {
+  timestamp: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+}
+
+export interface TradeChart {
+  available: boolean;
+  /** Why there is no chart, when there isn't one. */
+  reason: string | null;
+  symbol: string;
+  direction: string;
+  candles: ChartCandle[];
+  entryTimestamp: number;
+  exitTimestamp: number;
+  entryPrice: number | null;
+  exitPrice: number | null;
+  stopLoss: number | null;
+  takeProfit: number | null;
+}
+
+/** Bars of context to show either side of the trade so the move reads in situ. */
+const CHART_PAD_BARS = 40;
+const BAR_MS = 3_600_000;
+
+const NO_CHART: TradeChart = {
+  available: false, reason: null, symbol: '', direction: '', candles: [],
+  entryTimestamp: 0, exitTimestamp: 0, entryPrice: null, exitPrice: null,
+  stopLoss: null, takeProfit: null,
+};
+
+/**
+ * Candles around a trade, plus the markers needed to draw it.
+ *
+ * Only crypto persists OHLCV (`bot_candles`). Session legs and gold quote live
+ * and never store bars, so they return `available: false` with a reason rather
+ * than an empty chart that looks like a bug.
+ */
+export function readTradeChart(id: string, dataDir: string = defaultDataDir()): TradeChart {
+  const detail = readTradeDetail(id, dataDir);
+  if (!detail.found) return { ...NO_CHART, reason: 'Trade not found.' };
+
+  const base: TradeChart = {
+    ...NO_CHART,
+    symbol: detail.symbol,
+    direction: detail.direction,
+    entryTimestamp: detail.entryTimestamp,
+    exitTimestamp: detail.exitTimestamp,
+    entryPrice: detail.entryPrice,
+    exitPrice: detail.exitPrice,
+    stopLoss: detail.stopLoss,
+    takeProfit: detail.takeProfit,
+  };
+
+  if (detail.sleeve !== 'crypto') {
+    return {
+      ...base,
+      reason: `The ${detail.sleeve} bot does not store candles — it quotes live and keeps only fills.`,
+    };
+  }
+
+  const db = openReadonly(dataDir);
+  if (!db) return { ...base, reason: 'No candle history available.' };
+  try {
+    if (!tableExists(db, 'bot_candles')) {
+      return { ...base, reason: 'No candle history available.' };
+    }
+    const from = detail.entryTimestamp - CHART_PAD_BARS * BAR_MS;
+    const to = detail.exitTimestamp + CHART_PAD_BARS * BAR_MS;
+    const rows = db.prepare(
+      'SELECT timestamp, open, high, low, close FROM bot_candles WHERE symbol = ? AND timestamp >= ? AND timestamp <= ? ORDER BY timestamp ASC',
+    ).all(detail.symbol, from, to) as ChartCandle[];
+    if (rows.length === 0) {
+      return { ...base, reason: 'No candles stored for this window.' };
+    }
+    return { ...base, available: true, candles: rows };
+  } finally {
+    db.close();
+  }
+}

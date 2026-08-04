@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { trpc } from '@/lib/trpc/client';
+import { TradeChart } from './TradeChart';
 import { formatUsd, formatPnlPct } from '@/lib/bot/format';
 
 function fmtTs(ts: number): string {
@@ -122,7 +123,7 @@ export function TradeDetailDrawer({ tradeId, onClose }: { tradeId: string | null
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/60" onClick={onClose} />
-      <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md overflow-y-auto border-l border-zinc-800 bg-zinc-950 p-4">
+      <div className="fixed inset-y-0 right-0 z-50 w-full max-w-2xl overflow-y-auto border-l border-zinc-800 bg-zinc-950 p-4">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-400">Trade detail</h2>
           <button
@@ -171,6 +172,12 @@ export function TradeDetailDrawer({ tradeId, onClose }: { tradeId: string | null
             {/* Why this trade happened, and why it ended — the two questions a
                 detail view exists to answer. Both are derivable from the leg and
                 the exit reason; neither was shown before. */}
+            {/* The market itself — where the entry landed and how price behaved. */}
+            <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
+              <h3 className="mb-2 text-xs uppercase tracking-wider text-zinc-400">Chart</h3>
+              {tradeId ? <TradeChart tradeId={tradeId} /> : null}
+            </section>
+
             <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
               <h3 className="mb-2 text-xs uppercase tracking-wider text-zinc-400">Why</h3>
               <dl className="space-y-2 text-xs">

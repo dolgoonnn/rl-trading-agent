@@ -5,7 +5,7 @@ import {
   readAllSleeves, readOpenPositions, readRecentTrades, readEquityCurve,
   readFreshness, readGovernance,
   readTradeDetail, readAllTradesForStats, readDrawdownCurve, readCosts,
-  readLegAttribution, summariseAttribution, readBookEquityCurve,
+  readLegAttribution, summariseAttribution, readBookEquityCurve, readTradeChart,
 } from '../../../bot/sleeve-readers';
 import { combineSleeves } from '../../../bot/track-record';
 import { computePerfStats, groupBy, confluenceBucket, MIN_TRADES_FOR_STATS } from '../../../bot/trade-analytics';
@@ -40,6 +40,11 @@ export const bookRouter = router({
   tradeDetail: publicProcedure
     .input(z.object({ id: z.string().min(1) }))
     .query(({ input }) => readTradeDetail(input.id, dataDir())),
+
+  /** Candles around a trade plus its markers — see the market, not just the number. */
+  tradeChart: publicProcedure
+    .input(z.object({ id: z.string().min(1) }))
+    .query(({ input }) => readTradeChart(input.id, dataDir())),
 
   stats: publicProcedure.query(() => {
     const trades = readAllTradesForStats(dataDir());
