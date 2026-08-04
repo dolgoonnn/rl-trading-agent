@@ -16,7 +16,10 @@ import * as path from 'path';
 import { WebsocketClient } from 'bybit-api';
 
 const OUT_DIR = path.resolve(__dirname, '..', 'data', 'orderflow');
-const SYMBOL = 'BTCUSDT';
+// Symbol via env so the entrypoint can run one isolated instance per market
+// (BTCUSDT since Jun-2026; XAGUSDT/XAUTUSDT added Aug-2026 for close-flow
+// entry-timing research — see gold-scalp-deep-dig memory).
+const SYMBOL = process.env.ORDERFLOW_SYMBOL ?? 'BTCUSDT';
 
 interface BookSide { [price: string]: number }
 

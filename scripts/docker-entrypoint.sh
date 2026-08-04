@@ -45,14 +45,27 @@ UI_PID=$!
 npx tsx scripts/run-letf-bot.ts --verbose &
 LETF_PID=$!
 
-echo "  crypto=$CRYPTO_PID gold=$GOLD_PID metals=$METALS_PID governor=$GOV_PID orderflow=$FLOW_PID ui=$UI_PID letf=$LETF_PID"
+# 8-9. Metals L2 collectors (non-fatal research feeds — close-flow entry timing)
+ORDERFLOW_SYMBOL=XAGUSDT npx tsx scripts/collect-btc-orderflow.ts &
+FLOW_XAG_PID=$!
+ORDERFLOW_SYMBOL=XAUTUSDT npx tsx scripts/collect-btc-orderflow.ts &
+FLOW_XAUT_PID=$!
+
+# 10. XAUT options surface collector (non-fatal — unbackfillable data moat:
+#     Bybit publishes no options history; see mechanism-edge-hunt-2)
+npx tsx scripts/collect-xaut-options.ts &
+OPT_PID=$!
+
+echo "  crypto=$CRYPTO_PID gold=$GOLD_PID metals=$METALS_PID governor=$GOV_PID orderflow=$FLOW_PID ui=$UI_PID letf=$LETF_PID xagL2=$FLOW_XAG_PID xautL2=$FLOW_XAUT_PID xautOpt=$OPT_PID"
 
 # Core processes whose death should restart the whole container.
 CORE_PIDS="$CRYPTO_PID $GOLD_PID $METALS_PID $GOV_PID"
 
+ALL_PIDS="$CRYPTO_PID $GOLD_PID $METALS_PID $GOV_PID $FLOW_PID $UI_PID $LETF_PID $FLOW_XAG_PID $FLOW_XAUT_PID $OPT_PID"
+
 cleanup() {
   echo "Received shutdown signal, stopping fleet..."
-  kill "$CRYPTO_PID" "$GOLD_PID" "$METALS_PID" "$GOV_PID" "$FLOW_PID" "$UI_PID" "$LETF_PID" 2>/dev/null || true
+  kill $ALL_PIDS 2>/dev/null || true
   wait 2>/dev/null || true
   echo "Fleet stopped."
   exit 0
@@ -69,7 +82,7 @@ while true; do
   for pid in $CORE_PIDS; do
     if ! kill -0 "$pid" 2>/dev/null; then
       echo "CORE process $pid exited — restarting container to recover clean fleet."
-      kill "$CRYPTO_PID" "$GOLD_PID" "$METALS_PID" "$GOV_PID" "$FLOW_PID" "$UI_PID" "$LETF_PID" 2>/dev/null || true
+      kill $ALL_PIDS 2>/dev/null || true
       wait 2>/dev/null || true
       exit 1
     fi
