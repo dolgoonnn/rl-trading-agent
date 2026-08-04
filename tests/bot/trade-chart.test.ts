@@ -99,7 +99,9 @@ describe('readTradeChart', () => {
     // otherwise 100% of the live book would be unchartable.
     expect(c.available).toBe(true);
     expect(c.candles.length).toBeGreaterThan(10);
-    expect(c.symbol).toContain('GC=F'); // the fixture's `metal: gold` -> Yahoo symbol
+    // The UI must name what a person recognises, not a Yahoo ticker convention.
+    expect(c.symbol).toContain('Gold futures');
+    expect(c.symbol).not.toContain('GC=F');
     expect(c.entryPrice).toBe(4000);
   });
 

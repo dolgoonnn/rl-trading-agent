@@ -833,6 +833,22 @@ const YAHOO_SYMBOL: Record<string, string> = {
   gold: 'GC=F', silver: 'SI=F', eurusd: 'EURUSD=X', us500: 'ES=F',
 };
 
+/**
+ * Human names for the venue instruments.
+ *
+ * `GC=F`/`SI=F`/`ES=F` are Yahoo ticker conventions (`=F` futures, `=X` FX) and
+ * mean nothing to a reader — the UI should name what a person recognises. These
+ * ARE futures rather than spot on purpose: the session edge only survives at
+ * futures-tier cost (~0.3-0.5bp/side; dead by 2bp), so the bot quotes the venue
+ * it could actually be traded on.
+ */
+const INSTRUMENT_LABEL: Record<string, string> = {
+  gold: 'Gold futures (COMEX GC)',
+  silver: 'Silver futures (COMEX SI)',
+  eurusd: 'EUR/USD spot',
+  us500: 'S&P 500 E-mini (CME ES)',
+};
+
 /** Default fetcher: Yahoo 5m bars. Covers ~60 days, enough for any live trade. */
 export const fetchYahooCandles: CandleFetcher = async (symbol, fromMs, toMs) => {
   const p1 = Math.floor(fromMs / 1000);
@@ -892,9 +908,10 @@ export async function readTradeChart(
   };
 
   if (detail.sleeve !== 'crypto') {
+    // Guard the instrument itself so both it and the venue symbol narrow.
     const instrument = detail.sleeve === 'metals' ? metalsInstrumentFromId(id) : null;
-    const venueSymbol = instrument ? YAHOO_SYMBOL[instrument] : undefined;
-    if (!venueSymbol) {
+    const venueSymbol = instrument === null ? undefined : YAHOO_SYMBOL[instrument];
+    if (instrument === null || venueSymbol === undefined) {
       return { ...base, reason: `No market data source mapped for the ${detail.sleeve} sleeve.` };
     }
     const pad = CHART_PAD_BARS * 5 * 60_000; // 5m bars
@@ -903,7 +920,8 @@ export async function readTradeChart(
       if (candles.length === 0) {
         return { ...base, reason: 'The venue returned no bars for this window.' };
       }
-      return { ...base, available: true, candles, symbol: `${detail.symbol} (${venueSymbol})` };
+      const label = INSTRUMENT_LABEL[instrument] ?? venueSymbol;
+      return { ...base, available: true, candles, symbol: `${detail.symbol} · ${label}` };
     } catch {
       // Never let a flaky upstream break the drawer.
       return { ...base, reason: 'Could not reach the market-data provider.' };

@@ -123,8 +123,18 @@ export function TradeChart({ tradeId }: { tradeId: string }) {
         <span><span className="text-violet-400">▼</span> exit</span>
         <span><span className="text-red-400">╌</span> stop</span>
         <span><span className="text-emerald-400">╌</span> target</span>
-        <span className="ml-auto">{data.symbol} · 1h · {data.candles.length} bars</span>
+        <span className="ml-auto">{data.symbol} · {barInterval(data.candles)} · {data.candles.length} bars</span>
       </div>
     </div>
   );
+}
+
+/** Timeframe label derived from actual bar spacing — crypto is 1h, venue fetches are 5m. */
+function barInterval(candles: Array<{ timestamp: number }>): string {
+  if (candles.length < 2) return '';
+  const gaps = candles.slice(1).map((c, i) => c.timestamp - candles[i]!.timestamp).filter((g) => g > 0).sort((a, b) => a - b);
+  const median = gaps[Math.floor(gaps.length / 2)] ?? 0;
+  const m = Math.round(median / 60_000);
+  if (m <= 0) return '';
+  return m < 60 ? `${m}m` : `${Math.round(m / 60)}h`;
 }
