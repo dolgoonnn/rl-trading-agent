@@ -82,10 +82,10 @@ export function RecentTradesTable() {
               ))}
             </tbody>
           </table>
-          {/* A pip means a different price step on each market — state it rather
-              than let the reader guess why gold moves 1,330 and EUR moves 39. */}
+          {/* A pip is the second-to-last digit of the quote, so it is a different
+              price step on each market — state it rather than let it be folklore. */}
           <p className="mt-3 text-[10px] text-zinc-600">
-            1 pip = 0.0001 EUR/USD · $0.01 gold · $0.001 silver · 0.1 US500 · $1 BTC · $0.1 ETH · $0.01 SOL
+            1 pip = 0.0001 EUR/USD · $0.10 gold · $0.01 silver · 1.0 US500 · $1 BTC · $0.10 ETH · $0.01 SOL
           </p>
         </div>
       )}

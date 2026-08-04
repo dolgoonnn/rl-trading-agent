@@ -58,23 +58,41 @@ describe('priceMove — pips, every instrument', () => {
     expect(m?.value).toBeCloseTo(39, 0);
   });
 
-  it('reads gold in pips of $0.01', () => {
+  // The pip is the second-to-last digit of the quote — the FX rule, applied to
+  // every market. A $13 gold move is 133 pips, NOT 1,330: a size that puts a
+  // routine day in the thousands is a decimal place too fine.
+  it('reads gold in pips of $0.10', () => {
     const gold = priceMove('gold', 'short', 4040, 4026.7);
     expect(gold?.unit).toBe('pips');
-    expect(gold?.pipSize).toBe(0.01);
-    expect(gold?.value).toBeCloseTo(1330, 0);
+    expect(gold?.pipSize).toBe(0.1);
+    expect(gold?.value).toBeCloseTo(133, 0);
   });
 
-  it('reads silver in pips of $0.001', () => {
+  it('reads silver in pips of $0.01', () => {
     const silver = priceMove('silver', 'long', 58, 58.348);
-    expect(silver?.unit).toBe('pips');
-    expect(silver?.value).toBeCloseTo(348, 0);
+    expect(silver?.pipSize).toBe(0.01);
+    expect(silver?.value).toBeCloseTo(34.8, 1);
   });
 
-  it('reads the index in pips of 0.1', () => {
+  it('reads the index in pips of one point', () => {
     const m = priceMove('us500', 'long', 7449.5, 7460.25);
-    expect(m?.unit).toBe('pips');
-    expect(m?.value).toBeCloseTo(107.5, 1);
+    expect(m?.pipSize).toBe(1);
+    expect(m?.value).toBeCloseTo(10.75, 2);
+  });
+
+  // Guard the scale itself: a 0.1% move must land in the tens of pips on every
+  // instrument. This is what catches a pip size that is off by a decimal.
+  it('keeps a 0.1% move in the same order of magnitude across the book', () => {
+    const cases: Array<[string, number]> = [
+      ['eurusd', 1.14], ['gold', 4055], ['silver', 58],
+      ['us500', 7443], ['btcusdt', 61000], ['ethusdt', 3000], ['solusdt', 150],
+    ];
+    for (const [instrument, price] of cases) {
+      const m = priceMove(instrument, 'long', price, price * 1.001);
+      expect(m, instrument).not.toBeNull();
+      expect(m!.value, instrument).toBeGreaterThan(1);
+      expect(m!.value, instrument).toBeLessThan(100);
+    }
   });
 
   it('reads crypto perps in pips too', () => {
@@ -84,8 +102,8 @@ describe('priceMove — pips, every instrument', () => {
   });
 
   it('signs the move by direction — a short profits when price falls', () => {
-    expect(priceMove('gold', 'short', 4040, 4050)?.value).toBeCloseTo(-1000, 0);
-    expect(priceMove('gold', 'long', 4040, 4050)?.value).toBeCloseTo(1000, 0);
+    expect(priceMove('gold', 'short', 4040, 4050)?.value).toBeCloseTo(-100, 0);
+    expect(priceMove('gold', 'long', 4040, 4050)?.value).toBeCloseTo(100, 0);
   });
 
   it('returns null when the instrument or prices are unknown', () => {
