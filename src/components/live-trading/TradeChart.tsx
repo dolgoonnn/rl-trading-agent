@@ -115,9 +115,32 @@ export function TradeChart({ tradeId }: { tradeId: string }) {
     );
   }
 
+  const ex = data.excursion;
+
   return (
     <div>
       <div ref={holder} className="w-full" />
+      {/* Heat and best-move. With no stop there is no R-multiple, so this is the
+          only risk number these trades have — and it is the one that says
+          whether the clock exit left money behind. */}
+      {ex ? (
+        <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+          <div className="rounded border border-zinc-800 bg-zinc-900/40 p-2">
+            <p className="text-[10px] uppercase tracking-wider text-zinc-500">Worst heat</p>
+            <p className="font-mono text-sm text-red-400">{(ex.maePct * 100).toFixed(2)}%</p>
+          </div>
+          <div className="rounded border border-zinc-800 bg-zinc-900/40 p-2">
+            <p className="text-[10px] uppercase tracking-wider text-zinc-500">Best offered</p>
+            <p className="font-mono text-sm text-emerald-400">+{(ex.mfePct * 100).toFixed(2)}%</p>
+          </div>
+          <div className="rounded border border-zinc-800 bg-zinc-900/40 p-2">
+            <p className="text-[10px] uppercase tracking-wider text-zinc-500">Captured</p>
+            <p className="font-mono text-sm text-zinc-200">
+              {ex.capturedPct === null ? '—' : `${(ex.capturedPct * 100).toFixed(0)}%`}
+            </p>
+          </div>
+        </div>
+      ) : null}
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-zinc-500">
         <span><span className="text-cyan-300">▲</span> entry</span>
         <span><span className="text-violet-400">▼</span> exit</span>
