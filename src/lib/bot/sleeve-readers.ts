@@ -3,6 +3,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { summarizeSleeve, type SleeveSummary } from './track-record';
 import type { AnalyticsTrade } from './trade-analytics';
+// priceMove lives in the PURE module so client components can import it without
+// dragging better-sqlite3 into the browser bundle.
+export { priceMove, type PriceMove } from './trade-analytics';
 
 export function defaultDataDir(): string {
   return path.resolve('data');
@@ -280,13 +283,22 @@ export interface ClosedTrade {
   id: string;
   sleeve: string;
   symbol: string;
+  /**
+   * Which market this leg traded (gold/silver/eurusd/us500). REQUIRED on the row:
+   * the gold and silver `overnight` legs share a leg name AND an exit timestamp,
+   * so without it two different trades render as indistinguishable rows.
+   */
+  instrument: string | null;
   direction: string;
   entryTimestamp: number;
   exitTimestamp: number;
+  entryPrice: number | null;
+  exitPrice: number | null;
   pnlPct: number;
   pnlUsdt: number | null;
   exitReason: string | null;
 }
+
 
 /**
  * Stable synthetic id for a metals trade (its JSON state has no id column).
@@ -307,11 +319,23 @@ export function readRecentTrades(limit: number, dataDir: string = defaultDataDir
   if (db) {
     try {
       if (tableExists(db, 'bot_trades')) {
+        // SELECT * and read defensively — a hard column list throws on older or
+        // partial schemas instead of degrading (same trap as readOpenPositions).
         const rows = db.prepare(
-          'SELECT id, symbol, direction, entry_timestamp, exit_timestamp, pnl_percent, pnl_usdt, exit_reason FROM bot_trades ORDER BY exit_timestamp DESC LIMIT ?',
-        ).all(limit) as Array<{ id: string; symbol: string; direction: string; entry_timestamp: number; exit_timestamp: number; pnl_percent: number; pnl_usdt: number; exit_reason: string }>;
-        for (const r of rows) {
-          out.push({ id: r.id, sleeve: 'crypto', symbol: r.symbol, direction: r.direction, entryTimestamp: r.entry_timestamp, exitTimestamp: r.exit_timestamp, pnlPct: r.pnl_percent, pnlUsdt: r.pnl_usdt, exitReason: r.exit_reason });
+          'SELECT * FROM bot_trades ORDER BY exit_timestamp DESC LIMIT ?',
+        ).all(limit) as Array<Record<string, unknown>>;
+        for (const raw of rows) {
+          const num = (k: string): number | null => (typeof raw[k] === 'number' ? (raw[k] as number) : null);
+          const str = (k: string): string => (typeof raw[k] === 'string' ? (raw[k] as string) : '');
+          out.push({
+            id: str('id'), sleeve: 'crypto', symbol: str('symbol'), instrument: null,
+            direction: str('direction'),
+            entryTimestamp: num('entry_timestamp') ?? 0,
+            exitTimestamp: num('exit_timestamp') ?? 0,
+            entryPrice: num('entry_price'), exitPrice: num('exit_price'),
+            pnlPct: num('pnl_percent') ?? 0, pnlUsdt: num('pnl_usdt'),
+            exitReason: str('exit_reason') || null,
+          });
         }
       }
     } finally {
@@ -319,19 +343,43 @@ export function readRecentTrades(limit: number, dataDir: string = defaultDataDir
     }
   }
   // Gold/metals JSON trades carry ISO timestamps; include when parseable, tagged by sleeve.
-  const gold = readJson(path.join(dataDir, 'gold-bot-state.json')) as { trades?: Array<{ direction?: string; entryTime?: string; exitTime?: string; pnlPct?: number; pnlPercent?: number; exitReason?: string }> } | null;
+  const gold = readJson(path.join(dataDir, 'gold-bot-state.json')) as { trades?: Array<{ direction?: string; entryPrice?: number; exitPrice?: number; entryTime?: string; exitTime?: string; pnlPct?: number; pnlPercent?: number; exitReason?: string }> } | null;
   for (const t of gold?.trades ?? []) {
-    out.push({ id: `gold:${t.exitTime ? Date.parse(t.exitTime) : 0}`, sleeve: 'gold', symbol: 'XAUTUSDT', direction: t.direction ?? '—', entryTimestamp: t.entryTime ? Date.parse(t.entryTime) : 0, exitTimestamp: t.exitTime ? Date.parse(t.exitTime) : 0, pnlPct: t.pnlPct ?? t.pnlPercent ?? 0, pnlUsdt: null, exitReason: t.exitReason ?? null });
+    out.push({
+      id: `gold:${t.exitTime ? Date.parse(t.exitTime) : 0}`,
+      sleeve: 'gold', symbol: 'XAUTUSDT', instrument: 'gold',
+      direction: t.direction ?? '—',
+      entryTimestamp: t.entryTime ? Date.parse(t.entryTime) : 0,
+      exitTimestamp: t.exitTime ? Date.parse(t.exitTime) : 0,
+      entryPrice: t.entryPrice ?? null, exitPrice: t.exitPrice ?? null,
+      pnlPct: t.pnlPct ?? t.pnlPercent ?? 0, pnlUsdt: null,
+      exitReason: t.exitReason ?? null,
+    });
   }
-  const metals = readJson(path.join(dataDir, 'metals-bot-state.json')) as { trades?: Array<{ leg?: string; metal?: string; side?: string; entryTime?: string; exitTime?: string; pnlPct?: number; stale?: boolean }> } | null;
+  const metals = readJson(path.join(dataDir, 'metals-bot-state.json')) as { trades?: Array<{ leg?: string; metal?: string; side?: string; entryPrice?: number; exitPrice?: number; entryTime?: string; exitTime?: string; pnlPct?: number; stale?: boolean }> } | null;
   for (const t of metals?.trades ?? []) {
     // Metals state stores PERCENT (see run-metals-bot.ts); readers normalize to FRACTION.
-    out.push({ id: metalsTradeId(t), sleeve: 'metals', symbol: t.leg ?? 'metals', direction: t.side ?? '—', entryTimestamp: t.entryTime ? Date.parse(t.entryTime) : 0, exitTimestamp: t.exitTime ? Date.parse(t.exitTime) : 0, pnlPct: (t.pnlPct ?? 0) / 100, pnlUsdt: null, exitReason: t.stale ? 'stale (downtime)' : null });
+    out.push({
+      id: metalsTradeId(t), sleeve: 'metals', symbol: t.leg ?? 'metals',
+      instrument: t.metal ?? null, direction: t.side ?? '—',
+      entryTimestamp: t.entryTime ? Date.parse(t.entryTime) : 0,
+      exitTimestamp: t.exitTime ? Date.parse(t.exitTime) : 0,
+      entryPrice: t.entryPrice ?? null, exitPrice: t.exitPrice ?? null,
+      pnlPct: (t.pnlPct ?? 0) / 100, pnlUsdt: null,
+      exitReason: t.stale ? 'stale (downtime)' : null,
+    });
   }
   const letf = readJson(path.join(dataDir, 'letf-bot-state.json')) as { trades?: Array<{ instrument?: string; side?: string; entryTime?: string; exitTime?: string; pnlPct?: number }> } | null;
   for (const t of letf?.trades ?? []) {
     // LETF state stores PERCENT (metals convention); readers normalize to FRACTION.
-    out.push({ id: letfTradeId(t), sleeve: 'letf', symbol: `close-flow ${t.instrument ?? '?'}`, direction: t.side ?? '—', entryTimestamp: t.entryTime ? Date.parse(t.entryTime) : 0, exitTimestamp: t.exitTime ? Date.parse(t.exitTime) : 0, pnlPct: (t.pnlPct ?? 0) / 100, pnlUsdt: null, exitReason: null });
+    out.push({
+      id: letfTradeId(t), sleeve: 'letf', symbol: `close-flow ${t.instrument ?? '?'}`,
+      instrument: t.instrument ?? null, direction: t.side ?? '—',
+      entryTimestamp: t.entryTime ? Date.parse(t.entryTime) : 0,
+      exitTimestamp: t.exitTime ? Date.parse(t.exitTime) : 0,
+      entryPrice: null, exitPrice: null,
+      pnlPct: (t.pnlPct ?? 0) / 100, pnlUsdt: null, exitReason: null,
+    });
   }
   return out.sort((a, b) => b.exitTimestamp - a.exitTimestamp).slice(0, limit);
 }

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { trpc } from '@/lib/trpc/client';
 import { formatUsd, formatPnlPct } from '@/lib/bot/format';
+import { priceMove } from '@/lib/bot/trade-analytics';
 import { TradeDetailDrawer } from './TradeDetailDrawer';
 
 export function RecentTradesTable() {
@@ -27,6 +28,7 @@ export function RecentTradesTable() {
                 <th className="px-3 py-2">Symbol</th>
                 <th className="px-3 py-2">Direction</th>
                 <th className="px-3 py-2 text-right">PnL %</th>
+                <th className="px-3 py-2 text-right">Move</th>
                 <th className="px-3 py-2 text-right">PnL (USDT)</th>
                 <th className="px-3 py-2">Exit reason</th>
                 <th className="px-3 py-2">Closed</th>
@@ -44,7 +46,14 @@ export function RecentTradesTable() {
                       {t.sleeve}
                     </span>
                   </td>
-                  <td className="px-3 py-2 font-mono text-zinc-200">{t.symbol}</td>
+                  <td className="px-3 py-2 font-mono text-zinc-200">
+                    {t.symbol}
+                    {t.instrument ? (
+                      <span className="ml-2 rounded bg-zinc-800 px-1.5 py-0.5 font-sans text-[10px] uppercase tracking-wide text-zinc-400">
+                        {t.instrument}
+                      </span>
+                    ) : null}
+                  </td>
                   <td className="px-3 py-2">
                     <span className={t.direction === 'long' ? 'text-emerald-400' : 'text-red-400'}>
                       {t.direction === '—' ? t.direction : t.direction.toUpperCase()}
@@ -53,6 +62,17 @@ export function RecentTradesTable() {
                   <td className={`px-3 py-2 text-right font-mono ${t.pnlPct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                     {/* pnlPct is fraction-scale (0.0271 = 2.71%); multiply by 100 before formatPnlPct */}
                     {formatPnlPct(t.pnlPct * 100)}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-zinc-400">
+                    {(() => {
+                      // Percent is comparable across the book but does not describe the
+                      // move: FX reads in pips, futures in points.
+                      const m = priceMove(t.instrument, t.direction, t.entryPrice, t.exitPrice);
+                      if (m === null) return '—';
+                      const sign = m.value >= 0 ? '+' : '';
+                      const dp = m.unit === 'pips' ? 1 : m.value >= 10 ? 1 : 3;
+                      return `${sign}${m.value.toFixed(dp)} ${m.unit}`;
+                    })()}
                   </td>
                   <td className="px-3 py-2 text-right font-mono text-zinc-200">
                     {t.pnlUsdt !== null ? formatUsd(t.pnlUsdt) : '—'}
