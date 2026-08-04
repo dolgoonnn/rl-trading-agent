@@ -825,14 +825,57 @@ const NO_CHART: TradeChart = {
   stopLoss: null, takeProfit: null,
 };
 
+/** Fetches OHLC for a venue symbol over a window. Injectable so tests need no network. */
+export type CandleFetcher = (symbol: string, fromMs: number, toMs: number) => Promise<ChartCandle[]>;
+
+/** Instrument -> Yahoo symbol, mirroring run-metals-bot.ts's own map. */
+const YAHOO_SYMBOL: Record<string, string> = {
+  gold: 'GC=F', silver: 'SI=F', eurusd: 'EURUSD=X', us500: 'ES=F',
+};
+
+/** Default fetcher: Yahoo 5m bars. Covers ~60 days, enough for any live trade. */
+export const fetchYahooCandles: CandleFetcher = async (symbol, fromMs, toMs) => {
+  const p1 = Math.floor(fromMs / 1000);
+  const p2 = Math.ceil(toMs / 1000);
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=5m&period1=${p1}&period2=${p2}`;
+  const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+  if (!res.ok) return [];
+  const j = (await res.json()) as {
+    chart?: { result?: Array<{ timestamp?: number[]; indicators?: { quote?: Array<Record<string, Array<number | null>>> } }> };
+  };
+  const r = j.chart?.result?.[0];
+  const ts = r?.timestamp ?? [];
+  const q = r?.indicators?.quote?.[0];
+  if (!q) return [];
+  const out: ChartCandle[] = [];
+  for (let i = 0; i < ts.length; i++) {
+    const o = q.open?.[i]; const h = q.high?.[i]; const l = q.low?.[i]; const c = q.close?.[i];
+    if (o == null || h == null || l == null || c == null) continue;
+    out.push({ timestamp: ts[i]! * 1000, open: o, high: h, low: l, close: c });
+  }
+  return out;
+};
+
+/** Instrument segment of a synthetic metals id (`metals:<leg>:<metal>:<ts>`). */
+function metalsInstrumentFromId(id: string): string | null {
+  const parts = id.split(':');
+  return parts.length >= 4 ? (parts[2] ?? null) : null;
+}
+
 /**
  * Candles around a trade, plus the markers needed to draw it.
  *
- * Only crypto persists OHLCV (`bot_candles`). Session legs and gold quote live
- * and never store bars, so they return `available: false` with a reason rather
- * than an empty chart that looks like a bug.
+ * Crypto reads stored OHLCV (`bot_candles`). The session legs and gold never
+ * persist bars — they quote live and keep only fills — so rather than showing
+ * nothing (which left 100% of the live book unchartable), those windows are
+ * fetched ON DEMAND from the same venue the bot quotes from. No bot change and
+ * it works retroactively for every trade already booked.
  */
-export function readTradeChart(id: string, dataDir: string = defaultDataDir()): TradeChart {
+export async function readTradeChart(
+  id: string,
+  dataDir: string = defaultDataDir(),
+  fetcher: CandleFetcher = fetchYahooCandles,
+): Promise<TradeChart> {
   const detail = readTradeDetail(id, dataDir);
   if (!detail.found) return { ...NO_CHART, reason: 'Trade not found.' };
 
@@ -849,10 +892,22 @@ export function readTradeChart(id: string, dataDir: string = defaultDataDir()): 
   };
 
   if (detail.sleeve !== 'crypto') {
-    return {
-      ...base,
-      reason: `The ${detail.sleeve} bot does not store candles — it quotes live and keeps only fills.`,
-    };
+    const instrument = detail.sleeve === 'metals' ? metalsInstrumentFromId(id) : null;
+    const venueSymbol = instrument ? YAHOO_SYMBOL[instrument] : undefined;
+    if (!venueSymbol) {
+      return { ...base, reason: `No market data source mapped for the ${detail.sleeve} sleeve.` };
+    }
+    const pad = CHART_PAD_BARS * 5 * 60_000; // 5m bars
+    try {
+      const candles = await fetcher(venueSymbol, detail.entryTimestamp - pad, detail.exitTimestamp + pad);
+      if (candles.length === 0) {
+        return { ...base, reason: 'The venue returned no bars for this window.' };
+      }
+      return { ...base, available: true, candles, symbol: `${detail.symbol} (${venueSymbol})` };
+    } catch {
+      // Never let a flaky upstream break the drawer.
+      return { ...base, reason: 'Could not reach the market-data provider.' };
+    }
   }
 
   const db = openReadonly(dataDir);
