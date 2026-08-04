@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { trpc } from '@/lib/trpc/client';
 import { formatUsd, formatPnlPct } from '@/lib/bot/format';
-import { priceMove } from '@/lib/bot/trade-analytics';
+import { priceMove, formatPips } from '@/lib/bot/trade-analytics';
 import { TradeDetailDrawer } from './TradeDetailDrawer';
 
 export function RecentTradesTable() {
@@ -48,7 +48,7 @@ export function RecentTradesTable() {
                   </td>
                   <td className="px-3 py-2 font-mono text-zinc-200">
                     {t.symbol}
-                    {t.instrument ? (
+                    {t.instrument && t.instrument.toUpperCase() !== t.symbol.toUpperCase() ? (
                       <span className="ml-2 rounded bg-zinc-800 px-1.5 py-0.5 font-sans text-[10px] uppercase tracking-wide text-zinc-400">
                         {t.instrument}
                       </span>
@@ -65,13 +65,10 @@ export function RecentTradesTable() {
                   </td>
                   <td className="px-3 py-2 text-right font-mono text-zinc-400">
                     {(() => {
-                      // Percent is comparable across the book but does not describe the
-                      // move: FX reads in pips, futures in points.
+                      // Percent is comparable across the book but does not describe
+                      // the move — and these are leveraged, so pips is the unit.
                       const m = priceMove(t.instrument, t.direction, t.entryPrice, t.exitPrice);
-                      if (m === null) return '—';
-                      const sign = m.value >= 0 ? '+' : '';
-                      const dp = m.unit === 'pips' ? 1 : m.value >= 10 ? 1 : 3;
-                      return `${sign}${m.value.toFixed(dp)} ${m.unit}`;
+                      return m === null ? '—' : formatPips(m);
                     })()}
                   </td>
                   <td className="px-3 py-2 text-right font-mono text-zinc-200">
@@ -85,6 +82,11 @@ export function RecentTradesTable() {
               ))}
             </tbody>
           </table>
+          {/* A pip means a different price step on each market — state it rather
+              than let the reader guess why gold moves 1,330 and EUR moves 39. */}
+          <p className="mt-3 text-[10px] text-zinc-600">
+            1 pip = 0.0001 EUR/USD · $0.01 gold · $0.001 silver · 0.1 US500 · $1 BTC · $0.1 ETH · $0.01 SOL
+          </p>
         </div>
       )}
       <TradeDetailDrawer tradeId={openId} onClose={() => setOpenId(null)} />

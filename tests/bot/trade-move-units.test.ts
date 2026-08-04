@@ -46,38 +46,51 @@ describe('instrument on the trade row', () => {
   });
 });
 
-describe('priceMove — native units per instrument', () => {
+describe('priceMove — pips, every instrument', () => {
+  // These positions are leveraged, so the trader-facing unit is the pip on every
+  // market — not points on some and pips on others. Sizes follow the standard
+  // retail-broker quote convention per instrument.
   it('reads FX in pips', () => {
     // EUR/USD 1.1400 -> 1.1361 short = +39 pips in the trade's favour
     const m = priceMove('eurusd', 'short', 1.14, 1.1361);
     expect(m?.unit).toBe('pips');
+    expect(m?.pipSize).toBe(0.0001);
     expect(m?.value).toBeCloseTo(39, 0);
   });
 
-  it('reads gold and silver futures in points', () => {
+  it('reads gold in pips of $0.01', () => {
     const gold = priceMove('gold', 'short', 4040, 4026.7);
-    expect(gold?.unit).toBe('pts');
-    expect(gold?.value).toBeCloseTo(13.3, 1);
-
-    const silver = priceMove('silver', 'long', 58, 58.348);
-    expect(silver?.unit).toBe('pts');
-    expect(silver?.value).toBeCloseTo(0.348, 3);
+    expect(gold?.unit).toBe('pips');
+    expect(gold?.pipSize).toBe(0.01);
+    expect(gold?.value).toBeCloseTo(1330, 0);
   });
 
-  it('reads the index in points', () => {
+  it('reads silver in pips of $0.001', () => {
+    const silver = priceMove('silver', 'long', 58, 58.348);
+    expect(silver?.unit).toBe('pips');
+    expect(silver?.value).toBeCloseTo(348, 0);
+  });
+
+  it('reads the index in pips of 0.1', () => {
     const m = priceMove('us500', 'long', 7449.5, 7460.25);
-    expect(m?.unit).toBe('pts');
-    expect(m?.value).toBeCloseTo(10.75, 2);
+    expect(m?.unit).toBe('pips');
+    expect(m?.value).toBeCloseTo(107.5, 1);
+  });
+
+  it('reads crypto perps in pips too', () => {
+    expect(priceMove('btcusdt', 'long', 61000, 61350)?.value).toBeCloseTo(350, 0);
+    expect(priceMove('ethusdt', 'short', 3000, 2985)?.value).toBeCloseTo(150, 0);
+    expect(priceMove('solusdt', 'long', 150, 151.2)?.value).toBeCloseTo(120, 0);
   });
 
   it('signs the move by direction — a short profits when price falls', () => {
-    expect(priceMove('gold', 'short', 4040, 4050)?.value).toBeCloseTo(-10, 1);
-    expect(priceMove('gold', 'long', 4040, 4050)?.value).toBeCloseTo(10, 1);
+    expect(priceMove('gold', 'short', 4040, 4050)?.value).toBeCloseTo(-1000, 0);
+    expect(priceMove('gold', 'long', 4040, 4050)?.value).toBeCloseTo(1000, 0);
   });
 
   it('returns null when the instrument or prices are unknown', () => {
     expect(priceMove(null, 'long', 100, 101)).toBeNull();
     expect(priceMove('gold', 'long', null, 101)).toBeNull();
-    expect(priceMove('dogecoin', 'long', 1, 2)).toBeNull();
+    expect(priceMove('dogeusdt', 'long', 1, 2)).toBeNull();
   });
 });

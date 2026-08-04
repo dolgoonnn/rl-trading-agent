@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { trpc } from '@/lib/trpc/client';
 import { TradeChart } from './TradeChart';
 import { formatUsd, formatPnlPct } from '@/lib/bot/format';
+import { priceMove, formatPips } from '@/lib/bot/trade-analytics';
 
 function fmtTs(ts: number): string {
   return ts ? new Date(ts).toLocaleString() : '—';
@@ -212,13 +213,35 @@ export function TradeDetailDrawer({ tradeId, onClose }: { tradeId: string | null
                     <p className="font-mono text-zinc-200">{fmtPrice(data.exitPrice)}</p>
                   </div>
                   <div>
-                    <span className="text-zinc-500">Stop loss</span>
-                    <p className="font-mono text-zinc-200">{fmtPrice(data.stopLoss)}</p>
+                    <span className="text-zinc-500">Move</span>
+                    <p className="font-mono text-zinc-200">{(() => {
+                      const m = priceMove(data.instrument, data.direction, data.entryPrice, data.exitPrice);
+                      return m === null ? '—' : formatPips(m);
+                    })()}</p>
                   </div>
-                  <div>
-                    <span className="text-zinc-500">Take profit</span>
-                    <p className="font-mono text-zinc-200">{fmtPrice(data.takeProfit)}</p>
-                  </div>
+                  {/* A blank stop is a design, not missing data — say which. */}
+                  {data.riskModel === 'time' ? (
+                    <div className="col-span-2 rounded border border-amber-500/25 bg-amber-500/5 p-2">
+                      <span className="text-amber-300/90">No stop, no target</span>
+                      <p className="mt-0.5 leading-snug text-zinc-400">
+                        This leg places neither. It opens on a clock and closes on a clock, so the
+                        holding window is the whole risk control — the position is unprotected
+                        against a move inside it. Stops were tested on these legs and made results
+                        worse, which is why none is set.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <span className="text-zinc-500">Stop loss</span>
+                        <p className="font-mono text-zinc-200">{fmtPrice(data.stopLoss)}</p>
+                      </div>
+                      <div>
+                        <span className="text-zinc-500">Take profit</span>
+                        <p className="font-mono text-zinc-200">{fmtPrice(data.takeProfit)}</p>
+                      </div>
+                    </>
+                  )}
                   <div>
                     <span className="text-zinc-500">Position size</span>
                     <p className="font-mono text-zinc-200">

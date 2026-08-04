@@ -121,8 +121,12 @@ export function TradeChart({ tradeId }: { tradeId: string }) {
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-zinc-500">
         <span><span className="text-cyan-300">▲</span> entry</span>
         <span><span className="text-violet-400">▼</span> exit</span>
-        <span><span className="text-red-400">╌</span> stop</span>
-        <span><span className="text-emerald-400">╌</span> target</span>
+        {/* Only claim rails that exist — the session legs place neither. */}
+        {data.stopLoss !== null ? <span><span className="text-red-400">╌</span> stop</span> : null}
+        {data.takeProfit !== null ? <span><span className="text-emerald-400">╌</span> target</span> : null}
+        {data.stopLoss === null && data.takeProfit === null ? (
+          <span className="text-amber-300/70">no stop / target — time exit</span>
+        ) : null}
         <span className="ml-auto">{data.symbol} · {barInterval(data.candles)} · {data.candles.length} bars</span>
       </div>
     </div>

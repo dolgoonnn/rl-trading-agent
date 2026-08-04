@@ -5,7 +5,7 @@ import { summarizeSleeve, type SleeveSummary } from './track-record';
 import type { AnalyticsTrade } from './trade-analytics';
 // priceMove lives in the PURE module so client components can import it without
 // dragging better-sqlite3 into the browser bundle.
-export { priceMove, type PriceMove } from './trade-analytics';
+export { priceMove, formatPips, type PriceMove } from './trade-analytics';
 
 export function defaultDataDir(): string {
   return path.resolve('data');
@@ -465,11 +465,25 @@ export function readGovernance(dataDir: string = defaultDataDir()): GovernanceSt
 
 export interface FactorScore { name: string; value: number }
 
+/**
+ * How the position was risk-managed.
+ *
+ * `levels` — a stop and a target were placed at entry (crypto only).
+ * `time`   — no stop, no target: the leg enters on a clock and exits on a
+ *            clock. Grep the session bots and there is no stop field to store.
+ *            This is deliberate (holding past the window tested worse), but it
+ *            is a risk fact the operator must SEE, not infer from a blank cell.
+ */
+export type RiskModel = 'levels' | 'time';
+
 export interface TradeDetail {
   found: boolean;
   id: string | null;
   sleeve: string;
   symbol: string;
+  /** Market key for pip sizing and labelling; null when unknown. */
+  instrument: string | null;
+  riskModel: RiskModel;
   direction: string;
   entryPrice: number | null;
   exitPrice: number | null;
@@ -495,7 +509,8 @@ export interface TradeDetail {
 }
 
 const NOT_FOUND: TradeDetail = {
-  found: false, id: null, sleeve: '', symbol: '', direction: '',
+  found: false, id: null, sleeve: '', symbol: '', instrument: null,
+  riskModel: 'time', direction: '',
   entryPrice: null, exitPrice: null, entryTimestamp: 0, exitTimestamp: 0,
   pnlPct: 0, pnlUsdt: null, exitReason: null, stopLoss: null, takeProfit: null,
   riskAmountUsdt: null, positionSizeUsdt: null, regime: null, barsHeld: null,
@@ -537,7 +552,10 @@ export function readTradeDetail(id: string, dataDir: string = defaultDataDir()):
           const risk = num('risk_amount_usdt');
           return {
             found: true, id, sleeve: 'crypto',
-            symbol: str('symbol') ?? '', direction: str('direction') ?? '',
+            symbol: str('symbol') ?? '',
+            instrument: (str('symbol') ?? '').toLowerCase() || null,
+            riskModel: 'levels',
+            direction: str('direction') ?? '',
             entryPrice: num('entry_price'), exitPrice: num('exit_price'),
             entryTimestamp: num('entry_timestamp') ?? 0, exitTimestamp: num('exit_timestamp') ?? 0,
             pnlPct: num('pnl_percent') ?? 0, pnlUsdt,
@@ -565,7 +583,7 @@ export function readTradeDetail(id: string, dataDir: string = defaultDataDir()):
     if (tid === id) {
       return {
         ...NOT_FOUND, found: true, id: tid, sleeve: 'gold', symbol: 'XAUTUSDT',
-        direction: t.direction ?? '—', entryPrice: t.entryPrice ?? null, exitPrice: t.exitPrice ?? null,
+        instrument: 'gold', riskModel: 'time', direction: t.direction ?? '—', entryPrice: t.entryPrice ?? null, exitPrice: t.exitPrice ?? null,
         entryTimestamp: t.entryTime ? Date.parse(t.entryTime) : 0,
         exitTimestamp: t.exitTime ? Date.parse(t.exitTime) : 0,
         pnlPct: t.pnlPct ?? t.pnlPercent ?? 0, exitReason: t.exitReason ?? null,
@@ -581,7 +599,7 @@ export function readTradeDetail(id: string, dataDir: string = defaultDataDir()):
       // Metals state stores PERCENT (see run-metals-bot.ts); readers normalize to FRACTION.
       return {
         ...NOT_FOUND, found: true, id: tid, sleeve: 'metals', symbol: t.leg ?? 'metals',
-        direction: t.side ?? '—', entryPrice: t.entryPrice ?? null, exitPrice: t.exitPrice ?? null,
+        instrument: t.metal ?? null, riskModel: 'time', direction: t.side ?? '—', entryPrice: t.entryPrice ?? null, exitPrice: t.exitPrice ?? null,
         entryTimestamp: t.entryTime ? Date.parse(t.entryTime) : 0,
         exitTimestamp: t.exitTime ? Date.parse(t.exitTime) : 0,
         pnlPct: (t.pnlPct ?? 0) / 100, exitReason: t.stale ? 'stale (downtime)' : null,
@@ -597,7 +615,7 @@ export function readTradeDetail(id: string, dataDir: string = defaultDataDir()):
       // LETF state stores PERCENT (metals convention); readers normalize to FRACTION.
       return {
         ...NOT_FOUND, found: true, id: tid, sleeve: 'letf', symbol: `close-flow ${t.instrument ?? '?'}`,
-        direction: t.side ?? '—', entryPrice: t.entryPrice ?? null, exitPrice: t.exitPrice ?? null,
+        instrument: t.instrument ?? null, riskModel: 'time', direction: t.side ?? '—', entryPrice: t.entryPrice ?? null, exitPrice: t.exitPrice ?? null,
         entryTimestamp: t.entryTime ? Date.parse(t.entryTime) : 0,
         exitTimestamp: t.exitTime ? Date.parse(t.exitTime) : 0,
         pnlPct: (t.pnlPct ?? 0) / 100,
