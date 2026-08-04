@@ -104,12 +104,22 @@ export function confluenceBucket(score: number | null): string {
  */
 export interface PriceMove { value: number; unit: 'pips'; pipSize: number }
 
+/**
+ * Pip = the SECOND-TO-LAST digit of the standard quote (the last digit is the
+ * fractional pip). That is the FX convention and it carries to every other
+ * market on an MT-style platform — it is why 1 pip is 0.0001 on a 5-digit
+ * EUR/USD and $0.10 on a 2-decimal gold quote, not $0.01.
+ *
+ * Sanity check the rule holds its scale: a 0.1% move lands at roughly 10-60
+ * pips on every instrument below. Sizes that put a normal day in the thousands
+ * are a decimal place too fine.
+ */
 const PIP_SIZE: Record<string, number> = {
-  eurusd: 0.0001, // 5-digit FX: 1 pip = 0.0001
-  gold: 0.01,     // XAU quoted to 2dp: $1.00 = 100 pips
-  silver: 0.001,  // XAG quoted to 3dp: $1.00 = 1000 pips
-  us500: 0.1,     // index CFD quoted to 1dp
-  btcusdt: 1,     // crypto perps: pip scaled so one pip is a meaningful tick
+  eurusd: 0.0001, // 1.14000 -> pip is the 4th decimal
+  gold: 0.1,      // 4055.40 -> $1.00 = 10 pips
+  silver: 0.01,   // 58.505  -> $1.00 = 100 pips
+  us500: 1,       // 7443.75 -> 1 index point = 1 pip
+  btcusdt: 1,     // $1 = 1 pip
   ethusdt: 0.1,
   solusdt: 0.01,
 };
