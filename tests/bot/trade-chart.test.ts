@@ -15,7 +15,16 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import Database from 'better-sqlite3';
-import { readTradeChart } from '../../src/lib/bot/sleeve-readers';
+import { readTradeChart, type CandleFetcher } from '../../src/lib/bot/sleeve-readers';
+
+/** Deterministic stub so tests never touch the network. */
+const stubFetcher: CandleFetcher = async (_symbol, fromMs, toMs) => {
+  const out = [];
+  for (let t = fromMs; t <= toMs; t += 5 * 60_000) {
+    out.push({ timestamp: t, open: 30, high: 30.2, low: 29.8, close: 30.1 });
+  }
+  return out;
+};
 
 let dir: string;
 const H = 3_600_000;
@@ -44,8 +53,8 @@ beforeEach(() => {
 afterEach(() => { fs.rmSync(dir, { recursive: true, force: true }); });
 
 describe('readTradeChart', () => {
-  it('returns candles covering the trade with context on both sides', () => {
-    const c = readTradeChart('t1', dir);
+  it('returns candles covering the trade with context on both sides', async () => {
+    const c = await readTradeChart('t1', dir);
     expect(c.available).toBe(true);
     expect(c.candles.length).toBeGreaterThan(10);
     // The window must contain both the entry and the exit bar.
@@ -58,8 +67,8 @@ describe('readTradeChart', () => {
     expect(last).toBeGreaterThan(T0 + 110 * H);
   });
 
-  it('carries the markers needed to draw the trade on the chart', () => {
-    const c = readTradeChart('t1', dir);
+  it('carries the markers needed to draw the trade on the chart', async () => {
+    const c = await readTradeChart('t1', dir);
     expect(c.entryTimestamp).toBe(T0 + 100 * H);
     expect(c.exitTimestamp).toBe(T0 + 110 * H);
     expect(c.entryPrice).toBe(61000);
@@ -70,31 +79,32 @@ describe('readTradeChart', () => {
     expect(c.symbol).toBe('BTCUSDT');
   });
 
-  it('returns OHLC, not just closes — it is a candle chart', () => {
-    const k = readTradeChart('t1', dir).candles[0]!;
+  it('returns OHLC, not just closes — it is a candle chart', async () => {
+    const k = (await readTradeChart('t1', dir)).candles[0]!;
     expect(k.open).toBeGreaterThan(0);
     expect(k.high).toBeGreaterThanOrEqual(k.open);
     expect(k.low).toBeLessThanOrEqual(k.open);
     expect(k.close).toBeGreaterThan(0);
   });
 
-  it('explains itself when a sleeve stores no candles', () => {
+  it('fetches metals candles on demand from the venue', async () => {
     fs.writeFileSync(path.join(dir, 'metals-bot-state.json'), JSON.stringify({
       positions: [],
       trades: [{ leg: 'overnight', metal: 'gold', side: 'long', entryPrice: 4000, exitPrice: 4040,
         entryTime: '2026-07-01T22:00:00Z', exitTime: '2026-07-02T07:00:00Z', pnlPct: 1 }],
     }));
     const id = `metals:overnight:gold:${Date.parse('2026-07-02T07:00:00Z')}`;
-    const c = readTradeChart(id, dir);
-    expect(c.available).toBe(false);
-    expect(c.reason).toMatch(/does not store/i);
-    expect(c.candles).toEqual([]);
-    // Markers still come through so the panel can show levels without a chart.
+    const c = await readTradeChart(id, dir, stubFetcher);
+    // The metals bot stores no bars, so they are fetched from the venue instead —
+    // otherwise 100% of the live book would be unchartable.
+    expect(c.available).toBe(true);
+    expect(c.candles.length).toBeGreaterThan(10);
+    expect(c.symbol).toContain('GC=F'); // the fixture's `metal: gold` -> Yahoo symbol
     expect(c.entryPrice).toBe(4000);
   });
 
-  it('returns unavailable rather than throwing for an unknown id', () => {
-    const c = readTradeChart('nope', dir);
+  it('returns unavailable rather than throwing for an unknown id', async () => {
+    const c = await readTradeChart('nope', dir, stubFetcher);
     expect(c.available).toBe(false);
     expect(c.candles).toEqual([]);
   });
