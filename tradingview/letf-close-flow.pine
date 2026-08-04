@@ -1,0 +1,86 @@
+//@version=6
+// LETF Close-Flow (metals) — the deployed paper-bot rule, visualized.
+// sig = log(P15:00 NY / prev day P16:00 NY); trade sign(sig) when |sig| >= rolling p95 of trailing 250 days; exit 16:00 NY.
+// USE ON: 5m or 15m chart of BYBIT:XAUTUSDT / OANDA:XAUUSD (gold) or BYBIT:XAGUSDT / OANDA:XAGUSD (silver — the stronger leg).
+// PASTE-PROOF FORMAT: no line wraps anywhere (Pine requires non-multiple-of-4 indents on wrapped lines; copy-paste often breaks them).
+
+indicator("LETF Close-Flow (metals) — 15:00→16:00 NY", overlay = true, max_labels_count = 500)
+
+lookbackDays = input.int(250, "Threshold lookback (trading days)", minval = 20)
+pct = input.float(95, "|sig| percentile threshold", minval = 50, maxval = 99.9)
+minDays = input.int(250, "Min history before signals fire", minval = 20)
+showWindow = input.bool(true, "Shade the 15:00-16:00 NY window")
+showTable = input.bool(true, "Show status panel")
+
+TZ = "America/New_York"
+
+nyHour = hour(time, TZ)
+prevHr = hour(time[1], TZ)
+inWindow = nyHour == 15
+cross15 = nyHour >= 15 and prevHr < 15
+cross16 = nyHour >= 16 and prevHr < 16
+
+var float p1600prev = na
+var float sigToday = na
+var float thr = na
+var int tradeDir = 0
+var float entryPx = na
+var absHist = array.new_float()
+
+longSig = false
+shortSig = false
+exitSig = false
+
+if cross15
+    p1500 = close[1]
+    sigToday := na(p1600prev) or p1600prev <= 0 ? float(na) : math.log(p1500 / p1600prev)
+    if not na(sigToday) and array.size(absHist) >= minDays
+        thr := array.percentile_nearest_rank(absHist, pct)
+        if math.abs(sigToday) >= thr and tradeDir == 0
+            tradeDir := sigToday > 0 ? 1 : -1
+            entryPx := close
+            longSig := tradeDir == 1
+            shortSig := tradeDir == -1
+    if not na(sigToday)
+        array.push(absHist, math.abs(sigToday))
+        if array.size(absHist) > lookbackDays
+            array.shift(absHist)
+
+if cross16
+    if tradeDir != 0
+        exitSig := true
+        retBp = (tradeDir == 1 ? math.log(close[1] / entryPx) : math.log(entryPx / close[1])) * 10000
+        exitTxt = "EXIT " + str.tostring(retBp, "#.#") + "bp"
+        exitStyle = tradeDir == 1 ? label.style_label_down : label.style_label_up
+        exitColor = retBp >= 0 ? color.new(color.teal, 20) : color.new(color.maroon, 20)
+        label.new(bar_index, tradeDir == 1 ? high : low, exitTxt, style = exitStyle, color = exitColor, textcolor = color.white, size = size.small)
+        tradeDir := 0
+        entryPx := na
+    p1600prev := close[1]
+
+sigTxt = na(sigToday) or na(thr) ? "" : "|sig| " + str.tostring(math.abs(sigToday) * 10000, "#") + "bp >= thr " + str.tostring(thr * 10000, "#") + "bp"
+if longSig
+    label.new(bar_index, low, "LONG\n" + sigTxt, style = label.style_label_up, color = color.new(color.green, 10), textcolor = color.white, size = size.small)
+if shortSig
+    label.new(bar_index, high, "SHORT\n" + sigTxt, style = label.style_label_down, color = color.new(color.red, 10), textcolor = color.white, size = size.small)
+
+bgcolor(showWindow and inWindow ? color.new(color.orange, tradeDir != 0 ? 75 : 90) : na)
+
+var table panel = table.new(position.top_right, 2, 5, border_width = 1)
+if showTable and barstate.islast
+    warmed = array.size(absHist) >= minDays
+    tfBad = timeframe.in_seconds(timeframe.period) > 900
+    table.cell(panel, 0, 0, "LETF close-flow", text_color = color.white, bgcolor = color.new(color.black, 20))
+    table.cell(panel, 1, 0, tfBad ? "use <=15m chart!" : "15:00-16:00 NY", text_color = tfBad ? color.orange : color.gray, bgcolor = color.new(color.black, 20))
+    table.cell(panel, 0, 1, "history", text_color = color.gray)
+    table.cell(panel, 1, 1, str.tostring(array.size(absHist)) + "/" + str.tostring(minDays) + (warmed ? " ok" : " warming"), text_color = warmed ? color.teal : color.orange)
+    table.cell(panel, 0, 2, "p" + str.tostring(pct, "#") + " threshold", text_color = color.gray)
+    table.cell(panel, 1, 2, na(thr) ? "-" : str.tostring(thr * 10000, "#.#") + "bp", text_color = color.white)
+    table.cell(panel, 0, 3, "today's |sig|", text_color = color.gray)
+    table.cell(panel, 1, 3, na(sigToday) ? "-" : str.tostring(math.abs(sigToday) * 10000, "#.#") + "bp " + (sigToday > 0 ? "up" : "dn"), text_color = color.white)
+    table.cell(panel, 0, 4, "position", text_color = color.gray)
+    table.cell(panel, 1, 4, tradeDir == 1 ? "LONG (exit 16:00)" : tradeDir == -1 ? "SHORT (exit 16:00)" : "flat", text_color = tradeDir != 0 ? color.yellow : color.gray)
+
+alertcondition(longSig, "Close-flow LONG", "LETF close-flow: LONG into 16:00 NY - |sig| cleared p95 threshold")
+alertcondition(shortSig, "Close-flow SHORT", "LETF close-flow: SHORT into 16:00 NY - |sig| cleared p95 threshold")
+alertcondition(exitSig, "Close-flow EXIT", "LETF close-flow: exit at the 16:00 NY mark")
