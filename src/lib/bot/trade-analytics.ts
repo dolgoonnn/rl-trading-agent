@@ -89,16 +89,30 @@ export function confluenceBucket(score: number | null): string {
 }
 
 /**
- * How far price moved, in the unit a trader actually reads for that market.
+ * How far price moved, in PIPS, on every instrument.
  *
- * Percent is comparable across the book but says nothing about the move itself —
- * FX is read in pips, futures in points. Signed by direction, so a profitable
- * short reports a positive move.
+ * Percent is comparable across the book but says nothing about the move itself,
+ * and these are leveraged positions — the pip is the unit the trade is actually
+ * read in. One unit everywhere beats pips-here/points-there: mixed units make
+ * two rows in the same table silently incomparable.
+ *
+ * Sizes follow the standard retail quote convention per instrument, so the
+ * numbers match what a broker platform shows for the same move. `pipSize` rides
+ * along so the UI can state the definition rather than leave it folklore.
+ *
+ * Signed by direction — a profitable short reports a positive move.
  */
-export interface PriceMove { value: number; unit: 'pips' | 'pts' }
+export interface PriceMove { value: number; unit: 'pips'; pipSize: number }
 
-const PIP_SIZE: Record<string, number> = { eurusd: 0.0001 };
-const POINT_INSTRUMENTS = new Set(['gold', 'silver', 'us500']);
+const PIP_SIZE: Record<string, number> = {
+  eurusd: 0.0001, // 5-digit FX: 1 pip = 0.0001
+  gold: 0.01,     // XAU quoted to 2dp: $1.00 = 100 pips
+  silver: 0.001,  // XAG quoted to 3dp: $1.00 = 1000 pips
+  us500: 0.1,     // index CFD quoted to 1dp
+  btcusdt: 1,     // crypto perps: pip scaled so one pip is a meaningful tick
+  ethusdt: 0.1,
+  solusdt: 0.01,
+};
 
 export function priceMove(
   instrument: string | null,
@@ -107,9 +121,16 @@ export function priceMove(
   exitPrice: number | null,
 ): PriceMove | null {
   if (instrument === null || entryPrice === null || exitPrice === null) return null;
+  const pipSize = PIP_SIZE[instrument.toLowerCase()];
+  if (pipSize === undefined) return null;
   const raw = direction === 'short' ? entryPrice - exitPrice : exitPrice - entryPrice;
-  const pip = PIP_SIZE[instrument];
-  if (pip !== undefined) return { value: raw / pip, unit: 'pips' };
-  if (POINT_INSTRUMENTS.has(instrument)) return { value: raw, unit: 'pts' };
-  return null;
+  return { value: raw / pipSize, unit: 'pips', pipSize };
+}
+
+/** Pips rendered the way a platform shows them: grouped, and never false-precise. */
+export function formatPips(m: PriceMove): string {
+  const abs = Math.abs(m.value);
+  const dp = abs >= 100 ? 0 : 1;
+  const sign = m.value >= 0 ? '+' : '−';
+  return `${sign}${abs.toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp })} pips`;
 }
