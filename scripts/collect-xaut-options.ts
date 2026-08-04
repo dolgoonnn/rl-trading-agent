@@ -21,7 +21,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 const OUT_DIR = path.resolve(__dirname, '..', 'data', 'options');
-const INTERVAL_MS = 5 * 60_000;
+export const XAUT_OPTIONS_INTERVAL_MS = 5 * 60_000;
 const once = process.argv.includes('--once');
 
 function log(msg: string): void {
@@ -48,7 +48,7 @@ async function fetchJson<T>(url: string): Promise<T | null> {
   }
 }
 
-async function snapshot(): Promise<void> {
+export async function snapshotXautOptions(): Promise<void> {
   const now = Date.now();
   const day = new Date(now).toISOString().slice(0, 10);
 
@@ -89,12 +89,16 @@ async function snapshot(): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  log(`XAUT options surface collector starting → ${OUT_DIR} (every ${INTERVAL_MS / 60000}m)`);
-  if (once) { await snapshot(); return; }
+  log(`XAUT options surface collector starting → ${OUT_DIR} (every ${XAUT_OPTIONS_INTERVAL_MS / 60000}m)`);
+  if (once) { await snapshotXautOptions(); return; }
   for (;;) {
-    try { await snapshot(); } catch (err) { log(`snapshot error: ${err}`); }
-    await new Promise((r) => setTimeout(r, INTERVAL_MS));
+    try { await snapshotXautOptions(); } catch (err) { log(`snapshot error: ${err}`); }
+    await new Promise((r) => setTimeout(r, XAUT_OPTIONS_INTERVAL_MS));
   }
 }
 
-main().catch((err) => { console.error('XAUT options collector crashed:', err); process.exit(1); });
+// Importable module (the unified collector runs the poll in-process to save a
+// runtime); only self-start when invoked directly.
+if (require.main === module) {
+  main().catch((err) => { console.error('XAUT options collector crashed:', err); process.exit(1); });
+}
