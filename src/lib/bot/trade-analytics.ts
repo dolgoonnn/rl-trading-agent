@@ -87,3 +87,29 @@ export function confluenceBucket(score: number | null): string {
   if (score < 6) return '5-6';
   return '6+';
 }
+
+/**
+ * How far price moved, in the unit a trader actually reads for that market.
+ *
+ * Percent is comparable across the book but says nothing about the move itself —
+ * FX is read in pips, futures in points. Signed by direction, so a profitable
+ * short reports a positive move.
+ */
+export interface PriceMove { value: number; unit: 'pips' | 'pts' }
+
+const PIP_SIZE: Record<string, number> = { eurusd: 0.0001 };
+const POINT_INSTRUMENTS = new Set(['gold', 'silver', 'us500']);
+
+export function priceMove(
+  instrument: string | null,
+  direction: string,
+  entryPrice: number | null,
+  exitPrice: number | null,
+): PriceMove | null {
+  if (instrument === null || entryPrice === null || exitPrice === null) return null;
+  const raw = direction === 'short' ? entryPrice - exitPrice : exitPrice - entryPrice;
+  const pip = PIP_SIZE[instrument];
+  if (pip !== undefined) return { value: raw / pip, unit: 'pips' };
+  if (POINT_INSTRUMENTS.has(instrument)) return { value: raw, unit: 'pts' };
+  return null;
+}
