@@ -1,14 +1,26 @@
 #!/usr/bin/env tsx
 /**
- * BTC order-flow collector — pillar-2 data (experiments/practitioner-research.md).
+ * Order-flow collector — pillar-2 data (experiments/practitioner-research.md).
  *
- * Subscribes to Bybit's free L2 orderbook (50 levels) + public trades for
- * BTCUSDT and appends one NDJSON line per second to data/orderflow/:
+ * Subscribes to Bybit's free L2 orderbook (50 levels) + public trades +
+ * liquidations for one or more linear perps on a SINGLE WebSocket client and
+ * appends one NDJSON line per second per symbol to data/orderflow/:
  *   { ts, mid, spreadBps, bidDepth5, askDepth5, imb5, imb25,
- *     buyVol, sellVol, tradeCount }   (volumes = since previous snapshot)
+ *     buyVol, sellVol, tradeCount, liqBuy, liqSell, liqCount }
+ *
+ * MULTI-SYMBOL IN ONE PROCESS by design: each `npx tsx` runtime costs
+ * ~150-250MB RSS, and the 2026-08-04 deploy proved that one-process-per-
+ * symbol OOM-killed the container (dashboard died first). Per-symbol state
+ * lives in a Map; the marginal cost of an extra symbol is just its book.
+ *
+ * --with-xaut-options additionally runs the XAUT options-surface poll
+ * (collect-xaut-options.ts) inside this process for the same reason.
+ *
+ * Symbols: ORDERFLOW_SYMBOLS=BTCUSDT,XAGUSDT,XAUTUSDT (comma list; the
+ * legacy singular ORDERFLOW_SYMBOL is honored too).
  *
  * This is a COLLECTOR only — analysis comes after days of data accumulate.
- * Daily file rotation; ~1-2 MB/day. PM2-compatible.
+ * Daily file rotation; ~1-2 MB/day/symbol.
  */
 
 import * as fs from 'fs';
@@ -16,21 +28,28 @@ import * as path from 'path';
 import { WebsocketClient } from 'bybit-api';
 
 const OUT_DIR = path.resolve(__dirname, '..', 'data', 'orderflow');
-// Symbol via env so the entrypoint can run one isolated instance per market
-// (BTCUSDT since Jun-2026; XAGUSDT/XAUTUSDT added Aug-2026 for close-flow
-// entry-timing research — see gold-scalp-deep-dig memory).
-const SYMBOL = process.env.ORDERFLOW_SYMBOL ?? 'BTCUSDT';
+const SYMBOLS = (process.env.ORDERFLOW_SYMBOLS ?? process.env.ORDERFLOW_SYMBOL ?? 'BTCUSDT')
+  .split(',').map((s) => s.trim()).filter(Boolean);
+const WITH_XAUT_OPTIONS = process.argv.includes('--with-xaut-options');
 
 interface BookSide { [price: string]: number }
 
-const book = { bids: {} as BookSide, asks: {} as BookSide };
-let buyVol = 0;
-let sellVol = 0;
-let tradeCount = 0;
-let liqBuyVol = 0;
-let liqSellVol = 0;
-let liqCount = 0;
-let haveSnapshot = false;
+interface SymbolState {
+  book: { bids: BookSide; asks: BookSide };
+  buyVol: number; sellVol: number; tradeCount: number;
+  liqBuyVol: number; liqSellVol: number; liqCount: number;
+  haveSnapshot: boolean;
+}
+
+const states = new Map<string, SymbolState>();
+for (const s of SYMBOLS) {
+  states.set(s, {
+    book: { bids: {}, asks: {} },
+    buyVol: 0, sellVol: 0, tradeCount: 0,
+    liqBuyVol: 0, liqSellVol: 0, liqCount: 0,
+    haveSnapshot: false,
+  });
+}
 
 function log(msg: string): void {
   console.log(`[${new Date().toISOString()}] ${msg}`);
@@ -51,9 +70,9 @@ function topLevels(side: BookSide, desc: boolean, n: number): Array<{ p: number;
     .slice(0, n);
 }
 
-function snapshotLine(): string | null {
-  const bids = topLevels(book.bids, true, 25);
-  const asks = topLevels(book.asks, false, 25);
+function snapshotLine(st: SymbolState): string | null {
+  const bids = topLevels(st.book.bids, true, 25);
+  const asks = topLevels(st.book.asks, false, 25);
   if (bids.length < 5 || asks.length < 5) return null;
   const bb = bids[0]!.p;
   const ba = asks[0]!.p;
@@ -65,55 +84,63 @@ function snapshotLine(): string | null {
   const b25 = sum(bids, 25), a25 = sum(asks, 25);
   const line = JSON.stringify({
     ts: Date.now(),
-    mid: Math.round(mid * 100) / 100,
+    mid: Math.round(mid * 10000) / 10000,
     spreadBps: Math.round(((ba - bb) / mid) * 1e6) / 100,
     bidDepth5: Math.round(b5 * 1000) / 1000,
     askDepth5: Math.round(a5 * 1000) / 1000,
     imb5: Math.round(((b5 - a5) / (b5 + a5)) * 1000) / 1000,
     imb25: Math.round(((b25 - a25) / (b25 + a25)) * 1000) / 1000,
-    buyVol: Math.round(buyVol * 1000) / 1000,
-    sellVol: Math.round(sellVol * 1000) / 1000,
-    tradeCount,
+    buyVol: Math.round(st.buyVol * 1000) / 1000,
+    sellVol: Math.round(st.sellVol * 1000) / 1000,
+    tradeCount: st.tradeCount,
     // forced-flow fields (liquidation-fade test, practitioner-mechanisms #3):
-    // liqBuy = shorts force-bought, liqSell = longs force-sold (BTC units)
-    liqBuy: Math.round(liqBuyVol * 1000) / 1000,
-    liqSell: Math.round(liqSellVol * 1000) / 1000,
-    liqCount,
+    // liqBuy = shorts force-bought, liqSell = longs force-sold (base units)
+    liqBuy: Math.round(st.liqBuyVol * 1000) / 1000,
+    liqSell: Math.round(st.liqSellVol * 1000) / 1000,
+    liqCount: st.liqCount,
   });
-  buyVol = 0; sellVol = 0; tradeCount = 0;
-  liqBuyVol = 0; liqSellVol = 0; liqCount = 0;
+  st.buyVol = 0; st.sellVol = 0; st.tradeCount = 0;
+  st.liqBuyVol = 0; st.liqSellVol = 0; st.liqCount = 0;
   return line;
+}
+
+/** Symbol = last dot-segment of a v5 topic (orderbook.50.BTCUSDT etc). */
+function topicSymbol(topic: string): string {
+  const parts = topic.split('.');
+  return parts[parts.length - 1] ?? '';
 }
 
 async function main(): Promise<void> {
   fs.mkdirSync(OUT_DIR, { recursive: true });
-  log(`BTC order-flow collector starting → ${OUT_DIR}`);
+  log(`order-flow collector starting → ${OUT_DIR} [${SYMBOLS.join(', ')}]${WITH_XAUT_OPTIONS ? ' + XAUT options poll' : ''}`);
 
   const ws = new WebsocketClient({ market: 'v5' });
 
   ws.on('update', (msg: { topic?: string; type?: string; data?: unknown }) => {
     if (!msg.topic) return;
+    const st = states.get(topicSymbol(msg.topic));
+    if (!st) return;
     if (msg.topic.startsWith('orderbook')) {
       const data = msg.data as { b: Array<[string, string]>; a: Array<[string, string]> };
       if (msg.type === 'snapshot') {
-        book.bids = {}; book.asks = {};
-        haveSnapshot = true;
+        st.book.bids = {}; st.book.asks = {};
+        st.haveSnapshot = true;
       }
-      applyDelta(book.bids, data.b ?? []);
-      applyDelta(book.asks, data.a ?? []);
+      applyDelta(st.book.bids, data.b ?? []);
+      applyDelta(st.book.asks, data.a ?? []);
     } else if (msg.topic.startsWith('publicTrade')) {
       const trades = msg.data as Array<{ S: 'Buy' | 'Sell'; v: string }>;
       for (const t of trades) {
         const v = parseFloat(t.v);
-        if (t.S === 'Buy') buyVol += v; else sellVol += v;
-        tradeCount++;
+        if (t.S === 'Buy') st.buyVol += v; else st.sellVol += v;
+        st.tradeCount++;
       }
     } else if (msg.topic.startsWith('allLiquidation')) {
       const liqs = msg.data as Array<{ S: 'Buy' | 'Sell'; v: string }>;
       for (const l of liqs) {
         const v = parseFloat(l.v);
-        if (l.S === 'Buy') liqBuyVol += v; else liqSellVol += v;
-        liqCount++;
+        if (l.S === 'Buy') st.liqBuyVol += v; else st.liqSellVol += v;
+        st.liqCount++;
       }
     }
   });
@@ -122,17 +149,29 @@ async function main(): Promise<void> {
   (ws as unknown as { on(event: 'error', cb: (e: unknown) => void): void })
     .on('error', (err) => log(`ws error: ${JSON.stringify(err).slice(0, 200)}`));
 
-  ws.subscribeV5([`orderbook.50.${SYMBOL}`, `publicTrade.${SYMBOL}`, `allLiquidation.${SYMBOL}`], 'linear');
+  const topics = SYMBOLS.flatMap((s) => [`orderbook.50.${s}`, `publicTrade.${s}`, `allLiquidation.${s}`]);
+  ws.subscribeV5(topics, 'linear');
 
   setInterval(() => {
-    if (!haveSnapshot) return;
-    const line = snapshotLine();
-    if (!line) return;
     const day = new Date().toISOString().slice(0, 10);
-    fs.appendFileSync(path.resolve(OUT_DIR, `${SYMBOL}_${day}.ndjson`), line + '\n');
+    for (const [symbol, st] of states) {
+      if (!st.haveSnapshot) continue;
+      const line = snapshotLine(st);
+      if (!line) continue;
+      fs.appendFileSync(path.resolve(OUT_DIR, `${symbol}_${day}.ndjson`), line + '\n');
+    }
   }, 1000);
 
-  log('subscribed; writing 1s snapshots');
+  if (WITH_XAUT_OPTIONS) {
+    const { snapshotXautOptions, XAUT_OPTIONS_INTERVAL_MS } = await import('./collect-xaut-options');
+    const poll = async (): Promise<void> => {
+      try { await snapshotXautOptions(); } catch (err) { log(`options poll error: ${err}`); }
+    };
+    void poll();
+    setInterval(() => { void poll(); }, XAUT_OPTIONS_INTERVAL_MS);
+  }
+
+  log(`subscribed ${topics.length} topics; writing 1s snapshots`);
 }
 
 main().catch((err) => {
