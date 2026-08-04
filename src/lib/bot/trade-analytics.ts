@@ -137,6 +137,47 @@ export function priceMove(
   return { value: raw / pipSize, unit: 'pips', pipSize };
 }
 
+/**
+ * Heat taken and best move offered, over the holding window.
+ *
+ * The stopless analogue of risk/reward. `maePct` is the worst unrealized loss
+ * (<= 0), `mfePct` the best unrealized gain (>= 0), and `capturedPct` how much
+ * of the favourable move the exit actually kept — the number that says whether
+ * a clock exit is leaving money on the table.
+ */
+export interface Excursion {
+  maePct: number;
+  mfePct: number;
+  /** null when there was no favourable move to capture — a ratio over zero. */
+  capturedPct: number | null;
+}
+
+export function computeExcursion(
+  candles: Array<{ timestamp: number; high: number; low: number }>,
+  direction: string,
+  entryPrice: number | null,
+  exitPrice: number | null,
+  entryTimestamp: number,
+  exitTimestamp: number,
+): Excursion | null {
+  if (entryPrice === null || entryPrice <= 0 || exitPrice === null) return null;
+  const held = candles.filter((c) => c.timestamp >= entryTimestamp && c.timestamp <= exitTimestamp);
+  if (held.length === 0) return null;
+  const high = Math.max(...held.map((c) => c.high));
+  const low = Math.min(...held.map((c) => c.low));
+  const short = direction === 'short';
+  // Favourable is up for a long, down for a short.
+  const best = short ? (entryPrice - low) / entryPrice : (high - entryPrice) / entryPrice;
+  const worst = short ? (entryPrice - high) / entryPrice : (low - entryPrice) / entryPrice;
+  const realized = short ? (entryPrice - exitPrice) / entryPrice : (exitPrice - entryPrice) / entryPrice;
+  const mfePct = Math.max(0, best);
+  return {
+    maePct: Math.min(0, worst),
+    mfePct,
+    capturedPct: mfePct > 0 ? realized / mfePct : null,
+  };
+}
+
 /** Pips rendered the way a platform shows them: grouped, and never false-precise. */
 export function formatPips(m: PriceMove): string {
   const abs = Math.abs(m.value);

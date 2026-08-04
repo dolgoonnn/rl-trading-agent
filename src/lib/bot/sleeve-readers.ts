@@ -6,6 +6,8 @@ import type { AnalyticsTrade } from './trade-analytics';
 // priceMove lives in the PURE module so client components can import it without
 // dragging better-sqlite3 into the browser bundle.
 export { priceMove, formatPips, type PriceMove } from './trade-analytics';
+import { computeExcursion, type Excursion } from './trade-analytics';
+export { computeExcursion, type Excursion };
 
 export function defaultDataDir(): string {
   return path.resolve('data');
@@ -879,6 +881,14 @@ export interface TradeChart {
   exitPrice: number | null;
   stopLoss: number | null;
   takeProfit: number | null;
+  /**
+   * Heat taken and best move offered while the position was open.
+   *
+   * Derived from the bars already fetched for the chart, so it costs nothing
+   * extra and works on every trade ever booked — including the stopless session
+   * legs, where it is the only risk number that exists.
+   */
+  excursion: Excursion | null;
 }
 
 /** Bars of context to show either side of the trade so the move reads in situ. */
@@ -888,7 +898,7 @@ const BAR_MS = 3_600_000;
 const NO_CHART: TradeChart = {
   available: false, reason: null, symbol: '', direction: '', candles: [],
   entryTimestamp: 0, exitTimestamp: 0, entryPrice: null, exitPrice: null,
-  stopLoss: null, takeProfit: null,
+  stopLoss: null, takeProfit: null, excursion: null,
 };
 
 /** Fetches OHLC for a venue symbol over a window. Injectable so tests need no network. */
@@ -987,7 +997,10 @@ export async function readTradeChart(
         return { ...base, reason: 'The venue returned no bars for this window.' };
       }
       const label = INSTRUMENT_LABEL[instrument] ?? venueSymbol;
-      return { ...base, available: true, candles, symbol: `${detail.symbol} · ${label}` };
+      return {
+        ...base, available: true, candles, symbol: `${detail.symbol} · ${label}`,
+        excursion: excursionFor(detail, candles),
+      };
     } catch {
       // Never let a flaky upstream break the drawer.
       return { ...base, reason: 'Could not reach the market-data provider.' };
@@ -1008,8 +1021,16 @@ export async function readTradeChart(
     if (rows.length === 0) {
       return { ...base, reason: 'No candles stored for this window.' };
     }
-    return { ...base, available: true, candles: rows };
+    return { ...base, available: true, candles: rows, excursion: excursionFor(detail, rows) };
   } finally {
     db.close();
   }
+}
+
+/** Excursion over the holding window, from whichever bar source the chart used. */
+function excursionFor(detail: TradeDetail, candles: ChartCandle[]): Excursion | null {
+  return computeExcursion(
+    candles, detail.direction, detail.entryPrice, detail.exitPrice,
+    detail.entryTimestamp, detail.exitTimestamp,
+  );
 }
