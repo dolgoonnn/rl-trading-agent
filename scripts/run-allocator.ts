@@ -37,6 +37,7 @@ import {
   decideBookGovernance,
   writeBookGovernanceSignal,
 } from '../src/lib/bot/book-governance';
+import { reviseSharpe } from '../src/lib/bot/sharpe-revision';
 import { BOOK_GOVERNANCE_CONFIG } from '../src/lib/bot/config';
 
 // ============================================
@@ -420,6 +421,20 @@ function main(): void {
   );
   console.log(`\nBOOK GOVERNANCE: ${action.toUpperCase()} ×${multiplier} — ${reason}`);
   console.log(`  book: 30d Sharpe ${bookState.bookSharpe30 ?? '—'}, 60d Sharpe ${bookState.bookSharpe60 ?? '—'}, DD ${(bookState.bookDrawdown * 100).toFixed(1)}%, days ${bookState.days}`);
+  // The drawdown depths that decide — printed every run so they are known in
+  // advance rather than discovered during a drawdown.
+  const rev = reviseSharpe({
+    drawdown: bookState.bookDrawdown,
+    assumedSharpe: BOOK_GOVERNANCE_CONFIG.sharpe,
+    annualizedVol: BOOK_GOVERNANCE_CONFIG.sigmaAnnual,
+    alpha: BOOK_GOVERNANCE_CONFIG.revisionAlpha,
+    minAllocatableSharpe: BOOK_GOVERNANCE_CONFIG.minAllocatableSharpe,
+  });
+  console.log(
+    `  revision: typical DD ${(rev.medianDrawdown * 100).toFixed(1)}% · de-risk at ${(rev.rejectAtDrawdown * 100).toFixed(1)}% · cut at ${(rev.cutAtDrawdown * 100).toFixed(1)}%` +
+    `${rev.impliedSharpe === null ? '' : ` · Sharpe now capped at ${rev.impliedSharpe.toFixed(2)}`}` +
+    `${bookState.bookVolAnnualized === null ? '' : ` · realized vol ${(bookState.bookVolAnnualized * 100).toFixed(1)}% vs target ${(BOOK_GOVERNANCE_CONFIG.sigmaAnnual * 100).toFixed(1)}%`}`,
+  );
 
   const outPath = path.resolve(__dirname, '..', 'experiments', 'runs', 'allocator-report.json');
   fs.writeFileSync(outPath, JSON.stringify({

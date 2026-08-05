@@ -110,7 +110,7 @@ describe('readBookGovernanceSignal', () => {
   it('fresh signal round-trips; stale ⇒ null; missing ⇒ null', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bookgov-'));
     const now = 1_000_000_000_000;
-    writeBookGovernanceSignal(dir, { action: 'derisk', multiplier: 0.5, reason: 'x', asOfMs: now, bookSharpe30: -0.2, bookSharpe60: -1.3, bookDrawdown: 0.05, days: 100 });
+    writeBookGovernanceSignal(dir, { action: 'derisk', multiplier: 0.5, reason: 'x', asOfMs: now, bookSharpe30: -0.2, bookSharpe60: -1.3, bookDrawdown: 0.05, days: 100, bookVolAnnualized: 0.12 });
     expect(readBookGovernanceSignal(dir, now + 60_000, 90 * 60 * 1000)?.multiplier).toBe(0.5);
     expect(readBookGovernanceSignal(dir, now + 2 * 60 * 60 * 1000, 90 * 60 * 1000)).toBeNull(); // stale
     expect(readBookGovernanceSignal(path.join(dir, 'nope'), now, 90 * 60 * 1000)).toBeNull(); // missing

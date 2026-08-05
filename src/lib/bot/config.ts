@@ -314,6 +314,16 @@ export interface BookGovernanceConfig {
   bootstrapP5DD: number;
   /** A signal older than this (ms) is treated as STALE ⇒ fail-open. */
   signalMaxAgeMs: number;
+  /**
+   * One-sided significance for the drawdown-based Sharpe revision.
+   *
+   * Live returns cannot prove an edge in usable time — MinTRL scales as 1/SR²
+   * (~6 months for the book, >6 years for a single low-Sharpe leg). The
+   * drawdown CAN be judged fast, so the revision leg is what actually decides.
+   */
+  revisionAlpha: number;
+  /** Revised Sharpe below which a sleeve stops earning its allocation. */
+  minAllocatableSharpe: number;
 }
 
 export const BOOK_GOVERNANCE_CONFIG: BookGovernanceConfig = {
@@ -328,6 +338,8 @@ export const BOOK_GOVERNANCE_CONFIG: BookGovernanceConfig = {
   horizonYears: RETIREMENT_CONFIG.horizonYears,
   bootstrapP5DD: RETIREMENT_CONFIG.bootstrapP5DD,
   signalMaxAgeMs: 90 * 60 * 1000, // 90 min staleness window: the governor loop refreshes every 15 min (6x headroom)
+  revisionAlpha: 0.05,
+  minAllocatableSharpe: RETIREMENT_CONFIG.minAcceptableSharpe,
 };
 
 // ============================================

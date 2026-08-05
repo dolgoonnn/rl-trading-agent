@@ -8,6 +8,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { expectedMaxDD, hardKillDD } from '@/lib/bot/retirement';
+import { reviseSharpe } from '@/lib/bot/sharpe-revision';
 import type { BookGovernanceConfig } from '@/lib/bot/config';
 import { BOOK_GOVERNANCE_CONFIG } from '@/lib/bot/config';
 
@@ -20,6 +21,16 @@ export interface BookGovernanceInputs {
   bookSharpe60: number | null;
   bookDrawdown: number;
   days: number;
+  /**
+   * Realized annualized vol of the live book, when known.
+   *
+   * The revision leg deliberately tests against the FROZEN config vol, because
+   * the allocation was sized on that assumption — but a book running hotter
+   * than target produces deeper drawdowns for reasons that have nothing to do
+   * with edge decay. Carrying the realized figure into the reason string makes
+   * "which assumption broke" answerable at a glance instead of by re-derivation.
+   */
+  bookVolAnnualized?: number | null;
   config: BookGovernanceConfig;
 }
 
@@ -32,7 +43,7 @@ export interface BookGovernanceDecision {
 }
 
 export function decideBookGovernance(inputs: BookGovernanceInputs): BookGovernanceDecision {
-  const { bookSharpe30, bookSharpe60, bookDrawdown, days, config } = inputs;
+  const { bookSharpe30, bookSharpe60, bookDrawdown, days, bookVolAnnualized = null, config } = inputs;
   const eMaxDD = expectedMaxDD({
     sigmaAnnual: config.sigmaAnnual,
     sharpe: config.sharpe,
@@ -56,7 +67,41 @@ export function decideBookGovernance(inputs: BookGovernanceInputs): BookGovernan
     return { action: 'trade', multiplier: 1, reason: `cold book (days=${days} < ${config.minDays})`, watch: false, reviewRequired: false };
   }
 
-  // 2. BREACH (sustained 60d edge collapse) — auto de-risk + flag for review.
+  // 2. DRAWDOWN-BASED SHARPE REVISION — the leg that can actually decide.
+  //
+  // The Sharpe legs below need a track record we will not have for years
+  // (MinTRL ~ 1/SR²), so on their own this book would coast until the
+  // catastrophe stop. The drawdown is judgeable NOW: once it passes the depth
+  // that refutes the assumed Sharpe, the assumption — not the market — is what
+  // has been falsified, and the allocation was sized on that assumption.
+  //
+  // Deliberately does NOT hard-halt. Removing a sleeve is portfolio
+  // construction, not risk control; this de-risks and demands a human review,
+  // and the absolute-drawdown stop above keeps sole ownership of halting.
+  const revision = reviseSharpe({
+    drawdown: bookDrawdown,
+    assumedSharpe: config.sharpe,
+    annualizedVol: config.sigmaAnnual,
+    alpha: config.revisionAlpha,
+    minAllocatableSharpe: config.minAllocatableSharpe,
+  });
+  if (revision.verdict !== 'consistent') {
+    // Name the hotter-than-designed case explicitly: the same drawdown means
+    // something different if the book is running at double its target vol.
+    const volNote =
+      bookVolAnnualized !== null && bookVolAnnualized > config.sigmaAnnual * 1.25
+        ? ` — NOTE realized vol ${(bookVolAnnualized * 100).toFixed(1)}% vs target ${(config.sigmaAnnual * 100).toFixed(1)}%, so check sizing before edge`
+        : '';
+    return {
+      action: 'derisk',
+      multiplier: config.deriskMultiplier,
+      reason: `book Sharpe REVISION (${revision.verdict}): ${revision.reason}${volNote}`,
+      watch: false,
+      reviewRequired: true,
+    };
+  }
+
+  // 3. BREACH (sustained 60d edge collapse) — auto de-risk + flag for review.
   if (bookSharpe60 !== null && bookSharpe60 < config.breachSharpe60) {
     return {
       action: 'derisk',
@@ -67,7 +112,7 @@ export function decideBookGovernance(inputs: BookGovernanceInputs): BookGovernan
     };
   }
 
-  // 3. WATCH (30d soft) — OBSERVE only, a flat stretch is normal.
+  // 4. WATCH (30d soft) — OBSERVE only, a flat stretch is normal.
   const watch = bookSharpe30 !== null && bookSharpe30 < config.watchSharpe30;
   return {
     action: 'trade',
@@ -92,6 +137,8 @@ export interface BookGovernanceState {
   bookSharpe60: number | null;
   bookDrawdown: number;
   days: number;
+  /** Realized annualized vol of the book series; null until there are 2+ days. */
+  bookVolAnnualized: number | null;
 }
 
 export interface BookGovernanceSignal extends BookGovernanceState {
@@ -169,6 +216,7 @@ export function computeBookGovernanceState(
     bookSharpe30: last30.length >= min30 ? annSharpe(last30) : null,
     bookSharpe60: last60.length >= min60 ? annSharpe(last60) : null,
     bookDrawdown: maxdd,
+    bookVolAnnualized: book.length >= 2 ? std(book) * Math.sqrt(252) : null,
   };
 }
 
