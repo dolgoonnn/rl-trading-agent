@@ -179,6 +179,36 @@ function openPosition(state: BotState, p: Position): void {
  */
 export const CORRELATED_PAIR_WEIGHT = 0.5;
 
+/**
+ * Disaster brake for the stopless session legs. NOT a trading stop.
+ *
+ * These legs exit on a clock and place no stop, which the data says is correct
+ * at ordinary distances: simulated over 1,662 nights of gold/silver minute bars
+ * (2020-2026), a 0.25% stop cuts gold's total from +39.1% to +13.3%, fires on
+ * 49% of nights, and in 56% of those the untouched trade would have finished
+ * BETTER than the stop price. Tight stops here convert noise into realised loss.
+ *
+ * What the clock does not bound is the tail. The worst untouched night was
+ * -6.57% (gold) and -11.65% (silver), taken naked. At 3% the brake fires on
+ * 0.4% of nights — outside all normal noise — so it caps that tail without
+ * touching the edge. On gold the same simulation improved both total (+44.4%)
+ * and Sharpe (0.80 vs 0.66); treat the return effect as incidental, since it
+ * rests on ~7 nights and assumes a fill AT the level, which a real gap beats.
+ * The RISK case does not depend on that sample.
+ */
+export const CATASTROPHE_STOP_PCT = 0.03;
+
+export function catastropheStopPrice(side: 'long' | 'short', entryPrice: number): number {
+  return side === 'long'
+    ? entryPrice * (1 - CATASTROPHE_STOP_PCT)
+    : entryPrice * (1 + CATASTROPHE_STOP_PCT);
+}
+
+export function catastropheStopHit(side: 'long' | 'short', entryPrice: number, price: number): boolean {
+  const level = catastropheStopPrice(side, entryPrice);
+  return side === 'long' ? price < level : price > level;
+}
+
 /** Legs that run gold AND silver simultaneously as a single correlated bet. */
 const CORRELATED_PAIR_LEGS = new Set(['overnight', 'weekend']);
 
@@ -266,6 +296,13 @@ async function tick(state: BotState): Promise<void> {
     // from strategy attribution. Dormant in normal operation.
     if (isStrandedHold(pos.leg, now - pos.entryTime)) {
       closePosition(state, pos, q.price, true);
+      continue;
+    }
+    // Disaster brake before any clock rule: the clock bounds how LONG a losing
+    // position is held, never how FAR it goes. Fires ~0.4% of nights by design.
+    if (catastropheStopHit(pos.side, pos.entryPrice, q.price)) {
+      console.log(`[metals] CATASTROPHE STOP ${pos.leg}/${pos.metal} ${pos.side} entry ${pos.entryPrice} mark ${q.price}`);
+      closePosition(state, pos, q.price);
       continue;
     }
     if ((pos.leg === 'overnight' || pos.leg === 'weekend')
