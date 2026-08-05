@@ -418,13 +418,40 @@ export function readEquityCurve(dataDir: string = defaultDataDir()): EquityCurve
   return { crypto, currentEquity: cur };
 }
 
-export interface Freshness { cryptoLatestCandleMs: number | null; goldStateMtimeMs: number | null; metalsStateMtimeMs: number | null }
+export interface SleeveLiveness {
+  sleeve: string;
+  /** Most recent write from this bot (ms epoch); null when it has never written. */
+  lastWriteMs: number | null;
+  /** Silence beyond this means the process is presumed dead. */
+  staleAfterMs: number;
+}
+
+export interface Freshness { sleeves: SleeveLiveness[] }
+
+const H = 3_600_000;
+
+/**
+ * One row per sleeve — the single place liveness is defined.
+ *
+ * A sleeve with no entry here is a sleeve whose death is invisible, which is
+ * exactly how the LETF bot went weeks with nobody able to say whether it was
+ * running. The staleness threshold lives here rather than in the UI because
+ * only this layer knows each bot's write cadence: metals and LETF save state
+ * every 30s tick, crypto polls candles hourly, the gold bot runs once a day.
+ */
+export const SLEEVE_LIVENESS: Array<{ sleeve: string; stateFile: string | null; staleAfterMs: number }> = [
+  { sleeve: 'crypto', stateFile: null, staleAfterMs: 3 * H },   // read from bot_candles
+  { sleeve: 'gold', stateFile: 'gold-bot-state.json', staleAfterMs: 36 * H },
+  { sleeve: 'metals', stateFile: 'metals-bot-state.json', staleAfterMs: 2 * H },
+  { sleeve: 'letf', stateFile: 'letf-bot-state.json', staleAfterMs: 2 * H },
+];
 
 function mtimeMs(p: string): number | null {
   try { return fs.statSync(p).mtimeMs; } catch { return null; }
 }
 
 export function readFreshness(dataDir: string = defaultDataDir()): Freshness {
+  // Crypto keeps no state file — its heartbeat is the candle it last stored.
   let cryptoLatestCandleMs: number | null = null;
   const db = openReadonly(dataDir);
   if (db) {
@@ -438,9 +465,11 @@ export function readFreshness(dataDir: string = defaultDataDir()): Freshness {
     }
   }
   return {
-    cryptoLatestCandleMs,
-    goldStateMtimeMs: mtimeMs(path.join(dataDir, 'gold-bot-state.json')),
-    metalsStateMtimeMs: mtimeMs(path.join(dataDir, 'metals-bot-state.json')),
+    sleeves: SLEEVE_LIVENESS.map(({ sleeve, stateFile, staleAfterMs }) => ({
+      sleeve,
+      lastWriteMs: stateFile === null ? cryptoLatestCandleMs : mtimeMs(path.join(dataDir, stateFile)),
+      staleAfterMs,
+    })),
   };
 }
 
