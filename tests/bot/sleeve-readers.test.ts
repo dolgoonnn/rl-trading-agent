@@ -207,8 +207,8 @@ describe('curve/freshness/governance readers', () => {
   });
 
   it('reports freshness nulls on a fresh volume', () => {
-    const f = readFreshness(dir);
-    expect(f.cryptoLatestCandleMs).toBeNull();
+    const crypto = readFreshness(dir).sleeves.find((s) => s.sleeve === 'crypto');
+    expect(crypto?.lastWriteMs).toBeNull();
   });
 });
 

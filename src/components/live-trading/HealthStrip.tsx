@@ -41,11 +41,11 @@ export function HealthStrip() {
         ? { cls: 'border-amber-500/50 bg-amber-500/15 text-amber-300', label: 'de-risking' }
         : { cls: 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300', label: 'trading' };
 
-  const feeds = [
-    { name: 'crypto', ms: d.freshness.cryptoLatestCandleMs, staleAfterMs: 3 * 3_600_000 },
-    { name: 'gold', ms: d.freshness.goldStateMtimeMs, staleAfterMs: 36 * 3_600_000 },
-    { name: 'metals', ms: d.freshness.metalsStateMtimeMs, staleAfterMs: 2 * 3_600_000 },
-  ];
+  // Sleeves and their staleness thresholds come from the reader — the UI must
+  // not hold its own list, or a new sleeve gets a dashboard with no heartbeat.
+  const feeds = d.freshness.sleeves.map((s) => ({
+    name: s.sleeve, ms: s.lastWriteMs, staleAfterMs: s.staleAfterMs,
+  }));
   const stale = feeds.filter((f) => f.ms !== null && Date.now() - f.ms > f.staleAfterMs);
   const missing = feeds.filter((f) => f.ms === null);
   const allWell = stale.length === 0 && missing.length === 0 && gov.action === 'trade';
