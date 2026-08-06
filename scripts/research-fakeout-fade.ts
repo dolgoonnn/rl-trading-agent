@@ -81,6 +81,8 @@ function atr(bars: Bar[], period: number): number[] {
   return out;
 }
 
+export { loadM5, atr };
+
 export type Trigger = 'run-exhaust' | 'fade-break' | 'break-cont' | 'inside-break';
 
 export interface Params {
@@ -93,6 +95,9 @@ export interface Params {
   maxConcurrent: number;  // his chart shows overlapping positions
   mode: 'fixed' | 'atr';
   costPerSide: number;
+  /** Optional UTC entry-hour gate. Entry hour, never exit hour — you cannot
+   *  know at entry when a bracket will fill, so gating on exit is not tradeable. */
+  hours?: number[];
 }
 
 export interface Result {
@@ -101,9 +106,12 @@ export interface Result {
   perDay: number; tradesPerDay: number; days: number;
 }
 
-interface Pos { dir: 1 | -1; entry: number; tp: number; sl: number; flips: number }
+interface Pos { dir: 1 | -1; entry: number; tp: number; sl: number; flips: number; entryHour: number }
 
-export function run(bars: Bar[], a: number[], p: Params, from: number, to: number): Result {
+/** Per-trade record, so results can be conditioned on the state at entry. */
+export interface TradeRec { t: number; dir: 1 | -1; pnl: number; atr: number; hour: number }
+
+export function run(bars: Bar[], a: number[], p: Params, from: number, to: number, log?: TradeRec[]): Result {
   const rets: number[] = [];
   let cost = 0;
   const dayset = new Set<string>();
@@ -113,12 +121,12 @@ export function run(bars: Bar[], a: number[], p: Params, from: number, to: numbe
   // Box state for the box-based triggers.
   let boxHi = 0, boxLo = 0, boxOk = false, brokeUp = false, brokeDn = false;
 
-  const bracket = (dir: 1 | -1, px: number, atrNow: number, flips: number): Pos => {
+  const bracket = (dir: 1 | -1, px: number, atrNow: number, flips: number, hourAt: number): Pos => {
     const tpD = p.mode === 'fixed' ? p.tp : p.tp * atrNow;
     const slD = tpD * p.slMult;
     cost += p.costPerSide * 2;
     return {
-      dir, entry: px, flips,
+      dir, entry: px, flips, entryHour: hourAt,
       tp: dir === 1 ? px + tpD : px - tpD,
       sl: dir === 1 ? px - slD : px + slD,
     };
@@ -135,7 +143,9 @@ export function run(bars: Bar[], a: number[], p: Params, from: number, to: numbe
     // ---- fill anything queued on the previous bar, at THIS bar's open ----
     while (pending.length > 0) {
       const q = pending.shift()!;
-      if (open.length < p.maxConcurrent) open.push(bracket(q.dir, b.o, atrNow, q.flips));
+      const hourAt = new Date(b.t).getUTCHours();
+      if (p.hours && !p.hours.includes(hourAt)) continue;
+      if (open.length < p.maxConcurrent) open.push(bracket(q.dir, b.o, atrNow, q.flips, hourAt));
     }
 
     // ---- manage open positions ----
@@ -144,7 +154,9 @@ export function run(bars: Bar[], a: number[], p: Params, from: number, to: numbe
       const hitSL = pos.dir === 1 ? b.l <= pos.sl : b.h >= pos.sl;
       const hitTP = pos.dir === 1 ? b.h >= pos.tp : b.l <= pos.tp;
       if (hitSL) {
-        rets.push(-Math.abs(pos.entry - pos.sl) - p.costPerSide * 2);
+        const pnl = -Math.abs(pos.entry - pos.sl) - p.costPerSide * 2;
+        rets.push(pnl);
+        log?.push({ t: b.t, dir: pos.dir, pnl, atr: atrNow, hour: pos.entryHour });
         // `RV guard reflip` — reverse into the move that stopped us.
         if (pos.flips < p.maxReflips) {
           pending.push({ dir: (pos.dir === 1 ? -1 : 1) as 1 | -1, flips: pos.flips + 1 });
@@ -152,7 +164,9 @@ export function run(bars: Bar[], a: number[], p: Params, from: number, to: numbe
         continue;
       }
       if (hitTP) {
-        rets.push(Math.abs(pos.tp - pos.entry) - p.costPerSide * 2);
+        const pnl = Math.abs(pos.tp - pos.entry) - p.costPerSide * 2;
+        rets.push(pnl);
+        log?.push({ t: b.t, dir: pos.dir, pnl, atr: atrNow, hour: pos.entryHour });
         continue;
       }
       still.push(pos);
@@ -342,4 +356,4 @@ function main(): void {
   console.log(`  => ${maxFitT < expectedMaxT ? 'BELOW the noise expectation — the fit-window result is what a search this wide produces from nothing' : 'above the noise expectation'}`);
 }
 
-main();
+if (require.main === module) main();
