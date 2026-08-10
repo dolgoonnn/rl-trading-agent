@@ -13,6 +13,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import Database from 'better-sqlite3';
 import { readRecentTrades } from '../../src/lib/bot/sleeve-readers';
 import { priceMove } from '../../src/lib/bot/trade-analytics';
 
@@ -110,5 +111,29 @@ describe('priceMove — pips, every instrument', () => {
     expect(priceMove(null, 'long', 100, 101)).toBeNull();
     expect(priceMove('gold', 'long', null, 101)).toBeNull();
     expect(priceMove('dogeusdt', 'long', 1, 2)).toBeNull();
+  });
+});
+
+describe('crypto rows carry an instrument too', () => {
+  it('derives it from the symbol so the Move column is not blank', () => {
+    // The list and the detail view must agree. readTradeDetail derived the
+    // instrument while readRecentTrades hardcoded null, so crypto trades were
+    // present in the table but rendered with no badge and no Move — they read
+    // as broken rows beside session legs that all showed pips.
+    const db = new Database(path.join(dir, 'ict-trading.db'));
+    db.exec(`CREATE TABLE bot_trades (id TEXT PRIMARY KEY, symbol TEXT, direction TEXT,
+      entry_price REAL, exit_price REAL, entry_timestamp INTEGER, exit_timestamp INTEGER,
+      pnl_percent REAL, pnl_usdt REAL, exit_reason TEXT)`);
+    db.prepare('INSERT INTO bot_trades VALUES (?,?,?,?,?,?,?,?,?,?)').run(
+      'c1', 'ETHUSDT', 'short', 1864.81, 1901.88, 1, 2, -0.0199, -1.09, 'max_bars',
+    );
+    db.close();
+    const row = readRecentTrades(10, dir).find((r) => r.sleeve === 'crypto')!;
+    expect(row.instrument).toBe('ethusdt');
+    const m = priceMove(row.instrument, row.direction, row.entryPrice, row.exitPrice);
+    expect(m).not.toBeNull();
+    expect(m!.unit).toBe('pips');
+    // Short that moved against it: negative.
+    expect(m!.value).toBeLessThan(0);
   });
 });
