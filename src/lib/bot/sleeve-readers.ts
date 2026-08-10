@@ -330,7 +330,12 @@ export function readRecentTrades(limit: number, dataDir: string = defaultDataDir
           const num = (k: string): number | null => (typeof raw[k] === 'number' ? (raw[k] as number) : null);
           const str = (k: string): string => (typeof raw[k] === 'string' ? (raw[k] as string) : '');
           out.push({
-            id: str('id'), sleeve: 'crypto', symbol: str('symbol'), instrument: null,
+            // Derive the instrument here exactly as readTradeDetail does. Left
+            // as null, every crypto row rendered with no Move while all the
+            // session rows showed pips — the trades WERE listed, they just
+            // looked like empty rows next to everything else.
+            id: str('id'), sleeve: 'crypto', symbol: str('symbol'),
+            instrument: str('symbol').toLowerCase() || null,
             direction: str('direction'),
             entryTimestamp: num('entry_timestamp') ?? 0,
             exitTimestamp: num('exit_timestamp') ?? 0,
