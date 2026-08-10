@@ -22,7 +22,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { pruneArchive, hasHeadroom, diskStatus } from '../../src/lib/bot/disk-guard';
+import { pruneArchive, hasHeadroom, diskStatus, ensureFreeSpace } from '../../src/lib/bot/disk-guard';
 
 let dir: string;
 beforeEach(() => { dir = fs.mkdtempSync(path.join(os.tmpdir(), 'disk-')); });
@@ -79,6 +79,50 @@ describe('pruneArchive', () => {
     const r = pruneArchive(path.join(dir, 'nope'), { maxAgeDays: 1, maxTotalBytes: 1 });
     expect(r.deleted).toEqual([]);
     expect(r.freedBytes).toBe(0);
+  });
+});
+
+describe('ensureFreeSpace — the recovery primitive', () => {
+  it('does nothing when the target is already met', () => {
+    seed('a.ndjson', 1000, 5);
+    // 1 byte of free space is always available on a working disk.
+    const r = ensureFreeSpace(dir, 1);
+    expect(r.deleted).toEqual([]);
+    expect(r.ok).toBe(true);
+    expect(fs.existsSync(path.join(dir, 'a.ndjson'))).toBe(true);
+  });
+
+  it('reports honestly when it cannot reach the target', () => {
+    seed('a.ndjson', 1000, 5);
+    // Demanding more than the whole disk can never succeed — and must not
+    // pretend otherwise, since the caller decides whether to start the fleet.
+    const total = diskStatus(dir).totalBytes;
+    const r = ensureFreeSpace(dir, total * 2);
+    expect(r.ok).toBe(false);
+  });
+
+  it('deletes oldest-first while chasing the target', () => {
+    seed('old.ndjson', 1000, 9);
+    seed('new.ndjson', 1000, 1);
+    const total = diskStatus(dir).totalBytes;
+    const r = ensureFreeSpace(dir, total * 2); // unreachable => deletes everything
+    expect(r.deleted[0]).toBe('old.ndjson');
+  });
+
+  it('still refuses to touch the live book, even chasing an impossible target', () => {
+    fs.writeFileSync(path.join(dir, 'ict-trading.db'), 'x'.repeat(10_000));
+    fs.writeFileSync(path.join(dir, 'metals-bot-state.json'), 'x'.repeat(10_000));
+    seed('a.ndjson', 1000, 5);
+    const total = diskStatus(dir).totalBytes;
+    ensureFreeSpace(dir, total * 2);
+    expect(fs.existsSync(path.join(dir, 'ict-trading.db'))).toBe(true);
+    expect(fs.existsSync(path.join(dir, 'metals-bot-state.json'))).toBe(true);
+  });
+
+  it('treats an unmeasurable disk as ok rather than deleting blindly', () => {
+    const r = ensureFreeSpace(path.join(dir, 'missing'), 1e15);
+    expect(r.ok).toBe(true);
+    expect(r.deleted).toEqual([]);
   });
 });
 
