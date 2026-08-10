@@ -16,6 +16,17 @@ set -e
 echo "=== Starting ICT paper fleet (5 processes) ==="
 mkdir -p /app/data /app/logs
 
+# 0. Make the volume writable BEFORE any bot opens the database.
+#
+# 2026-08-10: the volume filled, the crypto bot (started first, below) died on
+# SQLITE_FULL during its startup state save, the supervisor exited, and Railway
+# restart-looped until it gave up routing to the service. Cleanup inside the
+# collector cannot help — the collector is 5th to start and the container is
+# already dying by then. This has to run first, and it must not be able to
+# abort the boot (|| true): a cleanup failure should never be the reason the
+# fleet does not start.
+npx tsx scripts/prepare-volume.ts || true
+
 # 1. Crypto forward bot (Run 20, BTC/ETH/SOL, paper-forward, resumes state)
 npx tsx scripts/run-bot.ts --mode paper-forward --symbols BTCUSDT,ETHUSDT,SOLUSDT --resume &
 CRYPTO_PID=$!

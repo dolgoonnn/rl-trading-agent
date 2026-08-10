@@ -128,3 +128,70 @@ export const ARCHIVE_BUDGET: PruneOptions = { maxAgeDays: 14, maxTotalBytes: 1_0
 
 /** Free space held back for the core trading processes — never written into. */
 export const CORE_RESERVE_BYTES = 500_000_000;
+
+export interface EnsureResult extends PruneResult {
+  freeBefore: number;
+  freeAfter: number;
+  /** True when the target was met (or was already met, or is unmeasurable). */
+  ok: boolean;
+}
+
+/**
+ * Free disk until `targetFreeBytes` is available, deleting oldest archive files.
+ *
+ * THIS is the recovery primitive, and it targets FREE SPACE rather than archive
+ * size for a reason the first attempt at this fix got wrong: an absolute cap
+ * ("keep the archive under 1 GB") frees NOTHING on a full 1 GB volume where
+ * every file is recent. The only budget that reliably recovers a wedged volume
+ * is one expressed in the quantity that actually ran out.
+ *
+ * Returns ok=true when it cannot measure the disk — an unmeasurable disk must
+ * not cause an unbounded delete loop.
+ */
+export function ensureFreeSpace(dir: string, targetFreeBytes: number): EnsureResult {
+  const before = diskStatus(dir).freeBytes;
+  const base: EnsureResult = {
+    deleted: [], freedBytes: 0, remainingBytes: 0,
+    freeBefore: before, freeAfter: before, ok: true,
+  };
+  if (!Number.isFinite(before)) return base;
+  if (before >= targetFreeBytes) return base;
+
+  let entries: Array<{ name: string; size: number; mtimeMs: number }>;
+  try {
+    entries = fs.readdirSync(dir)
+      .filter((n) => n.endsWith(ARCHIVE_EXT))
+      .map((name) => {
+        const st = fs.statSync(path.join(dir, name));
+        return { name, size: st.size, mtimeMs: st.mtimeMs };
+      })
+      .sort((a, b) => a.mtimeMs - b.mtimeMs); // oldest first
+  } catch {
+    return { ...base, ok: false };
+  }
+
+  const deleted: string[] = [];
+  let freedBytes = 0;
+  for (const e of entries) {
+    if (diskStatus(dir).freeBytes >= targetFreeBytes) break;
+    try {
+      fs.unlinkSync(path.join(dir, e.name));
+      deleted.push(e.name);
+      freedBytes += e.size;
+    } catch { /* nothing useful to do */ }
+  }
+
+  const after = diskStatus(dir).freeBytes;
+  let remainingBytes = 0;
+  try {
+    for (const n of fs.readdirSync(dir)) {
+      if (n.endsWith(ARCHIVE_EXT)) remainingBytes += fs.statSync(path.join(dir, n)).size;
+    }
+  } catch { /* best effort */ }
+
+  return {
+    deleted, freedBytes, remainingBytes,
+    freeBefore: before, freeAfter: after,
+    ok: !Number.isFinite(after) || after >= targetFreeBytes,
+  };
+}
