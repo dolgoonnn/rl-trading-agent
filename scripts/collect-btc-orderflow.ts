@@ -20,12 +20,20 @@
  * legacy singular ORDERFLOW_SYMBOL is honored too).
  *
  * This is a COLLECTOR only — analysis comes after days of data accumulate.
- * Daily file rotation; ~1-2 MB/day/symbol.
+ *
+ * DISK: daily file rotation at ~13 MB/day/symbol (MEASURED — an earlier note
+ * here claimed 1-2 MB/day and was 7-13x low, which is how the archive silently
+ * filled the Railway volume on 2026-08-10, killed the CORE trading process with
+ * SQLITE_FULL and took the whole book offline). The archive is now bounded by
+ * `disk-guard` and refuses to write into the reserve held for the core
+ * processes: this collector is research, and research must never be able to
+ * stop live trading.
  */
 
 import * as fs from 'fs';
 import * as path from 'path';
 import { WebsocketClient } from 'bybit-api';
+import { pruneArchive, hasHeadroom, diskStatus, ARCHIVE_BUDGET, CORE_RESERVE_BYTES } from '../src/lib/bot/disk-guard';
 
 const OUT_DIR = path.resolve(__dirname, '..', 'data', 'orderflow');
 const SYMBOLS = (process.env.ORDERFLOW_SYMBOLS ?? process.env.ORDERFLOW_SYMBOL ?? 'BTCUSDT')
@@ -152,13 +160,52 @@ async function main(): Promise<void> {
   const topics = SYMBOLS.flatMap((s) => [`orderbook.50.${s}`, `publicTrade.${s}`, `allLiquidation.${s}`]);
   ws.subscribeV5(topics, 'linear');
 
+  // Prune BEFORE the first write so a redeploy onto a full volume heals itself
+  // rather than needing someone to shell in and delete files by hand.
+  const prune = (): void => {
+    const r = pruneArchive(OUT_DIR, ARCHIVE_BUDGET);
+    const d = diskStatus(OUT_DIR);
+    if (r.deleted.length > 0) {
+      log(`pruned ${r.deleted.length} archive files, freed ${(r.freedBytes / 1e6).toFixed(0)}MB ` +
+        `(archive now ${(r.remainingBytes / 1e6).toFixed(0)}MB)`);
+    }
+    if (Number.isFinite(d.freeBytes)) {
+      log(`disk: ${(d.freeBytes / 1e6).toFixed(0)}MB free of ${(d.totalBytes / 1e6).toFixed(0)}MB`);
+    }
+  };
+  prune();
+  setInterval(prune, 60 * 60 * 1000);
+
+  // Latch so a full disk logs once, not once per second.
+  let paused = false;
   setInterval(() => {
+    // The reserve belongs to the trading processes. Collection stops at the
+    // fence; it does not get to spend the last bytes the book needs to save
+    // state. Re-checked each tick so it resumes on its own once pruning frees
+    // space — no restart required.
+    if (!hasHeadroom(OUT_DIR, CORE_RESERVE_BYTES)) {
+      if (!paused) {
+        log(`PAUSED — free space under the ${(CORE_RESERVE_BYTES / 1e6).toFixed(0)}MB core reserve; not writing`);
+        paused = true;
+        prune();
+      }
+      return;
+    }
+    if (paused) { log('resumed — free space recovered'); paused = false; }
+
     const day = new Date().toISOString().slice(0, 10);
     for (const [symbol, st] of states) {
       if (!st.haveSnapshot) continue;
       const line = snapshotLine(st);
       if (!line) continue;
-      fs.appendFileSync(path.resolve(OUT_DIR, `${symbol}_${day}.ndjson`), line + '\n');
+      try {
+        fs.appendFileSync(path.resolve(OUT_DIR, `${symbol}_${day}.ndjson`), line + '\n');
+      } catch (err) {
+        // A failed research write must never propagate — it used to reach the
+        // top level as ENOSPC and kill the process, restarting the container.
+        log(`write failed (${(err as { code?: string }).code ?? 'unknown'}) — skipping this snapshot`);
+        paused = true;
+      }
     }
   }, 1000);
 
