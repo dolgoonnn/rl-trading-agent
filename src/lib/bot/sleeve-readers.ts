@@ -46,12 +46,39 @@ function tableExists(db: Database.Database, name: string): boolean {
  */
 export const SLEEVE_STARTING_EQUITY = 10000;
 
+/**
+ * A crypto trade's return as a fraction of SLEEVE EQUITY.
+ *
+ * Falls back to the notional-relative figure when no dollar PnL was stored
+ * (older rows) — degrading to the previous number is better than reporting zero
+ * and hiding a real trade.
+ */
+function equityRelative(pnlUsdt: number | null, pnlPercent: number): number {
+  return typeof pnlUsdt === 'number' ? pnlUsdt / SLEEVE_STARTING_EQUITY : pnlPercent;
+}
+
 export function readCryptoSleeve(dataDir: string = defaultDataDir()): SleeveSummary {
   const db = openReadonly(dataDir);
   if (!db) return summarizeSleeve('crypto (Run 20)', [], 0, SLEEVE_STARTING_EQUITY);
   try {
+    // `pnl_percent` is return on POSITION NOTIONAL, and crypto sizes by risk —
+    // positions run $55-$389 on a $10,000 sleeve, so a -1.34% move on a $389
+    // position is -0.05% of equity, not -1.34%. Summing notional-relative
+    // percentages produced a sleeve figure 55x its real impact (-5.77% for
+    // -$10.48) and made this sleeve look like the book's worst detractor while
+    // the session legs moved 30x the money. Convert to EQUITY-relative via the
+    // stored dollar PnL so every sleeve percentage means the same thing.
+    // SELECT * and read defensively — a hard column list throws on older or
+    // partial schemas instead of degrading. Same trap as readOpenPositions and
+    // readRecentTrades; this is the third time it has bitten.
     const rows = tableExists(db, 'bot_trades')
-      ? (db.prepare('SELECT pnl_percent FROM bot_trades').all() as Array<{ pnl_percent: number }>)
+      ? (db.prepare('SELECT * FROM bot_trades').all() as Array<Record<string, unknown>>)
+          .map((r) => ({
+            pnl_percent: equityRelative(
+              typeof r.pnl_usdt === 'number' ? r.pnl_usdt : null,
+              typeof r.pnl_percent === 'number' ? r.pnl_percent : 0,
+            ),
+          }))
       : [];
     const state = tableExists(db, 'bot_state')
       ? (db.prepare('SELECT equity FROM bot_state WHERE id = 1').get() as { equity: number } | undefined)
@@ -773,8 +800,21 @@ export function readLegAttribution(dataDir: string = defaultDataDir()): LegAttri
   if (db) {
     try {
       if (tableExists(db, 'bot_trades')) {
-        const rows = db.prepare('SELECT strategy, pnl_percent FROM bot_trades').all() as Array<{ strategy: string; pnl_percent: number }>;
-        for (const r of rows) add(r.strategy, 'crypto', r.pnl_percent, false);
+        // Equity-relative, for the same reason as readCryptoSleeve: ranked on
+        // notional returns, a -$10 crypto leg outranked a +$337 session leg as
+        // "top detractor" and pointed the whole panel at the wrong sleeve.
+        const rows = db.prepare('SELECT * FROM bot_trades').all() as Array<Record<string, unknown>>;
+        for (const r of rows) {
+          add(
+            typeof r.strategy === 'string' ? r.strategy : 'unknown',
+            'crypto',
+            equityRelative(
+              typeof r.pnl_usdt === 'number' ? r.pnl_usdt : null,
+              typeof r.pnl_percent === 'number' ? r.pnl_percent : 0,
+            ),
+            false,
+          );
+        }
       }
     } finally {
       db.close();
