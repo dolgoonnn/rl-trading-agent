@@ -97,3 +97,13 @@
   dash-for-cash, OpEx week, ICT entry timing counted previously) → honest count ~247.
   Universe D (fix-gated book) = the September review package: combined Sharpe 2.61,
   5/5 gates. No live-book changes were made.
+- 2026-09-11 — 3-month review date. Cloud routine fired (trig_01Gx4HbtnrsStENw6LG9ng6k).
+  Bot state files (data/metals-bot-state.json, data/gold-bot-state.json, crypto bot DB)
+  were NOT committed to the repository before review — consistent with the dependency
+  warning in the 2026-06-11 log entry. Review written as a structured operator checklist
+  at experiments/paper-review-2026-09-11.md with every charter gate listed and
+  placeholders for live numbers. The allocator script was NOT run (no live state to feed
+  it). ACTION REQUIRED: operator must run `npx tsx scripts/run-allocator.ts`, fill in
+  all placeholders, apply FUND/DROP/EXTEND verdicts mechanically, and commit the
+  completed review. A flat result over this 3-month window is within pre-registered
+  expectations and is NOT a failure per this charter.
